@@ -1,14 +1,11 @@
 const express = require("express");
 const _ = express.Router();
 const { customError } = require("../../lib/CustomError");
+const { apiResponse } = require("../../utils/apiResponse");
 
-_.route("/auth").post(async (req, res) => {
+_.route("/signup").post(async (req, res) => {
   try {
-    res.status(200).json({
-      status: "success",
-      message: "Login successfull",
-      data: null,
-    });
+    apiResponse.success(200, "success", {});
   } catch (error) {
     throw new customError(error.message, 500);
   }
