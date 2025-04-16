@@ -1,6 +1,7 @@
 const multer = require("multer");
 const path = require("path");
 const { customError } = require("../lib/CustomError");
+const { log } = require("console");
 
 // Allowed file types
 const allowedExtensions = [".jpg", ".jpeg", ".png", ".webp"];
@@ -48,12 +49,9 @@ const singleFileUpload = (fieldName) => (req, res, next) => {
 
   uploader(req, res, function (err) {
     if (err instanceof multer.MulterError) {
-      throw new customError(
-        "Multer error: " + err.message || "Multer error",
-        500
-      );
+      throw new customError("Multer error: " + err || "Multer error", 500);
     } else if (err) {
-      throw new customError(err.message || "Multer error", 500);
+      throw new customError(err || "Multer error", 500);
     }
     next();
   });
@@ -62,23 +60,30 @@ const singleFileUpload = (fieldName) => (req, res, next) => {
 /**
  * Middleware wrapper for multiple file upload with clean error handling
  */
-const multipleFileUpload = (fieldName, maxCount) => (req, res, next) => {
-  const uploader = upload.array(fieldName, maxCount);
+const multipleFileUpload =
+  (fieldName, maxCount = 1) =>
+  (req, res, next) => {
+    const uploader = upload.array(fieldName, maxCount);
 
-  uploader(req, res, function (err) {
-    if (err instanceof multer.MulterError) {
-      // Handle Multer-specific errors
-      throw new customError(
-        "Multer error: " + err.message || "Multer error",
-        500
-      );
-    } else if (err) {
-      // Handle other errors
-      throw new customError(err.message || "File upload error", 500);
-    }
-    next();
-  });
-};
+    uploader(req, res, function (err) {
+      if (err instanceof multer.MulterError) {
+        // Handle Multer-specific errors
+        console.error("Multer multiple error:", err);
+        return res.status(400).json({
+          success: false,
+          message: "Multer error: " + (err.message || "File upload error"),
+        });
+      } else if (err) {
+        // Handle other errors
+        console.error("File upload error:", err);
+        return res.status(500).json({
+          success: false,
+          message: err.message || "Internal Server Error",
+        });
+      }
+      next();
+    });
+  };
 
 module.exports = {
   singleFileUpload,

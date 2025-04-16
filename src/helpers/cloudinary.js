@@ -1,7 +1,7 @@
 require("dotenv").config();
 const cloudinary = require("cloudinary").v2;
+const { log } = require("console");
 const fs = require("fs");
-const path = require("path");
 
 // Cloudinary configuration
 cloudinary.config({
@@ -22,20 +22,17 @@ const cloudinaryFileUpload = async (localFilePath) => {
   try {
     const result = await cloudinary.uploader.upload(localFilePath, {
       resource_type: "auto",
-      public_id: "taufik",
     });
 
     // Optimize delivery by resizing and applying auto-format and auto-quality
-    const optimizeUrl = cloudinary.url("taufik", {
+    const optimizeUrl = cloudinary.url(result.public_id, {
       fetch_format: "auto",
       quality: "auto",
     });
 
-    console.log("Cloudinary URL:", optimizeUrl);
-
     // Delete local file after upload
     fs.unlinkSync(localFilePath);
-    return result;
+    return { result, optimizeUrl };
   } catch (error) {
     console.error("Cloudinary Upload Error:", error.message);
 
@@ -59,7 +56,9 @@ const deleteCloudinaryFile = async (publicId) => {
   try {
     const result = await cloudinary.api.delete_resources([publicId], {
       type: "upload",
+      resource_type: "image",
     });
+    console.log("Cloudinary Delete Result:", result);
 
     return result;
   } catch (error) {
