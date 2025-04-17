@@ -16,4 +16,16 @@ _.route("/categories/:slug").put(
   multipleFileUpload("image", 1),
   Category.updateCategory
 );
+_.route("/categories/:slug").delete(Category.deleteCategory);
+_.route("/categories/:slug/activate").put(Category.activateCategory);
+_.route("/categories/:slug/deactivate").put(Category.deactivateCategory);
+// @desc   get all active categories
+_.route("/categories-active").get(Category.getActiveCategories);
+// @desc   get all inactive categories
+_.route("/categories-inactive").get(Category.getInactiveCategories);
+// @desc getCategoriesWithSearch using query
+_.route("/categories-search").get(Category.getCategoriesWithSearch);
+
+_.route("/categories-sort").get(Category.getCategoriesWithSort);
+
 module.exports = _;

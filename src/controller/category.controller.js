@@ -38,6 +38,7 @@ exports.getAllCategories = asynchandeler(async (req, res) => {
 exports.getCategoryBySlug = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const category = await Category.findOne({ slug, isActive: true });
+
   if (!category) {
     throw new customError("Category not found", 404);
   }
@@ -56,12 +57,19 @@ exports.updateCategory = asynchandeler(async (req, res) => {
   }
   let optimizeUrlCloudinary = null;
   // upload the image into cloudinary
-  if (req.files.length) {
+  if (req?.files?.length) {
     // delete the old image from cloudinary
-    const publicId = category.image.split("/").pop().split(".")[0];
-    console.log(category.image);
-    return;
+    const imageUrl = category.image;
+    // Regex to extract the ID
+    const regex = /\/([a-zA-Z0-9_-]+)\?/;
 
+    // Match the regex and extract the ID
+    const match = imageUrl.match(regex);
+    const publicId = match ? match[1] : null;
+
+    if (!publicId) {
+      throw new customError("Invalid image URL", 400);
+    }
     await deleteCloudinaryFile(publicId);
     // upload the new image into cloudinary
     const { optimizeUrl } = await cloudinaryFileUpload(req.files[0].path);
@@ -75,5 +83,106 @@ exports.updateCategory = asynchandeler(async (req, res) => {
   // send success response
   apiResponse.sendSuccess(res, 200, "Category updated successfully", {
     category,
+  });
+});
+
+// @desc    Delete a category by slug
+exports.deleteCategory = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+
+  // Find the category by slug and ensure it is active
+  const category = await Category.findOne({ slug, isActive: true });
+  if (!category) {
+    throw new customError("Category not found", 404);
+  }
+
+  // Delete the old image from Cloudinary
+  const imageUrl = category.image;
+  const regex = /\/([a-zA-Z0-9_-]+)\?/; // Regex to extract the ID
+  const match = imageUrl.match(regex);
+  const publicId = match ? match[1] : null;
+
+  if (!publicId) {
+    throw new customError("Invalid image URL", 400);
+  }
+
+  // Delete the image from Cloudinary
+  await deleteCloudinaryFile(publicId);
+
+  // Delete the category document from the database
+  await Category.findOneAndDelete({ slug, isActive: true });
+
+  // Send success response
+  apiResponse.sendSuccess(res, 200, "Category deleted successfully", {
+    slug,
+  });
+});
+
+// @desc activate a category by slug
+exports.activateCategory = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const category = await Category.findOne({ slug, isActive: false });
+  if (!category) {
+    throw new customError("Category not found", 404);
+  }
+  // now activate the category in the database
+  category.isActive = true;
+  await category.save();
+  // send success response
+  apiResponse.sendSuccess(res, 200, "Category activated successfully", {
+    category,
+  });
+});
+// @desc deactivate a category by slug
+exports.deactivateCategory = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const category = await Category.findOne({ slug, isActive: true });
+  if (!category) {
+    throw new customError("Category not found", 404);
+  }
+  // now deactivate the category in the database
+  category.isActive = false;
+  await category.save();
+  // send success response
+  apiResponse.sendSuccess(res, 200, "Category deactivated successfully", {
+    category,
+  });
+});
+// @desc get all active categories
+exports.getActiveCategories = asynchandeler(async (req, res) => {
+  const categories = await Category.find({ isActive: true });
+  // send success response
+  apiResponse.sendSuccess(res, 200, "Categories fetched successfully", {
+    categories,
+  });
+});
+// @desc get all inactive categories
+exports.getInactiveCategories = asynchandeler(async (req, res) => {
+  const categories = await Category.find({ isActive: false });
+  // send success response
+  apiResponse.sendSuccess(res, 200, "Categories fetched successfully", {
+    categories,
+  });
+});
+
+// @desc get all categories with search
+exports.getCategoriesWithSearch = asynchandeler(async (req, res) => {
+  const { search } = req.query;
+  const categories = await Category.find({
+    name: { $regex: search, $options: "i" },
+    isActive: true,
+  });
+  // send success response
+  apiResponse.sendSuccess(res, 200, "Categories fetched successfully", {
+    categories,
+  });
+});
+// @desc get all categories with sort
+exports.getCategoriesWithSort = asynchandeler(async (req, res) => {
+  const { sort } = req.query;
+  const categories = await Category.find({ isActive: true }).sort(sort);
+  // send success response
+  apiResponse.sendSuccess(res, 200, "Categories fetched successfully", {
+    categories,
   });
 });
