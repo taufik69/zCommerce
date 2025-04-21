@@ -85,7 +85,32 @@ const multipleFileUpload =
     });
   };
 
+// make a another funtion using upload.fields to upload multiple files with different field names
+const multipleFileUploadWithFields = (fields) => (req, res, next) => {
+  const uploader = upload.fields(fields);
+  uploader(req, res, function (err) {
+    if (err instanceof multer.MulterError) {
+      // Handle Multer-specific errors
+      console.error("Multer multiple error:", err);
+      return res.status(400).json({
+        success: false,
+        message: "Multer error: " + (err.message || "File upload error"),
+      });
+    } else if (err) {
+      // Handle other errors
+      console.error("File upload error:", err);
+      return res.status(500).json({
+        success: false,
+        message: err.message || "Internal Server Error",
+      });
+    }
+    next();
+  });
+};
+// Export the middleware functions
+
 module.exports = {
   singleFileUpload,
   multipleFileUpload,
+  multipleFileUploadWithFields,
 };

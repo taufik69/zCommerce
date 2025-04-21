@@ -9,6 +9,7 @@ const brandSchema = joi.object({
 
 exports.validateBrand = (req) => {
   const { error, value } = brandSchema.validate(req.body);
+
   if (!req.files || req.files.length === 0) {
     throw new customError("Please provide at least one image", 400);
   }
@@ -22,7 +23,7 @@ exports.validateBrand = (req) => {
     throw new customError("Image size should be less than 15MB", 400);
   }
 
-  if (req.files.length > 5) {
+  if (req.files.length > 10) {
     throw new customError("You can upload a maximum of 5 images", 400);
   }
 

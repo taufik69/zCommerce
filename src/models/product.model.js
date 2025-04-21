@@ -1,4 +1,6 @@
 const mongoose = require("mongoose");
+const { default: slugify } = require("slugify");
+const { customError } = require("../lib/CustomError");
 
 const productSchema = new mongoose.Schema(
   {
@@ -31,7 +33,6 @@ const productSchema = new mongoose.Schema(
     },
     thumbnail: {
       type: String,
-      required: true,
     },
     image: [
       {
@@ -40,7 +41,6 @@ const productSchema = new mongoose.Schema(
     ],
     slug: {
       type: String,
-      required: true,
       unique: true,
       lowercase: true,
       trim: true,
@@ -60,6 +60,33 @@ const productSchema = new mongoose.Schema(
     timestamps: true, // Automatically adds createdAt and updatedAt
   }
 );
+
+// make a slug from name  using slugify
+productSchema.pre("save", function (next) {
+  if (this.isModified("name")) {
+    this.slug = slugify(this.name, { lower: true, strict: true });
+  }
+  next();
+});
+
+// check if slug is unique
+productSchema.pre("save", async function (next) {
+  const existingProduct = await this.constructor.findOne({ slug: this.slug });
+  if (
+    existingProduct &&
+    existingProduct._id.toString() !== this._id.toString()
+  ) {
+    console.log(
+      `Product with slug ${this.slug} or ${this.name} already exists`
+    );
+
+    throw new customError(
+      `Product with slug ${this.slug} or ${this.name} already exists`,
+      400
+    );
+  }
+  next();
+});
 
 const Product = mongoose.model("Product", productSchema);
 

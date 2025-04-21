@@ -11,15 +11,16 @@ const brandSchema = new mongoose.Schema(
     },
     slug: {
       type: String,
-      required: true,
       unique: true,
       lowercase: true,
       trim: true,
     },
-    image: {
-      type: String,
-      required: true,
-    },
+    image: [
+      {
+        type: String,
+        required: true,
+      },
+    ],
     isActive: {
       type: Boolean,
       default: true,
