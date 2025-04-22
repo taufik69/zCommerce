@@ -217,10 +217,6 @@ exports.getProductsPagination = asynchandeler(async (req, res, next) => {
   const { limit, page } = req.query;
   const query = { isActive: true };
   const skip = (page - 1) * limit;
-  // 0 * 2
-  console.log(skip);
-  return;
-
   const products = await Product.find(query)
     .skip(skip)
     .limit(limit)

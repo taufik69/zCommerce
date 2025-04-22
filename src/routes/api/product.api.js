@@ -23,8 +23,6 @@ _.route("/updateproduct/:slug/image").put(
   Product.updateProductImages
 );
 // req.query apply
-_.route("/getproducts").get((req, res) => {
-  console.log(req.query);
-});
+_.route("/getproductspagination").get(Product.getProductsPagination);
 
 module.exports = _;
