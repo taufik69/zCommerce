@@ -8,7 +8,8 @@ _.route("/discount")
 
 _.route("/discount/:slug")
   .get(discountController.getDiscountBySlug)
-  .put(discountController.updateDiscount);
+  .put(discountController.updateDiscount)
+  .delete(discountController.deleteDiscount);
 
 _.route("/discount/deactive").post(discountController.deactivateDiscount);
 _.route("/discount/active").post(discountController.activateDiscount);

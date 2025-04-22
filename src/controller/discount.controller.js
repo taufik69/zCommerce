@@ -129,3 +129,22 @@ exports.activateDiscount = asynchandeler(async (req, res) => {
     discount
   );
 });
+
+// @desc  permanent delte the discount
+exports.deleteDiscount = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+
+  // Find the discount by slug
+  const discount = await Discount.findOneAndDelete({ slug });
+  if (!discount) {
+    throw new customError("Discount not found", 404);
+  }
+
+  // Send success response
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Discount deleted successfully",
+    discount
+  );
+});
