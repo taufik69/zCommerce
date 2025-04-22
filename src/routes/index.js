@@ -6,6 +6,7 @@ const brandRoutes = require("./api/brand.api");
 const productRoutes = require("./api/product.api");
 const variantRoutes = require("./api/variant.api");
 const discountRoutes = require("./api/discount.api");
+const productInventoryRoutes = require("./api/productInventory.api");
 const _ = express.Router();
 
 _.use(categoryRoutes);
@@ -14,6 +15,7 @@ _.use(brandRoutes);
 _.use("/product", productRoutes);
 _.use(variantRoutes);
 _.use(discountRoutes);
+_.use(productInventoryRoutes);
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });

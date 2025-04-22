@@ -74,7 +74,3 @@ const ProductInventory = mongoose.model(
 );
 
 module.exports = ProductInventory;
-
-// module.exports = mongoose.model("ProductInventory", productInventorySchema);
-
-// export default mongoose.model("ProductInventory", productInventorySchema);
