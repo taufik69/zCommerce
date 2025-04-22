@@ -9,7 +9,7 @@ const {
 // @desc    Create a new subcategory
 exports.createSubCategory = asynchandeler(async (req, res) => {
   // Validate the request body
-  const { category, name } = validateSubCategory(req);
+  const { category, name } = await validateSubCategory(req);
   const subCategory = await Subcategory.create({
     name,
     category,

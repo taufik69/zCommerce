@@ -11,7 +11,7 @@ const {
 // @desc    Create a new category
 
 exports.createCategory = asynchandeler(async (req, res) => {
-  const value = validateCategory(req);
+  const value = await validateCategory(req);
   const { name } = value;
   // upload the image into cloudinary
   const { optimizeUrl } = await cloudinaryFileUpload(req.files[0].path);

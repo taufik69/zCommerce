@@ -16,15 +16,18 @@ const subCategorySchmea = joi
 
 //   now make a validateSubCategory function that will validate the subcategory
 
-exports.validateSubCategory = (req) => {
-  const { error, value } = subCategorySchmea.validate(req.body);
-
-  if (error) {
+exports.validateSubCategory = async (req) => {
+  try {
+    const value = await subCategorySchmea.validateAsync(req.body);
+    return value;
+  } catch (error) {
+    console.log(
+      "SubCategory  Validation error " + error.details.map((err) => err.message)
+    );
     throw new customError(
       "SubCategory  Validation error " +
         error.details.map((err) => err.message),
       400
     );
   }
-  return value;
 };

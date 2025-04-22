@@ -9,7 +9,7 @@ const {
 } = require("../helpers/cloudinary");
 // @desc    Create a new brand
 exports.createBrand = asynchandeler(async (req, res, next) => {
-  const { name } = validateBrand(req);
+  const { name } = await validateBrand(req);
   //   upload image on cloudinary using promise.all beacuse brannd have multiple image
   const images = await Promise.all(
     req.files.map(async (file) => {

@@ -24,5 +24,7 @@ _.route("/updateproduct/:slug/image").put(
 );
 // req.query apply
 _.route("/getproductspagination").get(Product.getProductsPagination);
+_.route("/productListbyOrder").get(Product.getAllProductsInOrder);
+_.route("/searchProduct").get(Product.searchProductByName);
 
 module.exports = _;

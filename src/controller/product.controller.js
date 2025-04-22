@@ -11,7 +11,7 @@ const { validateProduct } = require("../validation/product.validation");
 // @desc    Create a new product
 exports.ProductCreate = asynchandeler(async (req, res, next) => {
   const { name, description, category, subcategory, brand, discountId, tag } =
-    validateProduct(req);
+    await validateProduct(req);
 
   // now upload the thumbnail and image to cloudinary
 
@@ -231,4 +231,50 @@ exports.getProductsPagination = asynchandeler(async (req, res, next) => {
     total,
     totalPages,
   });
+});
+
+// @desc get all products with sort
+exports.getAllProductsInOrder = asynchandeler(async (req, res, next) => {
+  const { sortBy } = req.query;
+  const query = { isActive: true };
+
+  // Determine the sort order
+  const sortOrder = sortBy === "asc" ? 1 : -1;
+
+  // Fetch products with sorting
+  const products = await Product.find(query)
+    .sort({ createdAt: sortOrder })
+    .populate(["category", "subcategory", "brand"]);
+
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Products fetched successfully",
+    products
+  );
+});
+
+// @desc search product with name using req.query
+exports.searchProductByName = asynchandeler(async (req, res, next) => {
+  const { search } = req.query;
+  const query = {
+    $or: [
+      { name: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+    ],
+    isActive: true,
+  };
+
+  const products = await Product.find(query).populate([
+    "category",
+    "subcategory",
+    "brand",
+  ]);
+
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Products fetched successfully",
+    products
+  );
 });
