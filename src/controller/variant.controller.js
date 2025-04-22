@@ -2,28 +2,101 @@ const { apiResponse } = require("../utils/apiResponse");
 const variant = require("../models/variant.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
-const { validateCategory } = require("../validation/category.validation");
-const {
-  cloudinaryFileUpload,
-  deleteCloudinaryFile,
-} = require("../helpers/cloudinary");
 const validateVariant = require("../validation/variant.validation");
 
+// @desc create  variant controller
 exports.createVariant = asynchandeler(async (req, res, next) => {
   // Validate the request body
   const validatedData = await validateVariant(req);
-  console.log(validatedData);
-
-  return;
-
   // Proceed with saving the variant
-  const variant = new Variant(validatedData);
-  await variant.save();
+  const variantData = new variant(validatedData);
+  await variantData.save();
 
   return apiResponse.sendSuccess(
     res,
     201,
     "Variant created successfully",
-    variant
+    variantData
+  );
+});
+
+// @desc get all  variant
+exports.getAllVariants = asynchandeler(async (req, res, next) => {
+  const variants = await variant.find().select("-updatedAt");
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Variants fetched successfully",
+    variants
+  );
+});
+
+// @desc get single variant
+exports.getSingleVariant = asynchandeler(async (req, res, next) => {
+  const id = req.params.id;
+  const singleVariant = await variant.findById(id).select("-updatedAt");
+  if (!singleVariant) {
+    throw new customError("Variant not found", 404);
+  }
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Variant fetched successfully",
+    singleVariant
+  );
+});
+
+// @desc update variant using req.params
+exports.updateVariant = asynchandeler(async (req, res) => {
+  const { id } = req.params;
+  const validatedData = await validateVariant(req);
+  const updatedVariant = await variant.findByIdAndUpdate(
+    id,
+    { $set: validatedData },
+    { new: true }
+  );
+  if (!updatedVariant) {
+    throw new customError("Variant not found", 404);
+  }
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Variant updated successfully",
+    updatedVariant
+  );
+});
+
+// @desc deactivateVariant variant
+exports.deactivateVariant = asynchandeler(async (req, res) => {
+  const { id } = req.query;
+  const variantToDeactivate = await variant.findById(id);
+  if (!variantToDeactivate) {
+    throw new customError("Variant not found", 404);
+  }
+  variantToDeactivate.isActive = false;
+  await variantToDeactivate.save();
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Variant deactivated successfully",
+    variantToDeactivate
+  );
+});
+
+
+// @desc activate Variant
+exports.activateVariant = asynchandeler(async (req, res) => {
+  const { id } = req.query;
+  const variantToActivate = await variant.findById(id);
+  if (!variantToActivate) {
+    throw new customError("Variant not found", 404);
+  }
+  variantToActivate.isActive = true;
+  await variantToActivate.save();
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Variant activated successfully",
+    variantToActivate
   );
 });

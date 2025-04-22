@@ -34,7 +34,7 @@ const variantSchema = new mongoose.Schema(
 );
 
 // check size and color already have database after save the data
-variantSchema.pre("save", async (next) => {
+variantSchema.pre("save", async function (next) {
   const isExistSizeColor = await this.constructor.find({
     size: this.size,
     color: this.color,
@@ -42,11 +42,12 @@ variantSchema.pre("save", async (next) => {
 
   if (
     isExistSizeColor &&
+    isExistSizeColor._id &&
     isExistSizeColor._id.toString() !== this._id.toString()
   ) {
-    console.log(`Already Have this ${this.color} and ${this.size} `);
-    throw new customError(`Already Have this ${this.color} and ${this.size} `);
+    throw new customError(`Already Have this ${this.color} and ${this.size}`);
   }
+  next();
 });
 
 const Variant = mongoose.model("Variant", variantSchema);
