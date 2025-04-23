@@ -15,7 +15,7 @@ _.use(brandRoutes);
 _.use("/product", productRoutes);
 _.use(variantRoutes);
 _.use(discountRoutes);
-_.use(productInventoryRoutes);
+_.use("/product-inventory", productInventoryRoutes);
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });

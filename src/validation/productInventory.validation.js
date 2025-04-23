@@ -11,7 +11,7 @@ const productInventorySchema = joi
       "string.empty": "Variant is required.",
       "any.required": "Variant is required.",
     }),
-    discount: joi.string().optional().messages({
+    discount: joi.string().optional().allow(null).messages({
       "string.base": "Discount must be a valid ID",
     }),
     stock: joi.number().required().min(0).messages({
