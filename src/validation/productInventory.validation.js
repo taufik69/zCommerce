@@ -51,12 +51,12 @@ module.exports = { validateProductInventory };
 
 async function validateProductInventory(req) {
   try {
-    const { value } = await productInventorySchema.validateAsync(req.body);
+    const value = await productInventorySchema.validateAsync(req.body);
     return value;
   } catch (error) {
     throw new customError(
-      "Product inventory validation error " +
-        value.error.details.map((err) => err.message),
+      "Product inventory validation error: " +
+        error.details.map((err) => err.message).join(", "), // Use `error.details`
       400
     );
   }
