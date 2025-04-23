@@ -3,7 +3,7 @@ const { customError } = require("../lib/CustomError");
 
 const productInventorySchema = joi
   .object({
-    productId: joi.string().required().messages({
+    product: joi.string().required().messages({
       "string.empty": "Product Id is required.",
       "any.required": "Product Id is required.",
     }),
@@ -39,15 +39,23 @@ const productInventorySchema = joi
       "number.min": "Whole sale price cannot be less than 0",
       "any.required": "Whole sale price is required",
     }),
-    profitRate: joi.number().required().min(0).messages({
+    profitRate: joi.number().optional().min(0).messages({
       "number.base": "Profit rate must be a number",
       "number.min": "Profit rate cannot be less than 0",
       "any.required": "Profit rate is required",
     }),
+    alertQuantity: joi.number().min(0).messages({
+      "number.base": "alertQuantity  must be a number",
+      "number.min": "alertQuantity  cannot be less than 0",
+      "any.required": "alertQuantity  is required",
+    }),
+    stockAlert: joi.boolean().messages({
+      "number.base": "stockAlert  must be a Boolean",
+      "any.required": "stockAlert  is required",
+    }),
+    isActive: joi.boolean().default(true).optional(),
   })
   .options({ abortEarly: false }); // Validate all fields, not just the first error
-
-module.exports = { validateProductInventory };
 
 async function validateProductInventory(req) {
   try {
@@ -61,3 +69,5 @@ async function validateProductInventory(req) {
     );
   }
 }
+
+module.exports = { validateProductInventory };

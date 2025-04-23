@@ -5,5 +5,11 @@ const productInventoryController = require("../../controller/productInventory.co
 _.route("/createproduct").post(
   productInventoryController.createProductInventory
 );
+_.route("/getallproductinventory").get(
+  productInventoryController.getAllProductInventory
+);
+_.route("/getproduct/:slug").get(
+  productInventoryController.getProductInventoryBySlug
+);
 
 module.exports = _;
