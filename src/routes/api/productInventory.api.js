@@ -12,4 +12,12 @@ _.route("/getproduct/:slug").get(
   productInventoryController.getProductInventoryBySlug
 );
 
+_.route("/updateproduct/:slug").put(
+  productInventoryController.updateProductInventory
+);
+
+_.route("/searchproduct").get(
+  productInventoryController.searchProductInventoryBySlug
+);
+
 module.exports = _;

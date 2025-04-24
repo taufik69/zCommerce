@@ -25,10 +25,58 @@ exports.createProductInventory = asynchandeler(async (req, res) => {
 
 //desc get all product inventory
 exports.getAllProductInventory = asynchandeler(async (req, res) => {
-  const productInventories = await ProductInventory.find().populate([
-    "product",
-    "variant",
-    "discount",
+  const productInventories = await ProductInventory.aggregate([
+    {
+      $lookup: {
+        from: "products",
+        localField: "product",
+        foreignField: "_id",
+        as: "productResult",
+      },
+    },
+    {
+      $unwind: "$productResult",
+    },
+    {
+      $lookup: {
+        from: "variants",
+        localField: "variant",
+        foreignField: "_id",
+        as: "variantResult",
+      },
+    },
+    {
+      $unwind: "$variantResult",
+    },
+    {
+      $lookup: {
+        from: "discounts",
+        localField: "discount",
+        foreignField: "_id",
+        as: "discountResult",
+      },
+    },
+    {
+      $unwind: "$discountResult",
+    },
+    {
+      $project: {
+        _id: 1,
+        stock: 1,
+        reverseStock: 1,
+        instock: 1,
+        warehouseLocation: 1,
+        sellingPrice: 1,
+        wholeSalePrice: 1,
+        profitRate: 1,
+        alertQuantity: 1,
+        stockAlert: 1,
+        isActive: 1,
+        product: "$productResult",
+        variant: "$variantResult",
+        discount: "$discountResult",
+      },
+    },
   ]);
   return apiResponse.sendSuccess(
     res,
@@ -79,17 +127,26 @@ exports.getProductInventoryBySlug = asynchandeler(async (req, res) => {
       $unwind: "$productResult",
     },
     {
-      $match: { "productResult.slug": "taufik-ali" },
+      $match: { "productResult.slug": slug },
+    },
+    {
+      $lookup: {
+        from: "categories",
+        localField: "productResult.category",
+        foreignField: "_id",
+        as: "categoryResult",
+      },
+    },
+    {
+      $unwind: "$categoryResult",
     },
     {
       $project: {
-        product: 1,
-        "productResult.name": 1,
-        "productResult.slug": 1,
-        "productResult.image": 1,
+        product: "$productResult",
         stock: 1,
         variant: "$variantResult",
         discount: "$discountResult",
+        category: "$categoryResult",
         reverseStock: 1,
         instock: 1,
         warehouseLocation: 1,
@@ -99,11 +156,6 @@ exports.getProductInventoryBySlug = asynchandeler(async (req, res) => {
         alertQuantity: 1,
         stockAlert: 1,
         isActive: 1,
-        createdAt: 1,
-        updatedAt: 1,
-        profitPrice: {
-          $add: ["$sellingPrice", 100],
-        },
       },
     },
   ]);
@@ -118,5 +170,140 @@ exports.getProductInventoryBySlug = asynchandeler(async (req, res) => {
     200,
     "Product inventory fetched successfully",
     productInventory // Return the first (and only) result
+  );
+});
+
+// @desc update product inventory
+exports.updateProductInventory = asynchandeler(async (req, res, next) => {
+  const { slug } = req.params;
+
+  // Step 1: Find the inventory by matching product slug
+  const inventoryResult = await ProductInventory.aggregate([
+    {
+      $lookup: {
+        from: "products",
+        localField: "product",
+        foreignField: "_id",
+        as: "productResult",
+      },
+    },
+    {
+      $unwind: "$productResult",
+    },
+    {
+      $match: { "productResult.slug": slug },
+    },
+    {
+      $project: { _id: 1 }, // We just need the inventory _id to update
+    },
+  ]);
+
+  if (!inventoryResult?.length) {
+    throw new customError("Product inventory not found", 404);
+  }
+
+  const inventoryId = inventoryResult[0]._id;
+
+  // Step 2: Update the inventory by _id
+  const updatedInventory = await ProductInventory.findByIdAndUpdate(
+    inventoryId,
+    { $set: req.body },
+    { new: true }
+  );
+
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Product inventory updated successfully",
+    updatedInventory
+  );
+});
+
+//@desc search the productinventory using product slug
+exports.searchProductInventoryBySlug = asynchandeler(async (req, res) => {
+  const { name } = req.query;
+
+  const productInventory = await ProductInventory.aggregate([
+    {
+      $lookup: {
+        from: "products",
+        localField: "product",
+        foreignField: "_id",
+        as: "productResult",
+      },
+    },
+    {
+      $unwind: "$productResult",
+    },
+    {
+      $match: {
+        "productResult.name": {
+          $regex: name?.trim(),
+          $options: "i",
+        },
+      },
+    },
+    {
+      $lookup: {
+        from: "variants",
+        localField: "variant",
+        foreignField: "_id",
+        as: "variantResult",
+      },
+    },
+    {
+      $unwind: "$variantResult",
+    },
+    {
+      $lookup: {
+        from: "discounts",
+        localField: "discount",
+        foreignField: "_id",
+        as: "discountResult",
+      },
+    },
+    {
+      $unwind: "$discountResult",
+    },
+    {
+      $lookup: {
+        from: "categories",
+        localField: "productResult.category",
+        foreignField: "_id",
+        as: "categoryResult",
+      },
+    },
+    {
+      $unwind: "$categoryResult",
+    },
+    {
+      $project: {
+        product: "$productResult",
+        stock: 1,
+        variant: "$variantResult",
+        discount: "$discountResult",
+        category: "$categoryResult",
+        reverseStock: 1,
+        instock: 1,
+        warehouseLocation: 1,
+        sellingPrice: 1,
+        wholeSalePrice: 1,
+        profitRate: 1,
+        alertQuantity: 1,
+        stockAlert: 1,
+        isActive: 1,
+      },
+    },
+  ]);
+
+  if (!productInventory || productInventory.length === 0) {
+    throw new customError("Product inventory not found", 404);
+  }
+
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Product inventory fetched successfully",
+    productInventory
   );
 });
