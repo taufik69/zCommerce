@@ -19,5 +19,12 @@ _.route("/updateproduct/:slug").put(
 _.route("/searchproduct").get(
   productInventoryController.searchProductInventoryBySlug
 );
+_.route("/getproductinorder").get(
+  productInventoryController.getProductInventoryInOrder
+);
+
+_.route("/productpagination").get(
+  productInventoryController.getProductInventoryPagination
+);
 
 module.exports = _;

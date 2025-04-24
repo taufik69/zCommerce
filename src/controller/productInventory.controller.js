@@ -307,3 +307,155 @@ exports.searchProductInventoryBySlug = asynchandeler(async (req, res) => {
     productInventory
   );
 });
+
+//@desc show productinventory in accending order
+exports.getProductInventoryInOrder = asynchandeler(async (req, res) => {
+  const { order } = req.query;
+  const productInventory = await ProductInventory.aggregate([
+    {
+      $lookup: {
+        from: "products",
+        localField: "product",
+        foreignField: "_id",
+        as: "productResult",
+      },
+    },
+    {
+      $unwind: "$productResult",
+    },
+    {
+      $lookup: {
+        from: "variants",
+        localField: "variant",
+        foreignField: "_id",
+        as: "variantResult",
+      },
+    },
+    {
+      $unwind: "$variantResult",
+    },
+    {
+      $lookup: {
+        from: "discounts",
+        localField: "discount",
+        foreignField: "_id",
+        as: "discountResult",
+      },
+    },
+    {
+      $unwind: "$discountResult",
+    },
+    {
+      $lookup: {
+        from: "categories",
+        localField: "productResult.category",
+        foreignField: "_id",
+        as: "categoryResult",
+      },
+    },
+    {
+      $unwind: "$categoryResult",
+    },
+    {
+      $project: {
+        product: "$productResult",
+        stock: 1,
+        variant: "$variantResult",
+        discount: "$discountResult",
+        category: "$categoryResult",
+        reverseStock: 1,
+        instock: 1,
+        warehouseLocation: 1,
+        sellingPrice: 1,
+        wholeSalePrice: 1,
+        profitRate: 1,
+        alertQuantity: 1,
+        stockAlert: 1,
+        isActive: 1,
+      },
+    },
+    {
+      $sort: { createdAt: order == 1 ? 1 : -1 },
+    },
+  ]);
+
+  if (!productInventory || productInventory.length === 0) {
+    throw new customError("Product inventory not found", 404);
+  }
+
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Product inventory fetched successfully",
+    productInventory
+  );
+});
+
+//@desc make pagination form productinventory
+exports.getProductInventoryPagination = asynchandeler(async (req, res) => {
+  const { limit, page } = req.query;
+  const skip = (page - 1) * limit;
+  const productInventory = await ProductInventory.find()
+    .skip(skip)
+    .limit(limit)
+    .sort({ createdAt: 1 })
+    .populate(["product", "variant", "discount"]);
+  const total = await ProductInventory.countDocuments();
+  const totalPages = Math.ceil(total / limit);
+
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Product inventory fetched successfully",
+    {
+      productInventory,
+      page,
+      limit,
+      total,
+      totalPages,
+    }
+  );
+});
+
+//@desc deactive productInventory searching by product slug using aggregation
+exports.deactivateProductInventoryBySlug = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+
+  const productInventory = await ProductInventory.aggregate([
+    {
+      $lookup: {
+        from: "products",
+        localField: "product",
+        foreignField: "_id",
+        as: "productResult",
+      },
+    },
+    {
+      $unwind: "$productResult",
+    },
+    {
+      $match: { "productResult.slug": slug },
+    },
+    {
+      $project: {
+        _id: 1,
+        isActive: 0,
+      },
+    },
+  ]);
+
+  if (!productInventory || productInventory.length === 0) {
+    throw new customError("Product inventory not found", 404);
+  }
+
+  await ProductInventory.findByIdAndUpdate(
+    productInventory[0]._id,
+    { isActive: false }
+  );
+
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Product inventory deactivated successfully"
+  );
+});
