@@ -26,7 +26,7 @@ exports.createDiscount = asynchandeler(async (req, res) => {
 
 // @desc get all discounts
 exports.getAllDiscounts = asynchandeler(async (req, res) => {
-  const discounts = await Discount.find().populate("targetCategory");
+  const discounts = await Discount.find();
   return apiResponse.sendSuccess(
     res,
     200,
@@ -38,7 +38,7 @@ exports.getAllDiscounts = asynchandeler(async (req, res) => {
 // @desc search discount with the help of slug
 exports.getDiscountBySlug = asynchandeler(async (req, res) => {
   const slug = req.params.slug;
-  const discount = await Discount.findOne({ slug }).populate("targetCategory");
+  const discount = await Discount.findOne({ slug });
   if (!discount) {
     throw new customError("Discount not found", 404);
   }
@@ -83,10 +83,7 @@ exports.deactivateDiscount = asynchandeler(async (req, res) => {
   const { slug } = req.query;
 
   // Find the discount by slug
-  const discount = await Discount.findOne({ slug, isActive: true }).populate([
-    "targetCategory",
-    "targetProduct",
-  ]);
+  const discount = await Discount.findOne({ slug, isActive: true });
   if (!discount) {
     throw new customError("Discount not found", 404);
   }
@@ -109,10 +106,7 @@ exports.activateDiscount = asynchandeler(async (req, res) => {
   const { slug } = req.query;
 
   // Find the discount by slug
-  const discount = await Discount.findOne({ slug, isActive: false }).populate([
-    "targetCategory",
-    "targetProduct",
-  ]);
+  const discount = await Discount.findOne({ slug, isActive: false });
   if (!discount) {
     throw new customError("Discount not found", 404);
   }

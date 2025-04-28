@@ -39,12 +39,12 @@ const discountSchema = Joi.object({
         "Discount plan must be one of 'flat', 'category', or 'product'",
       "any.required": "Discount plan is required",
     }),
-  targetCategory: Joi.string().optional().messages({
-    "string.base": "Target category must be a valid ID",
-  }),
-  targetProduct: Joi.string().allow(null).optional().messages({
-    "string.base": "Target product must be a valid ID",
-  }),
+  // targetCategory: Joi.string().optional().messages({
+  //   "string.base": "Target category must be a valid ID",
+  // }),
+  // targetProduct: Joi.string().allow(null).optional().messages({
+  //   "string.base": "Target product must be a valid ID",
+  // }),
 }).options({ abortEarly: false }); // Validate all fields, not just the first error
 
 const validateDiscount = async (req) => {
