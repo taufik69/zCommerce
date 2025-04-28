@@ -7,7 +7,11 @@ const productRoutes = require("./api/product.api");
 const variantRoutes = require("./api/variant.api");
 const discountRoutes = require("./api/discount.api");
 const productInventoryRoutes = require("./api/productInventory.api");
+const roleBaseAuthRoutes = require("./api/roleBaseAuth/auth.api");
 const _ = express.Router();
+
+// user role and persmission
+_.use("/admin", roleBaseAuthRoutes);
 
 _.use(categoryRoutes);
 _.use(subcategoryRoutes);
