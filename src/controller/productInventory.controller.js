@@ -419,7 +419,7 @@ exports.getProductInventoryPagination = asynchandeler(async (req, res) => {
 
 //@desc deactive productInventory searching by product slug using aggregation
 exports.deactivateProductInventoryBySlug = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
+  const { slug } = req.query;
 
   const productInventory = await ProductInventory.aggregate([
     {
@@ -448,14 +448,70 @@ exports.deactivateProductInventoryBySlug = asynchandeler(async (req, res) => {
     throw new customError("Product inventory not found", 404);
   }
 
-  await ProductInventory.findByIdAndUpdate(
+  const updateProduct = await ProductInventory.findByIdAndUpdate(
     productInventory[0]._id,
-    { isActive: false }
+    {
+      isActive: false,
+    },
+    {
+      new: true,
+    }
   );
 
   return apiResponse.sendSuccess(
     res,
     200,
-    "Product inventory deactivated successfully"
+    "Product inventory deactivated successfully",
+    updateProduct
+  );
+});
+
+//@desc active productInventory seraching by product slug using aggregation
+
+exports.activateProductInventoryBySlug = asynchandeler(async (req, res) => {
+  const { slug } = req.query;
+
+  const productInventory = await ProductInventory.aggregate([
+    {
+      $lookup: {
+        from: "products",
+        localField: "product",
+        foreignField: "_id",
+        as: "productResult",
+      },
+    },
+    {
+      $unwind: "$productResult",
+    },
+    {
+      $match: { "productResult.slug": slug },
+    },
+    {
+      $project: {
+        _id: 1,
+        isActive: 0,
+      },
+    },
+  ]);
+
+  if (!productInventory || productInventory.length === 0) {
+    throw new customError("Product inventory not found", 404);
+  }
+
+  const updateProduct = await ProductInventory.findByIdAndUpdate(
+    productInventory[0]._id,
+    {
+      isActive: true,
+    },
+    {
+      new: true,
+    }
+  );
+
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Product inventory activated successfully",
+    updateProduct
   );
 });

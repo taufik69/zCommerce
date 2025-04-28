@@ -27,4 +27,11 @@ _.route("/productpagination").get(
   productInventoryController.getProductInventoryPagination
 );
 
+_.route("/Productdeactive").get(
+  productInventoryController.deactivateProductInventoryBySlug
+);
+_.route("/Productactive").get(
+  productInventoryController.activateProductInventoryBySlug
+);
+
 module.exports = _;
