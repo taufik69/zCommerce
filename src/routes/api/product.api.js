@@ -14,7 +14,13 @@ _.route("/createproduct").post(
 
 _.route("/getallproducts").get(Product.getAllProducts);
 _.route("/getsingleproduct/:slug").get(Product.getSingleProduct);
-_.route("/updateproduct/:slug").put(Product.updateProductInfo);
+_.route("/updateproduct/:slug").put(
+  multipleFileUploadWithFields([
+    { name: "image", maxCount: 10 },
+    { name: "thumbnail", maxCount: 1 },
+  ]),
+  Product.updateProductInfo
+);
 _.route("/updateproduct/:slug/image").put(
   multipleFileUploadWithFields([
     { name: "image", maxCount: 10 },
