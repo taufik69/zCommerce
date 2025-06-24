@@ -24,7 +24,7 @@ app.use(express.static("public"));
 // routes
 app.use(process.env.BASE_URL || "/api/v1", require("../src/routes/index"));
 
-// this is global Error handaler method
+// this is global Error handaler method // this middleware always niche thakbe
 app.use(globalErrorHandeler);
 
 module.exports = { app };

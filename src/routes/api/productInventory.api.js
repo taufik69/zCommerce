@@ -34,4 +34,15 @@ _.route("/Productactive").get(
   productInventoryController.activateProductInventoryBySlug
 );
 
+_.route("/productpricerange").get(
+  productInventoryController.searchProductInventoryByPriceRange
+);
+_.route("/productpricelowtohigh").get(
+  productInventoryController.searchProductInventoryLowToHigh
+);
+
+_.route("/productpricehightolow").get(
+  productInventoryController.searchProductInventoryHighToLow
+);
+
 module.exports = _;
