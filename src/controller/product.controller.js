@@ -100,6 +100,8 @@ exports.updateProductInfo = asynchandeler(async (req, res, next) => {
   const { slug } = req.params;
   const { name, description, category, subcategory, brand, discountId, tag } =
     req.body;
+
+
   // manually check the req.body
   if (!name || !description || !category || !subcategory || !brand) {
     throw new customError("Please provide all required fields", 400);
