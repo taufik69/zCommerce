@@ -1,6 +1,7 @@
 const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 const Subcategory = require("../models/subcategory.model");
+const Category = require("..//models/category.model");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const {
   validateSubCategory,
@@ -17,6 +18,16 @@ exports.createSubCategory = asynchandeler(async (req, res) => {
   if (!subCategory) {
     throw new customError("Subcategory not created", 400);
   }
+
+  // Add the subcategory to the category's subcategories array
+
+  const categoryToUpdate = await Category.findOne({ _id: category });
+
+  if (!categoryToUpdate) {
+    throw new customError("Category not found", 404);
+  }
+  categoryToUpdate.subcategories.push(subCategory._id);
+  await categoryToUpdate.save();
 
   // Return the created subcategory in the response
   return apiResponse.sendSuccess(res, 201, "Subcategory created", subCategory);
@@ -64,9 +75,24 @@ exports.updateSubCategory = asynchandeler(async (req, res) => {
     throw new customError("Subcategory not found", 404);
   }
 
+  const oldCategoryId = subCategory.category.toString();
+  const newCategoryId = req.body.category;
+
   // Update only the fields provided in the request body
   subCategory.name = req.body.name || subCategory.name;
-  subCategory.category = req.body.category || subCategory.category;
+  subCategory.category = newCategoryId || subCategory.category;
+
+  // If category is changed, update the Category model
+  if (newCategoryId && newCategoryId !== oldCategoryId) {
+    // Remove subcategory from old category
+    await Category.findByIdAndUpdate(oldCategoryId, {
+      $pull: { subcategories: subCategory._id },
+    });
+    // Add subcategory to new category
+    await Category.findByIdAndUpdate(newCategoryId, {
+      $addToSet: { subcategories: subCategory._id },
+    });
+  }
 
   // Save the updated subcategory to the database
   await subCategory.save();
@@ -87,6 +113,11 @@ exports.deleteSubCategory = asynchandeler(async (req, res) => {
 
   // Delete the subcategory
   await Subcategory.deleteOne({ _id: subCategory._id });
+
+  // Remove subcategory from category's subcategories array
+  await Category.findByIdAndUpdate(subCategory.category, {
+    $pull: { subcategories: subCategory._id },
+  });
 
   // Send success response
   return apiResponse.sendSuccess(res, 200, "Subcategory deleted", subCategory);

@@ -23,7 +23,7 @@ exports.createProductInventory = asynchandeler(async (req, res) => {
   );
 });
 
-//desc get all product inventory
+//@desc get all product inventory
 exports.getAllProductInventory = asynchandeler(async (req, res) => {
   const productInventories = await ProductInventory.aggregate([
     {
@@ -35,7 +35,10 @@ exports.getAllProductInventory = asynchandeler(async (req, res) => {
       },
     },
     {
-      $unwind: "$productResult",
+      $unwind: {
+        path: "$productResult",
+        preserveNullAndEmptyArrays: true,
+      },
     },
     {
       $lookup: {
@@ -46,7 +49,10 @@ exports.getAllProductInventory = asynchandeler(async (req, res) => {
       },
     },
     {
-      $unwind: "$variantResult",
+      $unwind: {
+        path: "$variantResult",
+        preserveNullAndEmptyArrays: true,
+      },
     },
     {
       $lookup: {
@@ -57,7 +63,38 @@ exports.getAllProductInventory = asynchandeler(async (req, res) => {
       },
     },
     {
-      $unwind: "$discountResult",
+      $unwind: {
+        path: "$discountResult",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $lookup: {
+        from: "categories",
+        localField: "productResult.category",
+        foreignField: "_id",
+        as: "categoryResult",
+      },
+    },
+    {
+      $unwind: {
+        path: "$categoryResult",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $lookup: {
+        from: "subcategories",
+        localField: "productResult.subcategory",
+        foreignField: "_id",
+        as: "subcategoryResult",
+      },
+    },
+    {
+      $unwind: {
+        path: "$subcategoryResult",
+        preserveNullAndEmptyArrays: true,
+      },
     },
     {
       $project: {
@@ -71,13 +108,29 @@ exports.getAllProductInventory = asynchandeler(async (req, res) => {
         profitRate: 1,
         alertQuantity: 1,
         stockAlert: 1,
-        isActive: 1,
-        product: "$productResult",
+        // Flatten product fields
+        productId: "$productResult._id",
+        name: "$productResult.name",
+        description: "$productResult.description",
+        category: "$categoryResult",
+        subcategory: "$subcategoryResult",
+        brand: "$productResult.brand",
+        discountId: "$productResult.discountId",
+        thumbnail: "$productResult.thumbnail",
+        image: "$productResult.image",
+        tag: "$productResult.tag",
+        isActive: "$productResult.isActive",
+        createdAt: "$productResult.createdAt",
+        updatedAt: "$productResult.updatedAt",
+        slug: "$productResult.slug",
+
+        // Keep variant and discount as objects
         variant: "$variantResult",
         discount: "$discountResult",
       },
     },
   ]);
+
   return apiResponse.sendSuccess(
     res,
     200,
@@ -100,64 +153,106 @@ exports.getProductInventoryBySlug = asynchandeler(async (req, res) => {
         as: "productResult", // The name of the joined field
       },
     },
-    {
-      $lookup: {
-        from: "variants",
-        localField: "variant",
-        foreignField: "_id",
-        as: "variantResult",
-      },
-    },
-    {
-      $lookup: {
-        from: "discounts",
-        localField: "discount",
-        foreignField: "_id",
-        as: "discountResult",
-      },
-    },
-    {
-      $unwind: "$discountResult",
-    },
-
-    {
-      $unwind: "$variantResult",
-    },
-    {
-      $unwind: "$productResult",
-    },
+    // {
+    //   $unwind: {
+    //     path: "$productResult",
+    //     preserveNullAndEmptyArrays: true,
+    //   },
+    // },
     {
       $match: { "productResult.slug": slug },
     },
-    {
-      $lookup: {
-        from: "categories",
-        localField: "productResult.category",
-        foreignField: "_id",
-        as: "categoryResult",
-      },
-    },
-    {
-      $unwind: "$categoryResult",
-    },
-    {
-      $project: {
-        product: "$productResult",
-        stock: 1,
-        variant: "$variantResult",
-        discount: "$discountResult",
-        category: "$categoryResult",
-        reverseStock: 1,
-        instock: 1,
-        warehouseLocation: 1,
-        sellingPrice: 1,
-        wholeSalePrice: 1,
-        profitRate: 1,
-        alertQuantity: 1,
-        stockAlert: 1,
-        isActive: 1,
-      },
-    },
+    // {
+    //   $lookup: {
+    //     from: "variants",
+    //     localField: "variant",
+    //     foreignField: "_id",
+    //     as: "variantResult",
+    //   },
+    // },
+    // {
+    //   $unwind: {
+    //     path: "$variantResult",
+    //     preserveNullAndEmptyArrays: true,
+    //   },
+    // },
+    // {
+    //   $lookup: {
+    //     from: "discounts",
+    //     localField: "discount",
+    //     foreignField: "_id",
+    //     as: "discountResult",
+    //   },
+    // },
+    // {
+    //   $unwind: {
+    //     path: "$discountResult",
+    //     preserveNullAndEmptyArrays: true,
+    //   },
+    // },
+
+    // {
+    //   $lookup: {
+    //     from: "categories",
+    //     localField: "productResult.category",
+    //     foreignField: "_id",
+    //     as: "categoryResult",
+    //   },
+    // },
+    // {
+    //   $unwind: {
+    //     path: "$categoryResult",
+    //     preserveNullAndEmptyArrays: true,
+    //   },
+    // },
+    // {
+    //   $lookup: {
+    //     from: "subcategories",
+    //     localField: "productResult.subcategory",
+    //     foreignField: "_id",
+    //     as: "subcategoryResult",
+    //   },
+    // },
+    // {
+    //   $unwind: {
+    //     path: "$subcategoryResult",
+    //     preserveNullAndEmptyArrays: true,
+    //   },
+    // },
+    // {
+    //   $project: {
+    //     _id: 1,
+    //     stock: 1,
+    //     reverseStock: 1,
+    //     instock: 1,
+    //     warehouseLocation: 1,
+    //     sellingPrice: 1,
+    //     wholeSalePrice: 1,
+    //     profitRate: 1,
+    //     alertQuantity: 1,
+    //     stockAlert: 1,
+    //     product: "$productResult",
+    //     // Flatten product fields
+    //     productId: "$productResult._id",
+    //     name: "$productResult.name",
+    //     description: "$productResult.description",
+    //     category: "$categoryResult",
+    //     subcategory: "$subcategoryResult",
+    //     brand: "$productResult.brand",
+    //     discountId: "$productResult.discountId",
+    //     thumbnail: "$productResult.thumbnail",
+    //     image: "$productResult.image",
+    //     tag: "$productResult.tag",
+    //     isActive: "$productResult.isActive",
+    //     createdAt: "$productResult.createdAt",
+    //     updatedAt: "$productResult.updatedAt",
+    //     slug: "$productResult.slug",
+
+    //     // Keep variant and discount as objects
+    //     variant: "$variantResult",
+    //     discount: "$discountResult",
+    //   },
+    // },
   ]);
 
   // Check if product inventory exists

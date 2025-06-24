@@ -27,7 +27,12 @@ exports.createCategory = asynchandeler(async (req, res) => {
 
 // @desc    Get all categories
 exports.getAllCategories = asynchandeler(async (req, res) => {
-  const categories = await Category.find({ isActive: true });
+  const categories = await Category.find({ isActive: true })
+    .populate({
+      path: "subcategories",
+      select: "-updatedAt -createdAt",
+    })
+    .select("-updatedAt -createdAt");
   // send success response
   apiResponse.sendSuccess(res, 200, "Categories fetched successfully", {
     categories,
@@ -37,7 +42,12 @@ exports.getAllCategories = asynchandeler(async (req, res) => {
 // @desc    Get a single category by slug
 exports.getCategoryBySlug = asynchandeler(async (req, res) => {
   const { slug } = req.params;
-  const category = await Category.findOne({ slug, isActive: true });
+  const category = await Category.findOne({ slug, isActive: true })
+    .populate({
+      path: "subcategories",
+      select: "-updatedAt -createdAt",
+    })
+    .select("-updatedAt -createdAt");
 
   if (!category) {
     throw new customError("Category not found", 404);
