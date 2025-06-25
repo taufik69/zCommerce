@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const roleSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, unique: true },
+    name: { type: String, required: true, unique: true, default: "user" },
     permissions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Permission" }],
     isActive: { type: Boolean, default: true },
   },

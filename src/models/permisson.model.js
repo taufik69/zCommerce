@@ -2,8 +2,8 @@ const mongoose = require("mongoose");
 
 const permissionSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, unique: true },
-    description: { type: String },
+    PermissionName: { type: String, required: true, unique: true },
+    PermissionValue: [String], // can be view , add , delete , delete
   },
   { timestamps: true }
 );
