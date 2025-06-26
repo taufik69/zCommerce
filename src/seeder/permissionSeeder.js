@@ -176,3 +176,11 @@ const authorize = (permissionName, action) => {
 
 module.exports = authorize;
    */
+
+/**
+ * // Routes
+router.get('/users', authorize('users', 'read'), getUsersController);
+router.post('/users', authorize('users', 'create'), createUserController);
+router.put('/users/:id', authorize('users', 'update'), updateUserController);
+router.delete('/users/:id', authorize('users', 'delete'), deleteUserController);
+ */
