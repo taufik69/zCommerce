@@ -109,3 +109,70 @@ mongoose
     );
     process.exit(1);
   });
+
+/**
+   * const User = require("../models/User");
+const UserPermission = require("../models/UserPermission");
+
+const authorize = (permissionName, action) => {
+  return async (req, res, next) => {
+    try {
+      const user = req.user;
+      
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Single query to get user with populated roles and permissions
+      const userWithRoles = await User.findById(user._id)
+        .populate({
+          path: 'roles',
+          populate: {
+            path: 'permissions'
+          }
+        })
+        .lean(); // Use lean() for better performance
+
+      // Check role-based permissions
+      if (userWithRoles.roles && userWithRoles.roles.length > 0) {
+        for (const role of userWithRoles.roles) {
+          if (role.permissions) {
+            for (const perm of role.permissions) {
+              if (perm.PermissionName === permissionName && 
+                  perm.actions && perm.actions.includes(action)) {
+                return next(); // Authorized through role
+              }
+            }
+          }
+        }
+      }
+
+      // Check individual user permissions
+      const userPerm = await UserPermission.findOne({ user: user._id })
+        .populate("permissions")
+        .lean();
+      
+      if (userPerm && userPerm.permissions) {
+        for (const perm of userPerm.permissions) {
+          if (perm.PermissionName === permissionName && 
+              perm.actions && perm.actions.includes(action)) {
+            return next(); // Authorized through individual permission
+          }
+        }
+      }
+
+      // Not authorized
+      return res.status(403).json({ 
+        message: "Forbidden: Access denied",
+        required: { permission: permissionName, action: action }
+      });
+
+    } catch (error) {
+      console.error('Authorization error:', error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  };
+};
+
+module.exports = authorize;
+   */
