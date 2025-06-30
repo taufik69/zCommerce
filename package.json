@@ -8,7 +8,8 @@
     "start": "nodemon index.js",
     "dev": "nodemon index.js",
     "build": "pm2 start index.js --name jahirCommerce --watch --ignore-watch=\"node_modules\" --env production",
-   "seed:permissions": "node src/seeder/permissionSeeder.js"
+   "seed:permissions": "node src/seeder/permissionSeeder.js",
+   "seed:roles": "node src/seeder/roleSeeder.js"
    
    
   },
