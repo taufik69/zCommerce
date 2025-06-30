@@ -9,7 +9,8 @@ const variantRoutes = require("./api/variant.api");
 const discountRoutes = require("./api/discount.api");
 const productInventoryRoutes = require("./api/productInventory.api");
 const roleRoutes = require("./api/role.api");
-
+const userRoutes = require("./api/user.api");
+_.use("/auth", userRoutes);
 _.use(categoryRoutes);
 _.use(subcategoryRoutes);
 _.use(brandRoutes);
