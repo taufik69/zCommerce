@@ -23,7 +23,6 @@ exports.getAllRoles = async (req, res) => {
 exports.getRoleByslug = async (req, res) => {
   const role = await Role.findById(req.params.slug);
   if (!role) throw new customError("Role not found", 404);
-
   return apiResponse.sendSuccess(res, 200, "Role fetched successfully", role);
 };
 
