@@ -6,9 +6,11 @@ _.route("/variant")
   .post(variantController.createVariant)
   .get(variantController.getAllVariants);
 
-_.route("/variant/:id")
+_.route("/variant/:slug")
   .get(variantController.getSingleVariant)
-  .put(variantController.updateVariant);
+  .put(variantController.updateVariant)
+  .delete(variantController.deleteVariant);
+
 _.route("/variant/deactive").post(variantController.deactivateVariant);
 _.route("/variant/active").post(variantController.activateVariant);
 

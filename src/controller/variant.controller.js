@@ -33,8 +33,8 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
 
 // @desc get single variant
 exports.getSingleVariant = asynchandeler(async (req, res, next) => {
-  const id = req.params.id;
-  const singleVariant = await variant.findById(id).select("-updatedAt");
+  const slug = req.params.slug;
+  const singleVariant = await variant.findOne({ slug }).select("-updatedAt");
   if (!singleVariant) {
     throw new customError("Variant not found", 404);
   }
@@ -48,11 +48,11 @@ exports.getSingleVariant = asynchandeler(async (req, res, next) => {
 
 // @desc update variant using req.params
 exports.updateVariant = asynchandeler(async (req, res) => {
-  const { id } = req.params;
-  const validatedData = await validateVariant(req);
-  const updatedVariant = await variant.findByIdAndUpdate(
-    id,
-    { $set: validatedData },
+  const { slug } = req.params;
+  // const validatedData = await validateVariant(req);
+  const updatedVariant = await variant.findOneAndUpdate(
+    { slug },
+    { $set: req.body },
     { new: true }
   );
   if (!updatedVariant) {
@@ -68,8 +68,8 @@ exports.updateVariant = asynchandeler(async (req, res) => {
 
 // @desc deactivateVariant variant
 exports.deactivateVariant = asynchandeler(async (req, res) => {
-  const { id } = req.query;
-  const variantToDeactivate = await variant.findById(id);
+  const { slug } = req.query;
+  const variantToDeactivate = await variant.findOne({ slug });
   if (!variantToDeactivate) {
     throw new customError("Variant not found", 404);
   }
@@ -83,11 +83,10 @@ exports.deactivateVariant = asynchandeler(async (req, res) => {
   );
 });
 
-
 // @desc activate Variant
 exports.activateVariant = asynchandeler(async (req, res) => {
-  const { id } = req.query;
-  const variantToActivate = await variant.findById(id);
+  const { slug } = req.query;
+  const variantToActivate = await variant.findOne({ slug });
   if (!variantToActivate) {
     throw new customError("Variant not found", 404);
   }
@@ -98,5 +97,20 @@ exports.activateVariant = asynchandeler(async (req, res) => {
     200,
     "Variant activated successfully",
     variantToActivate
+  );
+});
+
+// @desc delete variant
+exports.deleteVariant = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const deletedVariant = await variant.findOneAndDelete({ slug });
+  if (!deletedVariant) {
+    throw new customError("Variant not found", 404);
+  }
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Variant deleted successfully",
+    deletedVariant
   );
 });
