@@ -15,16 +15,13 @@ exports.createRole = async (req, res) => {
 
 // Get all roles
 exports.getAllRoles = async (req, res) => {
-  console.log("====================================");
-  console.log("hi");
-  console.log("====================================");
   const roles = await Role.find();
   return apiResponse.sendSuccess(res, 200, "Roles fetched successfully", roles);
 };
 
 // Get a single role
-exports.getRoleById = async (req, res) => {
-  const role = await Role.findById(req.params.id).populate("permissions");
+exports.getRoleByslug = async (req, res) => {
+  const role = await Role.findById(req.params.slug);
   if (!role) throw new customError("Role not found", 404);
 
   return apiResponse.sendSuccess(res, 200, "Role fetched successfully", role);
