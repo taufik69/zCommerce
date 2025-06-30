@@ -21,17 +21,23 @@ exports.getAllRoles = async (req, res) => {
 
 // Get a single role
 exports.getRoleByslug = async (req, res) => {
-  const role = await Role.findById(req.params.slug);
+  if (!req.params.slug) {
+    throw new customError("Role Name not Found ", 404);
+  }
+  const role = await Role.findOne({ slug: req.params.slug });
   if (!role) throw new customError("Role not found", 404);
   return apiResponse.sendSuccess(res, 200, "Role fetched successfully", role);
 };
 
 // Update a role
 exports.updateRole = async (req, res) => {
-  const { id } = req.params;
+  const { slug } = req.params;
+  if (!slug) {
+    throw new customError("Role slug not provided", 400);
+  }
   const updates = req.body;
 
-  const role = await Role.findByIdAndUpdate(id, updates, { new: true });
+  const role = await Role.findOneAndUpdate({ slug }, updates, { new: true });
   if (!role) throw new customError("Role not found", 404);
 
   return apiResponse.sendSuccess(res, 200, "Role updated successfully", role);
@@ -39,9 +45,11 @@ exports.updateRole = async (req, res) => {
 
 // Delete a role
 exports.deleteRole = async (req, res) => {
-  const { id } = req.params;
-
-  const role = await Role.findByIdAndDelete(id);
+  const { slug } = req.params;
+  if (!slug) {
+    throw new customError("Role slug not provided", 400);
+  }
+  const role = await Role.findOneAndDelete({ slug: slug });
   if (!role) throw new customError("Role not found", 404);
 
   return apiResponse.sendSuccess(res, 200, "Role deleted successfully", role);
