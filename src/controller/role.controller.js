@@ -1,13 +1,13 @@
 const Role = require("../models/role.model");
-const Permission = require("../models/permisson.model");
+
 const { apiResponse } = require("../utils/apiResponse");
 const { customError } = require("../lib/CustomError");
 
 // Create a new role
 exports.createRole = async (req, res) => {
-  const { name, permissions } = req.body;
+  const { name } = req.body;
 
-  const role = new Role({ name, permissions });
+  const role = new Role({ name });
   await role.save();
 
   return apiResponse.sendSuccess(res, 201, "Role created successfully", role);
@@ -15,7 +15,10 @@ exports.createRole = async (req, res) => {
 
 // Get all roles
 exports.getAllRoles = async (req, res) => {
-  const roles = await Role.find().populate("permissions");
+  console.log("====================================");
+  console.log("hi");
+  console.log("====================================");
+  const roles = await Role.find();
   return apiResponse.sendSuccess(res, 200, "Roles fetched successfully", roles);
 };
 

@@ -1,35 +1,71 @@
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 dotenv.config();
-
 const Role = require("../models/role.model");
-const Permission = require("../models/permisson.model");
 const { customError } = require("../lib/CustomError");
 
-async function seedSuperAdminRole() {
-  await mongoose.connect(process.env.DATABASE_URL);
+const defaultRole = [
+  {
+    name: "superAdmin",
+    slug: "superadmin",
+    isActive: true,
+  },
+  {
+    name: "admin",
+    slug: "admin",
+    isActive: true,
+  },
+  {
+    name: "user",
+    slug: "user",
+    isActive: true,
+  },
+  {
+    name: "manager",
+    slug: "manager",
+    isActive: true,
+  },
+  {
+    name: "guest",
+    slug: "guest",
+    isActive: true,
+  },
+  {
+    name: "salesMen",
+    slug: "salesmen",
+    isActive: true,
+  },
+];
 
-  // 1. Get all permissions
-  const allPermissions = await Permission.find({});
-  const allPermissionIds = allPermissions.map((p) => p._id);
+const roleSeeder = async () => {
+  try {
+    await Role.deleteMany({});
+    console.log("All roles deleted successfully.");
 
-  // 2. Create or update superAdmin role
-  await Role.findOneAndUpdate(
-    { name: "superAdmin" },
-    {
-      name: "superAdmin",
-      permissions: allPermissionIds,
-      isActive: true,
-    },
-    { upsert: true, new: true } // upsert creates the role if it doesn't exist
-  );
+    const existingRoles = await Role.find();
+    if (existingRoles.length > 0) {
+      console.log("Roles already exist, skipping seeding.");
+      return;
+    }
 
-  console.log("SuperAdmin role seeded with all permissions.");
-  await mongoose.disconnect();
-}
+    await Role.insertMany(defaultRole);
+    console.log("Default roles seeded successfully.");
+  } catch (error) {
+    throw new customError("Error seeding roles: " + error.message, 500);
+  }
+};
 
-seedSuperAdminRole().catch((err) => {
-  console.error(err);
-  mongoose.disconnect();
-  throw new customError("Failed to seed SuperAdmin role", 500);
-});
+mongoose
+  .connect(process.env.DATABASE_URL)
+  .then(() => {
+    console.log("Connected to MongoDB");
+    return roleSeeder();
+  })
+  .then(() => {
+    console.log("Role seeding completed successfully.");
+    return mongoose.disconnect();
+  })
+  .catch((err) => {
+    console.error("Error connecting to MongoDB while seeding roles:", err);
+    process.exit(1);
+  });

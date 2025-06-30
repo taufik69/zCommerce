@@ -42,6 +42,20 @@ exports.getAllProductInventory = asynchandeler(async (req, res) => {
     },
     {
       $lookup: {
+        from: "brands",
+        localField: "productResult.brand",
+        foreignField: "_id",
+        as: "brandResult",
+      },
+    },
+    {
+      $unwind: {
+        path: "$brandResult",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $lookup: {
         from: "variants",
         localField: "variant",
         foreignField: "_id",
@@ -114,7 +128,7 @@ exports.getAllProductInventory = asynchandeler(async (req, res) => {
         description: "$productResult.description",
         category: "$categoryResult",
         subcategory: "$subcategoryResult",
-        brand: "$productResult.brand",
+        brand: "$brandResult",
         discountId: "$productResult.discountId",
         thumbnail: "$productResult.thumbnail",
         image: "$productResult.image",
@@ -125,7 +139,8 @@ exports.getAllProductInventory = asynchandeler(async (req, res) => {
         slug: "$productResult.slug",
 
         // Keep variant and discount as objects
-        variant: "$variantResult",
+
+        brand: "$brandResult",
         discount: "$discountResult",
       },
     },
@@ -186,7 +201,20 @@ exports.getProductInventoryBySlug = asynchandeler(async (req, res) => {
         preserveNullAndEmptyArrays: true,
       },
     },
-
+    {
+      $lookup: {
+        from: "brands",
+        localField: "productResult.brand",
+        foreignField: "_id",
+        as: "brandResult",
+      },
+    },
+    {
+      $unwind: {
+        path: "$brandResult",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
     {
       $lookup: {
         from: "categories",
@@ -233,7 +261,7 @@ exports.getProductInventoryBySlug = asynchandeler(async (req, res) => {
         description: "$productResult.description",
         category: "$categoryResult",
         subcategory: "$subcategoryResult",
-        brand: "$productResult.brand",
+        brand: "$brandResult",
         discountId: "$productResult.discountId",
         thumbnail: "$productResult.thumbnail",
         image: "$productResult.image",
@@ -485,12 +513,27 @@ exports.getProductInventoryInOrder = asynchandeler(async (req, res) => {
       },
     },
     {
+      $lookup: {
+        from: "brands",
+        localField: "productResult.brand",
+        foreignField: "_id",
+        as: "brandResult",
+      },
+    },
+    {
+      $unwind: {
+        path: "$brandResult",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
       $project: {
         product: "$productResult",
         stock: 1,
         variant: "$variantResult",
         discount: "$discountResult",
         category: "$categoryResult",
+        brand: "$brandResult",
         reverseStock: 1,
         instock: 1,
         warehouseLocation: 1,
