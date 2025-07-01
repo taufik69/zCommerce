@@ -42,14 +42,7 @@ const discountSchema = new mongoose.Schema(
       enum: ["flat", "category", "product"],
       required: true,
     },
-    // targetCategory: {
-    //   type: mongoose.Schema.Types.ObjectId,
-    //   ref: "Category",
-    // },
-    // targetProduct: {
-    //   type: mongoose.Schema.Types.ObjectId,
-    //   ref: "Product",
-    // },
+
     isActive: {
       type: Boolean,
       default: true,

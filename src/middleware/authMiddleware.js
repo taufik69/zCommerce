@@ -1,18 +1,31 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/user.model");
 const { customError } = require("../lib/CustomError");
+const { apiResponse } = require("../utils/apiResponse");
+const { asynchandeler } = require("../lib/asyncHandeler");
 
-exports.protect = async (req, res, next) => {
-  let token = req.headers.authorization?.split(" ")[1];
+exports.authGuard = asynchandeler(async (req, res, next) => {
+  let token =
+    req.headers.authorization.trim() ||
+    req.cookies?.accessToken.trim() ||
+    req.cookies?.token.trim();
+
   if (!token) {
-    throw new customError("No token provided", 401);
+    throw new customError("Token not found or Invalid", 401);
   }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id).populate("roles");
-    next();
-  } catch (error) {
-    throw new customError("Not authorized / Invalid token", 401);
+  const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SCCRECT);
+  if (!decoded) {
+    throw new customError("Invalid token", 401);
   }
-};
+  const user = await User.findById(decoded.id)
+    .populate("roles")
+    .populate("permission");
+  console.log(user);
+
+  if (!user) {
+    return apiResponse.sendSuccess(res, 401, "User not found");
+  }
+  req.user = user;
+  // next();
+});

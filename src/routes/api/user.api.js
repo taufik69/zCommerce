@@ -1,10 +1,11 @@
 const express = require("express");
 const _ = express.Router();
 const authController = require("../../controller/user.controller");
+const { authGuard } = require("../../middleware/authMiddleware");
 _.post("/registeruser", authController.registerUser);
 _.post("/login", authController.login);
 _.post("/refresh-token", authController.refreshToken);
-_.post("/logout", authController.logout);
+_.post("/logout", authGuard, authController.logout);
 // user control
 _.post("/send-email-verification", authController.sendEmailVerification);
 _.post("/verify-email", authController.verifyEmail);
