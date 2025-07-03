@@ -1,5 +1,6 @@
 const User = require("../models/user.model");
 const Role = require("../models/role.model");
+require("../models/permisson.model");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
@@ -263,19 +264,29 @@ exports.resetPassword = asynchandeler(async (req, res) => {
 });
 
 //change paassword
-// exports.changePassword = asynchandeler(async (req, res) => {
-//   const user = await User.findById(req.user.id);
-//   const { oldPassword, newPassword } = req.body;
+exports.changePassword = asynchandeler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (!user) throw new customError("User not found", 404);
 
-//   if (!(await user.comparePassword(oldPassword))) {
-//     throw new customError("Old password is incorrect", 400);
-//   }
+  const { oldPassword, newPassword } = req.body;
 
-//   user.password = newPassword;
-//   await user.save();
+  //check password have number and text and minimunm 8 character using regex
+  if (!/^(?=.*\d)(?=.*[a-zA-Z]).{8,}$/.test(newPassword)) {
+    throw new customError(
+      "Password must contain at least 8 characters, including at least one letter and one number",
+      400
+    );
+  }
 
-//   return apiResponse.sendSuccess(res, 200, "Password changed successfully");
-// });
+  if (!(await user.comparePassword(oldPassword))) {
+    throw new customError("Old password is incorrect", 400);
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  return apiResponse.sendSuccess(res, 200, "Password changed successfully");
+});
 
 // get all user
 exports.getAllUser = asynchandeler(async (_, res) => {
@@ -283,12 +294,9 @@ exports.getAllUser = asynchandeler(async (_, res) => {
     .select(
       "-__v -password -refreshToken  -createdAt  -twoFactorEnabled -newsLetterSubscribe "
     )
-    .populate([
-      { path: "roles" },
-      // { path: "permission" },
-      { path: "wishList" },
-      { path: "cart" },
-    ])
+    .populate([{ path: "roles" }])
+    .populate("wishList")
+    .populate("permission")
     .lean();
   return apiResponse.sendSuccess(res, 200, "User fetched successfully", users);
 });

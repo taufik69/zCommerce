@@ -11,6 +11,11 @@ _.post("/send-email-verification", authController.sendEmailVerification);
 _.post("/verify-email", authController.verifyEmail);
 _.post("/forgot-password", authController.forgotPassword);
 _.post("/reset-password", authController.resetPassword);
-_.get("/getallusers", authController.getAllUser);
-_.get("/getuserbyemailorphone", authController.getUserbyEmailOrPhone);
+_.get("/getallusers", authGuard, authController.getAllUser);
+_.get("/change-password", authGuard, authController.changePassword);
+_.get(
+  "/getuserbyemailorphone",
+  authGuard,
+  authController.getUserbyEmailOrPhone
+);
 module.exports = _;
