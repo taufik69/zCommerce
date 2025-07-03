@@ -15,6 +15,11 @@ exports.registerUser = asynchandeler(async (req, res) => {
   const value = await validateUser(req);
   const { name, email, password, phone, image } = value;
 
+  // check phone is valid bd number or not and start with 01 exist or not
+
+  if (!/^01[3-9]\d{8}$/.test(phone)) {
+    throw new customError("Invalid phone number", 400);
+  }
   // Check if user already exists
   const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
   if (existingUser) {
