@@ -11,7 +11,7 @@ const userSchema = new mongoose.Schema(
     isEmailVerified: { type: Boolean, default: false },
     isPhoneVerified: { type: Boolean, default: false },
     roles: [{ type: mongoose.Schema.Types.ObjectId, ref: "Role" }],
-    permission: [{ type: mongoose.Schema.Types.ObjectId, ref: "Permission" }],
+    permissions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Permission" }],
     phone: { type: String, unique: true },
     address: { type: String },
     city: { type: String },

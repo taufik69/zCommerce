@@ -34,6 +34,7 @@ const userSchema = joi
   })
   .options({
     abortEarly: true,
+    allowUnknown: true, // <-- This allows extra fields in req.body without validation
   });
 
 const validateUser = async (req) => {

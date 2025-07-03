@@ -3,49 +3,28 @@ const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 dotenv.config();
 const permission = [
-  { permissionName: "Product", actions: ["view", "add", "delete", "update"] },
-  { permissionName: "Category", actions: ["view", "add", "delete", "update"] },
-  { permissionName: "Order", actions: ["view", "add", "delete", "update"] },
-  { permissionName: "Discount", actions: ["view", "add", "delete", "update"] },
-  { permissionName: "Variant", actions: ["view", "add", "delete", "update"] },
-  {
-    permissionName: "SubCategory",
-    actions: ["view", "add", "delete", "update"],
-  },
-  { permissionName: "Brand", actions: ["view", "add", "delete", "update"] },
-  {
-    permissionName: "productInventory",
-    actions: ["view", "add", "delete", "update"],
-  },
-  {
-    permissionName: "RawProduct",
-    actions: ["view", "add", "delete", "update"],
-  },
-  {
-    permissionName: "ProductionStuff",
-    actions: ["view", "add", "delete", "update"],
-  },
-  { permissionName: "Purchase", actions: ["view", "add", "delete", "update"] },
-  { permissionName: "Sales", actions: ["view", "add", "delete", "update"] },
-  { permissionName: "Stock", actions: ["view", "add", "delete", "update"] },
-  { permissionName: "Customer", actions: ["view", "add", "delete", "update"] },
-  { permissionName: "Supplier", actions: ["view", "add", "delete", "update"] },
-  { permissionName: "Employee", actions: ["view", "add", "delete", "update"] },
-  {
-    permissionName: "Attendance",
-    actions: ["view", "add", "delete", "update"],
-  },
-  { permissionName: "Sms", actions: ["view", "add", "delete", "update"] },
-  {
-    permissionName: "UserRoleAndPermission",
-    actions: ["view", "add", "delete", "update"],
-  },
-  { permissionName: "Settings", actions: ["view", "add", "delete", "update"] },
-  {
-    permissionName: "Notification",
-    actions: ["view", "add", "delete", "update"],
-  },
-  { permissionName: "Report", actions: ["view", "add", "delete", "update"] },
+  { permissionName: "Product", actions: ["view"] },
+  { permissionName: "Category", actions: ["view"] },
+  { permissionName: "Order", actions: ["view"] },
+  { permissionName: "Discount", actions: ["view"] },
+  { permissionName: "Variant", actions: ["view"] },
+  { permissionName: "SubCategory", actions: ["view"] },
+  { permissionName: "Brand", actions: ["view"] },
+  { permissionName: "productInventory", actions: ["view"] },
+  { permissionName: "RawProduct", actions: ["view"] },
+  { permissionName: "ProductionStuff", actions: ["view"] },
+  { permissionName: "Purchase", actions: ["view"] },
+  { permissionName: "Sales", actions: ["view"] },
+  { permissionName: "Stock", actions: ["view"] },
+  { permissionName: "user", actions: ["view"] },
+  { permissionName: "Supplier", actions: ["view"] },
+  { permissionName: "Employee", actions: ["view"] },
+  { permissionName: "Attendance", actions: ["view"] },
+  { permissionName: "Sms", actions: ["view"] },
+  { permissionName: "UserRoleAndPermission", actions: ["view"] },
+  { permissionName: "Settings", actions: ["view"] },
+  { permissionName: "Notification", actions: ["view"] },
+  { permissionName: "Report", actions: ["view"] },
 ];
 
 async function seedPermisson() {

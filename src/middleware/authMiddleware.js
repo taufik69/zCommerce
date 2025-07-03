@@ -19,7 +19,9 @@ exports.authGuard = asynchandeler(async (req, res, next) => {
   if (!decoded) {
     throw new customError("Invalid token", 401);
   }
-  const user = await User.findById(decoded.id);
+  const user = await User.findById(decoded.id)
+    .populate("roles")
+    .populate("permissions");
 
   if (!user) {
     return apiResponse.sendSuccess(res, 401, "User not found");

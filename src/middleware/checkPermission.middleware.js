@@ -9,11 +9,10 @@ const authorize = (moduleName, action) =>
       throw new customError("Unauthorized: User not found in request", 401);
     }
 
-    // Populate roles and permissions
-    const user = await User.findById(req.user._id).populate({
-      path: "roles",
-      populate: { path: "permissions" },
-    });
+   
+    console.log(req.user);
+
+    return;
 
     if (!user) {
       throw new customError("Unauthorized: User not found", 401);
@@ -46,4 +45,4 @@ const authorize = (moduleName, action) =>
     next();
   });
 
-module.exports = authorize;
+module.exports = { authorize };

@@ -53,7 +53,7 @@ const VariantSchema = Joi.object({
   isActive: Joi.boolean().optional().messages({
     "boolean.base": "isActive must be a boolean value",
   }),
-}).options({ abortEarly: false });
+}).options({ abortEarly: false, allowUnknown: true });
 
 const validateVariant = async (req) => {
   try {
