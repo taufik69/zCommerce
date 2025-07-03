@@ -8,7 +8,6 @@ const { apiResponse } = require("../utils/apiResponse");
 const { customError } = require("../lib/CustomError");
 const { validateUser } = require("../validation/user.validation");
 const { asynchandeler } = require("../lib/asyncHandeler");
-const { log } = require("console");
 
 // user registraion/ or add user
 exports.registerUser = asynchandeler(async (req, res) => {
@@ -56,7 +55,6 @@ exports.registerUser = asynchandeler(async (req, res) => {
 // user login and send a refresh token and access token
 exports.login = asynchandeler(async (req, res) => {
   const { email, password, phone } = req.body;
-
 
   const user = await User.findOne({ $or: [{ email }, { phone }] }).select(
     "-__v -wishList -cart -newsLetterSubscribe  -lastLogout -createdAt  -twoFactorEnabled -newsLetterSubscribe -isEmailVerified -isPhoneVerified -roles -permission"
@@ -315,5 +313,11 @@ exports.getUserbyEmailOrPhone = asynchandeler(async (req, res) => {
       { path: "cart" },
     ]);
   if (!user) throw new customError("User not found", 404);
+  return apiResponse.sendSuccess(res, 200, "User fetched successfully", user);
+});
+
+//get me routes
+exports.getMe = asynchandeler(async (req, res) => {
+  const user = req.user;
   return apiResponse.sendSuccess(res, 200, "User fetched successfully", user);
 });

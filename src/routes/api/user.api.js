@@ -18,4 +18,5 @@ _.get(
   authGuard,
   authController.getUserbyEmailOrPhone
 );
+_.get("/getme", authGuard, authController.getMe);
 module.exports = _;
