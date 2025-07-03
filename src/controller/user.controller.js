@@ -56,6 +56,7 @@ exports.registerUser = asynchandeler(async (req, res) => {
 exports.login = asynchandeler(async (req, res) => {
   const { email, password, phone } = req.body;
 
+
   const user = await User.findOne({ $or: [{ email }, { phone }] }).select(
     "-__v -wishList -cart -newsLetterSubscribe  -lastLogout -createdAt  -twoFactorEnabled -newsLetterSubscribe -isEmailVerified -isPhoneVerified -roles -permission"
   );

@@ -8,7 +8,12 @@ const app = express();
  * todo : All middleware
  * *motive: Middleware are used to configuration
  */
-app.use(cors());
+app.use(cors(
+  {
+    origin: process.env.CLIENT_URL || "http://localhost:3001",
+    credentials: true,
+  }
+));
 app.use(cookieparser());
 
 /**
