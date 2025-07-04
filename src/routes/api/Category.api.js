@@ -2,9 +2,13 @@ const express = require("express");
 const _ = express.Router();
 const { multipleFileUpload } = require("../../middleware/multer.middleware");
 const Category = require("../../controller/category.controller");
+const { authGuard } = require("../../middleware/authMiddleware");
+const { authorize } = require("../../middleware/checkPermission.middleware");
 
 // @desc   categories routes
 _.route("/categories").post(
+  authGuard,
+  authorize("category", "add"),
   multipleFileUpload("image", 1),
   Category.createCategory
 );
