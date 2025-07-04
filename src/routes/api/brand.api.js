@@ -11,11 +11,16 @@ _.route("/brand")
     multipleFileUpload("image", 10),
     Brand.createBrand
   )
-  .get(Brand.getAllBrands);
+  .get(authGuard, Brand.getAllBrands);
 
 _.route("/brand/:slug")
-  .get(Brand.getBrandBySlug)
-  .put(multipleFileUpload("image", 10), Brand.updateBrand)
-  .delete(Brand.deleteBrand);
+  .get(authGuard, Brand.getBrandBySlug)
+  .put(
+    authGuard,
+    authorize("brand", "update"),
+    multipleFileUpload("image", 10),
+    Brand.updateBrand
+  )
+  .delete(authGuard, authorize("brand", "delete"), Brand.deleteBrand);
 
 module.exports = _;

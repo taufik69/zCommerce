@@ -35,13 +35,23 @@ exports.registerUser = asynchandeler(async (req, res) => {
     roleIds = [defaultRole._id];
   }
 
-  // Find default permission (example: view permission for SubCategory)
-  const defaultPermission = await Permission.findOne({
-    permissionName: "user",
-    actions: { $in: ["view"] },
-  });
-  if (!defaultPermission) {
-    throw new customError("Default user permission not found", 500);
+  // Find default permission (example: view permission for user)
+  let permissionIds = [];
+  if (
+    req.body.permissions &&
+    Array.isArray(req.body.permissions) &&
+    req.body.permissions.length > 0
+  ) {
+    permissionIds = req.body.permissions;
+  } else {
+    const defaultPermission = await Permission.findOne({
+      permissionName: "user",
+      actions: { $in: ["view"] },
+    });
+    if (!defaultPermission) {
+      throw new customError("Default user permission not found", 500);
+    }
+    permissionIds = [defaultPermission._id];
   }
 
   // Create user
@@ -52,7 +62,7 @@ exports.registerUser = asynchandeler(async (req, res) => {
     phone,
     image: image || null,
     roles: roleIds,
-    permissions: [defaultPermission._id],
+    permissions: permissionIds,
   });
 
   await user.save();

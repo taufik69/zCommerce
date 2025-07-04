@@ -9,40 +9,29 @@ const authorize = (moduleName, action) =>
       throw new customError("Unauthorized: User not found in request", 401);
     }
 
-   
-    console.log(req.user);
-
-    return;
-
-    if (!user) {
-      throw new customError("Unauthorized: User not found", 401);
-    }
-
-    if (!user.roles || user.roles.length === 0) {
-      throw new customError("Access denied: No roles assigned", 403);
-    }
-
     // Superadmin shortcut
-    const isSuperAdmin = user.roles.some((role) => role.name === "superadmin");
+    const isSuperAdmin = req.user.roles.some(
+      (role) => role.slug === "superadmin"
+    );
     if (isSuperAdmin) return next();
 
     // Check permissions
-    const allowed = user.roles.some(
-      (role) =>
-        Array.isArray(role.permissions) &&
-        role.permissions.some(
-          (permission) =>
-            permission.module === moduleName &&
-            Array.isArray(permission.actions) &&
-            permission.actions.includes(action)
-        )
-    );
+    const allowed = req.user.permissions.find((perm) => {
+      return (
+        perm.slug === moduleName &&
+        perm.actions &&
+        perm.actions.includes(action)
+      );
+    });
 
-    if (!allowed) {
-      throw new customError("Access denied: Insufficient permission", 403);
+    if (allowed) {
+      next();
+    } else {
+      throw new customError(
+        "Access denied: You don't have permission to perform this action",
+        403
+      );
     }
-
-    next();
   });
 
 module.exports = { authorize };
