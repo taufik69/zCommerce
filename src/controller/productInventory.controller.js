@@ -25,6 +25,8 @@ exports.createProductInventory = asynchandeler(async (req, res) => {
 
 //@desc get all product inventory
 exports.getAllProductInventory = asynchandeler(async (req, res) => {
+
+  console.log(req.query)
   const productInventories = await ProductInventory.aggregate([
     {
       $lookup: {

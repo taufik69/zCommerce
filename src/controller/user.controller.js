@@ -114,12 +114,18 @@ exports.login = asynchandeler(async (req, res) => {
   delete userData.userPassword;
   delete userData.userRefreshToken;
 
-  // now send  refresh token via cookie
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: process.env.NODE_ENV === "production" ? true : false, // secure: true,
-    secure: process.env.NODE_ENV === "production" ? true : false, // set to true in production
-    sameSite: "none",
-  });
+
+  // set refresh token in cookie
+const isProduction = process.env.NODE_ENV === "production";
+
+res.cookie("refreshToken", refreshToken, {
+  httpOnly: true,
+  secure: isProduction, 
+  sameSite: isProduction ? "none" : "lax", 
+  path: "/",
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+});
+
 
   return apiResponse.sendSuccess(res, 200, "Login successful", {
     accessToken,
