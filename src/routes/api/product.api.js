@@ -9,7 +9,6 @@ const { authorize } = require("../../middleware/checkPermission.middleware");
 _.route("/createproduct").post(
   authGuard,
   authorize("product", "add"),
-
   multipleFileUploadWithFields([
     { name: "image", maxCount: 10 },
     { name: "thumbnail", maxCount: 1 },
@@ -17,16 +16,24 @@ _.route("/createproduct").post(
   Product.ProductCreate
 );
 
-_.route("/getallproducts").get(Product.getAllProducts);
-_.route("/getsingleproduct/:slug").get(Product.getSingleProduct);
-_.route("/updateproduct/:slug").put(
-  multipleFileUploadWithFields([
-    { name: "image", maxCount: 10 },
-    { name: "thumbnail", maxCount: 1 },
-  ]),
+_.route("/getallproducts").get(
+  authGuard,
+  authorize("product", "view"),
+  Product.getAllProducts
+);
+_.route("/getsingleproduct/:slug").get(
+  authGuard,
+  authorize("product", "view"),
+  Product.getSingleProduct
+);
+_.route("/updateproductinfo/:slug").put(
+  authGuard,
+  authorize("product", "update"),
   Product.updateProductInfo
 );
-_.route("/updateproduct/:slug/image").put(
+_.route("/updateproductimages/:slug/image").put(
+  authGuard,
+  authorize("product", "update"),
   multipleFileUploadWithFields([
     { name: "image", maxCount: 10 },
     { name: "thumbnail", maxCount: 1 },
@@ -34,8 +41,20 @@ _.route("/updateproduct/:slug/image").put(
   Product.updateProductImages
 );
 // req.query apply
-_.route("/getproductspagination").get(Product.getProductsPagination);
-_.route("/productListbyOrder").get(Product.getAllProductsInOrder);
-_.route("/searchProduct").get(Product.searchProductByName);
+_.route("/getproductspagination").get(
+  authGuard,
+  authorize("product", "view"),
+  Product.getProductsPagination
+);
+_.route("/productListbyOrder").get(
+  authGuard,
+  authorize("product", "view"),
+  Product.getAllProductsInOrder
+);
+_.route("/searchProduct").get(
+  authGuard,
+  authorize("product", "view"),
+  Product.searchProductByName
+);
 
 module.exports = _;
