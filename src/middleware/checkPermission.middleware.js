@@ -11,7 +11,7 @@ const authorize = (moduleName, action) =>
     }
 
     // Superadmin shortcut
-    const isSuperAdmin = req.user.roles.some(
+    const isSuperAdmin = req.user?.roles?.some(
       (role) => role.slug === "superadmin"
     );
     if (isSuperAdmin) return next();
@@ -24,9 +24,14 @@ const authorize = (moduleName, action) =>
         perm.actions.includes(action)
       );
     });
+    console.log(req.user.permissions);
+    return;
 
     if (allowed) {
-      next();
+      // next();
+      console.log(
+        `User ${req.user.id} is authorized for ${moduleName} - ${action} ${allowed}`
+      );
     } else {
       throw new customError(
         "Access denied: You don't have permission to perform this action",
