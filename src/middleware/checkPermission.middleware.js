@@ -17,24 +17,21 @@ const authorize = (moduleName, action) =>
     if (isSuperAdmin) return next();
 
     // Check permissions
-    const allowed = req.user.permissions.find((perm) => {
+    const allowed = req.user?.permissions?.find((perm) => {
       return (
-        perm.slug === moduleName &&
+        perm.slug === moduleName?.toString()?.toLowerCase() &&
         perm.actions &&
         perm.actions.includes(action)
       );
     });
-    console.log(req.user.permissions);
-    return;
 
     if (allowed) {
-      // next();
-      console.log(
-        `User ${req.user.id} is authorized for ${moduleName} - ${action} ${allowed}`
-      );
+      // If permission is found, proceed to the next middleware
+      next();
     } else {
       throw new customError(
-        "Access denied: You don't have permission to perform this action",
+        "Access denied: You don't have permission to perform this action || " +
+          `User ${req.user.name} is authorized for ${moduleName} - ${action} action`,
         403
       );
     }
