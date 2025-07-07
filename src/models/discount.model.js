@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
+const { customError } = require("../lib/CustomError");
 
 const discountSchema = new mongoose.Schema(
   {

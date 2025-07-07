@@ -1,5 +1,4 @@
 const { apiResponse } = require("../utils/apiResponse");
-const Category = require("../models/category.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 
@@ -10,6 +9,12 @@ const validateDiscount = require("../validation/discount.validation");
 // @desc create a new discount
 exports.createDiscount = asynchandeler(async (req, res) => {
   const value = await validateDiscount(req);
+
+  // check if the discount already exists
+  const existingDiscount = await Discount.findOne({ slug: value.slug });
+  if (existingDiscount) {
+    throw new customError("Discount with this slug already exists", 400);
+  }
 
   // create a new discount
   const discount = new Discount(value);
