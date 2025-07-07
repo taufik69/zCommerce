@@ -114,18 +114,16 @@ exports.login = asynchandeler(async (req, res) => {
   delete userData.userPassword;
   delete userData.userRefreshToken;
 
-
   // set refresh token in cookie
-const isProduction = process.env.NODE_ENV === "production";
+  const isProduction = process.env.NODE_ENV === "production";
 
-res.cookie("refreshToken", refreshToken, {
-  httpOnly: true,
-  secure: isProduction, 
-  sameSite: isProduction ? "none" : "lax", 
-  path: "/",
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-});
-
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    path: "/",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  });
 
   return apiResponse.sendSuccess(res, 200, "Login successful", {
     accessToken,
@@ -354,6 +352,50 @@ exports.getUserbyEmailOrPhone = asynchandeler(async (req, res) => {
 exports.getMe = asynchandeler(async (req, res) => {
   const user = req.user;
 
-  
   return apiResponse.sendSuccess(res, 200, "User fetched successfully", user);
+});
+
+// search a user andd add permissin in  permission array
+exports.addPermissionToUser = asynchandeler(async (req, res) => {
+  const { userId, permissionId } = req.body;
+
+  // Check if user exists
+  const user = await User.findById(userId);
+  if (!user) throw new customError("User not found", 404);
+
+  // Check if permission exists
+  const permission = await Permission.findById(permissionId);
+  if (!permission) throw new customError("Permission not found", 404);
+
+  // Add permission to user's permissions array
+  user.permissions.push(permission._id);
+  await user.save();
+
+  return apiResponse.sendSuccess(res, 200, "Permission added successfully", {
+    user,
+    permission,
+  });
+});
+// remove permission from user
+exports.removePermissionFromUser = asynchandeler(async (req, res) => {
+  const { userId, permissionId } = req.body;
+
+  // Check if user exists
+  const user = await User.findById(userId);
+  if (!user) throw new customError("User not found", 404);
+
+  // Check if permission exists
+  const permission = await Permission.findById(permissionId);
+  if (!permission) throw new customError("Permission not found", 404);
+
+  // Remove permission from user's permissions array
+  user.permissions = user.permissions.filter(
+    (perm) => perm.toString() !== permission._id.toString()
+  );
+  await user.save();
+
+  return apiResponse.sendSuccess(res, 200, "Permission removed successfully", {
+    user,
+    permission,
+  });
 });

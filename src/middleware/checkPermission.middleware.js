@@ -31,7 +31,7 @@ const authorize = (moduleName, action) =>
     } else {
       throw new customError(
         "Access denied: You don't have permission to perform this action || " +
-          `User ${req.user.name} is authorized for ${moduleName} - ${action} action`,
+          `User ${req.user.name} is Not authorized for ${moduleName} - ${action} action`,
         403
       );
     }

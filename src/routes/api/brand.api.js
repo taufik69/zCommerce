@@ -11,10 +11,10 @@ _.route("/brand")
     multipleFileUpload("image", 10),
     Brand.createBrand
   )
-  .get(authGuard, Brand.getAllBrands);
+  .get(authGuard, authorize("brand", "view"), Brand.getAllBrands);
 
 _.route("/brand/:slug")
-  .get(authGuard, Brand.getBrandBySlug)
+  .get(authGuard, authorize("brand", "view"), Brand.getBrandBySlug)
   .put(
     authGuard,
     authorize("brand", "update"),
