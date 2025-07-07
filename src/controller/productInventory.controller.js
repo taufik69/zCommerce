@@ -25,8 +25,7 @@ exports.createProductInventory = asynchandeler(async (req, res) => {
 
 //@desc get all product inventory
 exports.getAllProductInventory = asynchandeler(async (req, res) => {
-
-  console.log(req.query)
+  console.log(req.query);
   const productInventories = await ProductInventory.aggregate([
     {
       $lookup: {
@@ -131,6 +130,8 @@ exports.getAllProductInventory = asynchandeler(async (req, res) => {
         category: "$categoryResult",
         subcategory: "$subcategoryResult",
         brand: "$brandResult",
+        variant: "$variantResult",
+        discount: "$discountResult",
         discountId: "$productResult.discountId",
         thumbnail: "$productResult.thumbnail",
         image: "$productResult.image",
@@ -141,9 +142,6 @@ exports.getAllProductInventory = asynchandeler(async (req, res) => {
         slug: "$productResult.slug",
 
         // Keep variant and discount as objects
-
-        brand: "$brandResult",
-        discount: "$discountResult",
       },
     },
   ]);
@@ -264,6 +262,8 @@ exports.getProductInventoryBySlug = asynchandeler(async (req, res) => {
         category: "$categoryResult",
         subcategory: "$subcategoryResult",
         brand: "$brandResult",
+        variant: "$variantResult",
+        discount: "$discountResult",
         discountId: "$productResult.discountId",
         thumbnail: "$productResult.thumbnail",
         image: "$productResult.image",
@@ -274,8 +274,6 @@ exports.getProductInventoryBySlug = asynchandeler(async (req, res) => {
         slug: "$productResult.slug",
 
         // Keep variant and discount as objects
-        variant: "$variantResult",
-        discount: "$discountResult",
       },
     },
   ]);
