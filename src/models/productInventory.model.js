@@ -5,12 +5,10 @@ const productInventorySchema = new mongoose.Schema(
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
-      required: true,
     },
     variant: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Variant",
-      required: true,
     },
     discount: {
       type: mongoose.Schema.Types.ObjectId,
@@ -18,7 +16,6 @@ const productInventorySchema = new mongoose.Schema(
     },
     stock: {
       type: Number,
-      required: true,
       min: 0,
     },
     reverseStock: {
@@ -36,17 +33,14 @@ const productInventorySchema = new mongoose.Schema(
     },
     sellingPrice: {
       type: Number,
-      required: true,
       min: 0,
     },
     wholeSalePrice: {
       type: Number,
-      required: true,
       min: 0,
     },
     profitRate: {
       type: Number,
-      required: true,
       min: 0,
     },
     alertQuantity: {
