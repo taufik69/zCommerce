@@ -60,6 +60,10 @@ exports.getAllProducts = asynchandeler(async (req, res, next) => {
     .populate({
       path: "brand",
       select: "-createdAt -updatedAt",
+    })
+    .populate({
+      path: "discountId",
+      select: "-createdAt -updatedAt",
     });
 
   return apiResponse.sendSuccess(res, 200, "Products fetched successfully", {
@@ -82,6 +86,10 @@ exports.getSingleProduct = asynchandeler(async (req, res, next) => {
     })
     .populate({
       path: "brand",
+      select: "-createdAt -updatedAt",
+    })
+    .populate({
+      path: "discountId",
       select: "-createdAt -updatedAt",
     });
   if (!product) {
@@ -245,7 +253,7 @@ exports.getAllProductsInOrder = asynchandeler(async (req, res, next) => {
   // Fetch products with sorting
   const products = await Product.find(query)
     .sort({ createdAt: sortOrder })
-    .populate(["category", "subcategory", "brand"]);
+    .populate(["category", "subcategory", "brand", "discountId"]);
 
   return apiResponse.sendSuccess(
     res,
@@ -270,6 +278,7 @@ exports.searchProductByName = asynchandeler(async (req, res, next) => {
     "category",
     "subcategory",
     "brand",
+    "discountId",
   ]);
 
   return apiResponse.sendSuccess(

@@ -5,18 +5,18 @@ const { authGuard } = require("../../middleware/authMiddleware");
 const { authorize } = require("../../middleware/checkPermission.middleware");
 
 _.route("/createproduct").post(
-  authGuard,
-  authorize("productinventory", "add"),
+  // authGuard,
+  // authorize("productinventory", "add"),
   productInventoryController.createProductInventory
 );
 _.route("/getallproductinventory").get(
-  authGuard,
-  authorize("productinventory", "view"),
+  // authGuard,
+  // authorize("productinventory", "view"),
   productInventoryController.getAllProductInventory
 );
-_.route("/getproduct/:slug").get(
-  authGuard,
-  authorize("productinventory", "view"),
+_.route("/getproduct-inventory/:slug").get(
+  // authGuard,
+  // authorize("productinventory", "view"),
   productInventoryController.getProductInventoryBySlug
 );
 

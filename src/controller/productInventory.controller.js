@@ -25,7 +25,6 @@ exports.createProductInventory = asynchandeler(async (req, res) => {
 
 //@desc get all product inventory
 exports.getAllProductInventory = asynchandeler(async (req, res) => {
-  console.log(req.query);
   const productInventories = await ProductInventory.aggregate([
     {
       $lookup: {
@@ -109,39 +108,6 @@ exports.getAllProductInventory = asynchandeler(async (req, res) => {
       $unwind: {
         path: "$subcategoryResult",
         preserveNullAndEmptyArrays: true,
-      },
-    },
-    {
-      $project: {
-        _id: 1,
-        stock: 1,
-        reverseStock: 1,
-        instock: 1,
-        warehouseLocation: 1,
-        sellingPrice: 1,
-        wholeSalePrice: 1,
-        profitRate: 1,
-        alertQuantity: 1,
-        stockAlert: 1,
-        // Flatten product fields
-        productId: "$productResult._id",
-        name: "$productResult.name",
-        description: "$productResult.description",
-        category: "$categoryResult",
-        subcategory: "$subcategoryResult",
-        brand: "$brandResult",
-        variant: "$variantResult",
-        discount: "$discountResult",
-        discountId: "$productResult.discountId",
-        thumbnail: "$productResult.thumbnail",
-        image: "$productResult.image",
-        tag: "$productResult.tag",
-        isActive: "$productResult.isActive",
-        createdAt: "$productResult.createdAt",
-        updatedAt: "$productResult.updatedAt",
-        slug: "$productResult.slug",
-
-        // Keep variant and discount as objects
       },
     },
   ]);
@@ -241,39 +207,6 @@ exports.getProductInventoryBySlug = asynchandeler(async (req, res) => {
       $unwind: {
         path: "$subcategoryResult",
         preserveNullAndEmptyArrays: true,
-      },
-    },
-    {
-      $project: {
-        _id: 1,
-        stock: 1,
-        reverseStock: 1,
-        instock: 1,
-        warehouseLocation: 1,
-        sellingPrice: 1,
-        wholeSalePrice: 1,
-        profitRate: 1,
-        alertQuantity: 1,
-        stockAlert: 1,
-        // Flatten product fields
-        productId: "$productResult._id",
-        name: "$productResult.name",
-        description: "$productResult.description",
-        category: "$categoryResult",
-        subcategory: "$subcategoryResult",
-        brand: "$brandResult",
-        variant: "$variantResult",
-        discount: "$discountResult",
-        discountId: "$productResult.discountId",
-        thumbnail: "$productResult.thumbnail",
-        image: "$productResult.image",
-        tag: "$productResult.tag",
-        isActive: "$productResult.isActive",
-        createdAt: "$productResult.createdAt",
-        updatedAt: "$productResult.updatedAt",
-        slug: "$productResult.slug",
-
-        // Keep variant and discount as objects
       },
     },
   ]);
