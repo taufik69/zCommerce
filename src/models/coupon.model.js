@@ -1,6 +1,9 @@
+const { customError } = require("../lib/CustomError");
 const mongoose = require("mongoose");
+const { default: slugify } = require("slugify");
 
 const couponSchema = new mongoose.Schema({
+  slug: { type: String, unique: true, trim: true },
   code: { type: String, required: true, unique: true },
   discountType: { type: String, enum: ["percentage", "fixed"], required: true },
   discountValue: { type: Number, required: true },
@@ -14,64 +17,26 @@ const couponSchema = new mongoose.Schema({
   subcategories: [{ type: mongoose.Schema.Types.ObjectId, ref: "Subcategory" }],
 });
 
+// make a slug using code
+couponSchema.pre("save", function (next) {
+  if (this.isModified("code")) {
+    this.slug = slugify(this.code, { lower: true, strict: true });
+  }
+  next();
+});
+
+// check this slug already exist or not
+couponSchema.pre("save", async function (next) {
+  const existingCoupon = await this.constructor.findOne({ slug: this.slug });
+  if (existingCoupon && existingCoupon._id.toString() !== this._id.toString()) {
+    console.log(
+      `Coupon with slug ${this.slug} or code ${this.code} already exists`
+    );
+    throw new customError(
+      `Coupon with slug ${this.slug} or code ${this.code} already exists`
+    );
+  }
+  next();
+});
+
 module.exports = mongoose.model("Coupon", couponSchema);
-
-/**
- * const Coupon = require('../models/Coupon');
-
-exports.createCoupon = async (req, res) => {
-  try {
-    const coupon = new Coupon(req.body);
-    await coupon.save();
-    res.status(201).json(coupon);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-};
-
-exports.applyCoupon = async (req, res) => {
-  const { code, productId, categoryId, subcategoryId, cartTotal } = req.body;
-  try {
-    const coupon = await Coupon.findOne({ code, isActive: true });
-    if (!coupon) return res.status(404).json({ error: 'Invalid coupon' });
-    if (coupon.expireAt < new Date()) return res.status(400).json({ error: 'Coupon expired' });
-    if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit)
-      return res.status(400).json({ error: 'Usage limit exceeded' });
-
-    // Check applicability
-    let applicable = false;
-    if (coupon.products.length && productId && coupon.products.includes(productId)) applicable = true;
-    if (coupon.categories.length && categoryId && coupon.categories.includes(categoryId)) applicable = true;
-    if (coupon.subcategories.length && subcategoryId && coupon.subcategories.includes(subcategoryId)) applicable = true;
-    // If coupon is not restricted, allow global use
-    if (!coupon.products.length && !coupon.categories.length && !coupon.subcategories.length) applicable = true;
-    if (!applicable) return res.status(400).json({ error: 'Coupon not applicable for this item' });
-
-    // Calculate discount
-    let discount = 0;
-    if (coupon.discountType === 'percentage') {
-      discount = cartTotal * (coupon.discountValue / 100);
-    } else {
-      discount = coupon.discountValue;
-    }
-
-    coupon.usedCount += 1;
-    await coupon.save();
-
-    res.json({ discount, total: cartTotal - discount, coupon });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
- */
-
-/**
- * const express = require('express');
-const router = express.Router();
-const couponController = require('../controllers/couponController');
-
-router.post('/create', couponController.createCoupon);
-router.post('/apply', couponController.applyCoupon);
-
-module.exports = router;
- */

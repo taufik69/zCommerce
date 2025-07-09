@@ -11,7 +11,7 @@ const productInventoryRoutes = require("./api/productInventory.api");
 const roleRoutes = require("./api/role.api");
 const userRoutes = require("./api/user.api");
 const permissionRoutes = require("./api/permisson.api");
-
+const cupuonRoutes = require("./api/coupon.api");
 _.use("/auth", userRoutes);
 _.use(categoryRoutes);
 _.use(subcategoryRoutes);
@@ -22,6 +22,7 @@ _.use(discountRoutes);
 _.use("/product-inventory", productInventoryRoutes);
 _.use(roleRoutes);
 _.use("/permission", permissionRoutes);
+_.use("/coupon", cupuonRoutes);
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });
