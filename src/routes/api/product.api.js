@@ -15,15 +15,15 @@ _.route("/createproduct").post(
   ]),
   Product.ProductCreate
 );
- 
+
 _.route("/getallproducts").get(
-  authGuard,
-  authorize("product", "view"),
+  // authGuard,
+  // authorize("product", "view"),
   Product.getAllProducts
 );
 _.route("/getsingleproduct/:slug").get(
-  authGuard,
-  authorize("product", "view"),
+  // authGuard,
+  // authorize("product", "view"),
   Product.getSingleProduct
 );
 _.route("/updateproductinfo/:slug").put(

@@ -10,13 +10,13 @@ _.route("/createproduct").post(
   productInventoryController.createProductInventory
 );
 _.route("/getallproductinventory").get(
-  authGuard,
-  authorize("productinventory", "view"),
+  // authGuard,
+  // authorize("productinventory", "view"),
   productInventoryController.getAllProductInventory
 );
 _.route("/getproduct-inventory/:slug").get(
-  authGuard,
-  authorize("productinventory", "view"),
+  // authGuard,
+  // authorize("productinventory", "view"),
   productInventoryController.getProductInventoryBySlug
 );
 
