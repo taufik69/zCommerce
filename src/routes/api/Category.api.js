@@ -14,8 +14,6 @@ _.route("/categories").post(
 );
 // @desc   get all categories
 _.route("/categories").get(
-  authGuard,
-  authorize("category", "view"),
   Category.getAllCategories
 );
 _.route("/categories/:slug").get(
