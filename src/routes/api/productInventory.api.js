@@ -53,4 +53,8 @@ _.route("/productpricehightolow").get(
   productInventoryController.searchProductInventoryHighToLow
 );
 
+_.route("/productinventory/:id").delete(
+  productInventoryController.deleteProductInventoryBySlug
+);
+
 module.exports = _;

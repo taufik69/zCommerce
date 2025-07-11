@@ -801,38 +801,12 @@ exports.searchProductInventoryHighToLow = asynchandeler(async (req, res) => {
 
 //@desc delete productInventory searching by product slug using aggregation
 exports.deleteProductInventoryBySlug = asynchandeler(async (req, res) => {
-  const { slug } = req.query;
-
-  const productInventory = await ProductInventory.aggregate([
-    {
-      $lookup: {
-        from: "products",
-        localField: "product",
-        foreignField: "_id",
-        as: "productResult",
-      },
-    },
-    {
-      $unwind: {
-        path: "$productResult",
-        preserveNullAndEmptyArrays: true,
-      },
-    },
-    {
-      $match: { "productResult.slug": slug },
-    },
-    {
-      $project: {
-        _id: 1,
-      },
-    },
-  ]);
-
-  if (!productInventory || productInventory.length === 0) {
-    throw new customError("Product inventory not found", 404);
+  const { id } = req.params;
+  if (!id) {
+    throw new customError("No product inventory found", 404);
   }
 
-  await ProductInventory.findByIdAndDelete(productInventory[0]._id);
+  await ProductInventory.findByIdAndDelete({ _id: id, isActive: true });
 
   return apiResponse.sendSuccess(
     res,
