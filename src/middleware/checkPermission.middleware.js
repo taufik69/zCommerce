@@ -6,6 +6,8 @@ const { custom } = require("joi");
 const authorize = (moduleName, action) =>
   asynchandeler(async (req, res, next) => {
     // Ensure req.user is set by auth middleware
+
+    console.log("runing ", action)
     if (!req.user || !req.user.id) {
       throw new customError("Unauthorized: User not found in request", 401);
     }

@@ -11,6 +11,7 @@ exports.authGuard = asynchandeler(async (req, res, next) => {
     req.cookies?.accessToken?.trim() ||
     req.cookies?.token?.trim();
 
+
   if (!token || token === "null" || token === "undefined") {
     throw new customError("Token not found or Invalid / Token Required", 401);
   }
