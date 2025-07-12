@@ -56,5 +56,10 @@ _.route("/searchProduct").get(
   // authorize("product", "view"),
   Product.searchProductByName
 );
+_.route("/deleteproduct/:slug").delete(
+  // authGuard,
+  // authorize("product", "delete"),
+  Product.deleteProduct
+);
 
 module.exports = _;

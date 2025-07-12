@@ -283,3 +283,18 @@ exports.searchProductByName = asynchandeler(async (req, res, next) => {
     products
   );
 });
+
+//@desc delete product by slug
+exports.deleteProduct = asynchandeler(async (req, res, next) => {
+  const { slug } = req.params;
+  const product = await Product.findOneAndDelete({ slug });
+  if (!product) {
+    throw new customError("Product not found", 404);
+  }
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Product deleted successfully",
+    product
+  );
+});
