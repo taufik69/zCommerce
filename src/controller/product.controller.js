@@ -109,11 +109,6 @@ exports.updateProductInfo = asynchandeler(async (req, res, next) => {
   const { name, description, category, subcategory, brand, discountId, tag } =
     req.body;
 
-  // manually check the req.body
-  if (!name || !description || !category || !subcategory || !brand) {
-    throw new customError("Please provide all required fields", 400);
-  }
-
   // check if product exists
   const product = await Product.findOne({ slug });
   if (!product) {
@@ -121,12 +116,12 @@ exports.updateProductInfo = asynchandeler(async (req, res, next) => {
   }
 
   // update the product
-  product.name = name;
-  product.description = description;
-  product.category = category;
-  product.subcategory = subcategory;
-  product.brand = brand;
-  product.discountId = discountId;
+  product.name = name ? name : product.name;
+  product.description = description ? description : product.description;
+  product.category = category ? category : product.category;
+  product.subcategory = subcategory ? subcategory : product.subcategory;
+  product.brand = brand ? brand : product.brand;
+  product.discountId = discountId ? discountId : product.discountId;
   product.tag = tag ? tag : [];
 
   await product.save();
