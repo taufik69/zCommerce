@@ -110,6 +110,9 @@ exports.getAllProductInventory = asynchandeler(async (req, res) => {
         preserveNullAndEmptyArrays: true,
       },
     },
+    {
+      $sort: { createdAt: -1 },
+    },
   ]);
 
   return apiResponse.sendSuccess(
@@ -212,7 +215,7 @@ exports.getProductInventoryBySlug = asynchandeler(async (req, res) => {
   ]);
 
   // Check if product inventory exists
-  if (!productInventory || productInventory.length === 0) {
+  if (!productInventory || productInventory?.length === 0) {
     throw new customError("Product inventory not found", 404);
   }
 
@@ -220,7 +223,7 @@ exports.getProductInventoryBySlug = asynchandeler(async (req, res) => {
     res,
     200,
     "Product inventory fetched successfully",
-    productInventory // Return the first (and only) result
+    productInventory[0] // Return the first (and only) result
   );
 });
 

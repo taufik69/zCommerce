@@ -5,8 +5,8 @@ const { authGuard } = require("../../middleware/authMiddleware");
 const { authorize } = require("../../middleware/checkPermission.middleware");
 
 _.route("/createproduct").post(
-  authGuard,
-  authorize("productinventory", "add"),
+  // authGuard,
+  // authorize("productinventory", "add"),
   productInventoryController.createProductInventory
 );
 _.route("/getallproductinventory").get(
