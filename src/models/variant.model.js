@@ -1,9 +1,14 @@
 const mongoose = require("mongoose");
+const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
-const slugify = require("slugify");
 
 const variantSchema = new mongoose.Schema(
   {
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      required: true,
+    },
     slug: {
       type: String,
       unique: true,
@@ -17,20 +22,27 @@ const variantSchema = new mongoose.Schema(
     },
     size: {
       type: String,
-      required: true,
       trim: true,
-      enum: ["S", "M", "L", "XL", "XXL", "XXXL", "Custom"], // Example sizes, adjust as needed
+      enum: ["S", "M", "L", "XL", "XXL", "XXXL", "Custom", "N/A"],
+      default: "N/A",
     },
     color: {
       type: String,
-      required: true,
       trim: true,
+      default: "N/A",
     },
+    // Quantity / stock
     stockVariant: {
       type: Number,
       required: true,
       min: 0,
     },
+    alertVariantStock: {
+      type: Number,
+      min: 0,
+      default: 5,
+    },
+    // Pricing
     retailPrice: {
       type: Number,
       required: true,
@@ -38,28 +50,18 @@ const variantSchema = new mongoose.Schema(
     },
     retailProfitMargin: {
       type: Number,
-      required: true,
       min: 0,
-      max: 100, // Assuming profit margin is a percentage
+      max: 100,
       default: 0,
     },
-
     wholesalePrice: {
       type: Number,
-      required: true,
       min: 0,
     },
     wholesaleProfitMargin: {
       type: Number,
-      required: true,
       min: 0,
-      max: 100, // Assuming profit margin is a percentage
-      default: 0,
-    },
-    alertVariantStock: {
-      type: Number,
-      required: true,
-      min: 5, // Initial stock when the variant is created
+      max: 100,
       default: 0,
     },
     isActive: {
@@ -69,12 +71,12 @@ const variantSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true }, // Include virtuals in JSON output
-    toObject: { virtuals: true }, // Include virtuals in object output
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
-// make a slug from variantName  using slugify
+// slugify
 variantSchema.pre("save", function (next) {
   if (this.isModified("variantName")) {
     this.slug = slugify(this.variantName, { lower: true, strict: true });
@@ -82,33 +84,28 @@ variantSchema.pre("save", function (next) {
   next();
 });
 
-//  make a virtual field for retailProfitAmount amount
+// virtuals
 variantSchema.virtual("retailProfitAmount").get(function () {
   return (this.retailPrice * this.retailProfitMargin) / 100;
 });
-
 variantSchema.virtual("wholesaleProfitAmount").get(function () {
   return (this.wholesalePrice * this.wholesaleProfitMargin) / 100;
 });
 
-// check if variant exist with same size and color and also slug
+// Check for duplicate variant by size, color, product
 variantSchema.pre("save", async function (next) {
-  const isExistSizeColor = await this.constructor.find({
+  const existing = await this.constructor.findOne({
+    product: this.product,
     size: this.size,
     color: this.color,
     slug: this.slug,
   });
 
-  if (
-    isExistSizeColor &&
-    isExistSizeColor._id &&
-    isExistSizeColor._id.toString() !== this._id.toString()
-  ) {
-    throw new customError(`Already Have this ${this.color} and ${this.size}`);
+  if (existing && existing._id.toString() !== this._id.toString()) {
+    throw new customError(
+      `Variant with size ${this.size} and color ${this.color} already exists.`
+    );
   }
+
   next();
 });
-
-const Variant = mongoose.model("Variant", variantSchema);
-
-module.exports = Variant;
