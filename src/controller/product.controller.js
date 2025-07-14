@@ -2,17 +2,55 @@ const Product = require("../models/product.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { apiResponse } = require("../utils/apiResponse");
+const path = require("path");
+const bwipjs = require("bwip-js");
+const QRCode = require("qrcode");
+const fs = require("fs");
 const {
   cloudinaryFileUpload,
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
 const { validateProduct } = require("../validation/product.validation");
+const { log } = require("console");
 
 // @desc    Create a new product
 exports.ProductCreate = asynchandeler(async (req, res, next) => {
-  const { name, description, category, subcategory, brand, discountId, tag } =
-    await validateProduct(req);
+  // const { name, description, category, subcategory, brand, discountId, tag } =
+  //   await validateProduct(req);
 
+  const outputDir = path.join("public", "temp");
+
+  const qrPath = `${outputDir}/${Math.random()}-qrcode.png`;
+  const barcodePath = `${outputDir}/${Math.random()}-barcode.png`;
+
+  // Generate QR Code
+  // await QRCode.toFile(qrPath, `Product SKU:`, {
+  //   width: 300,
+  //   margin: 1,
+  // });
+  // console.log(
+  //   await QRCode.toDataURL("text", {
+  //     errorCorrectionLevel: "H",
+  //     width: 400,
+  //   })
+  // );
+
+  // Generate Barcode
+  const barcodeBuffer = await bwipjs.toBuffer({
+    bcid: "code128",
+    text: "SKU-TAU123",
+    scale: 3, // pixel scaling factor
+    height: 20, // make it tall enough for scanners
+    includetext: true, // include text for better visual feedback
+    textxalign: "center",
+  });
+  // console.log(barcodeBuffer);
+  res.type("png").send(barcodeBuffer);
+
+  fs.writeFileSync(barcodePath, barcodeBuffer);
+  // const qrPath = `${outputDir}/qrcodes/${sku}-qrcode.png`;
+  // const barcodePath = `${outputDir}/barcodes/${sku}-barcode.png`;
+  return;
   // now upload the thumbnail and image to cloudinary
 
   const thumbnail = await cloudinaryFileUpload(req.files.thumbnail[0].path);
