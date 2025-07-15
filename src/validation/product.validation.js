@@ -39,10 +39,26 @@ const productSchema = joi
         "any.only": "Variant type must be 'singleVariant' or 'multipleVariant'",
         "any.required": "Variant type is required.",
       }),
-    retailPrice: joi.number().min(0).required().messages({
+
+    stock: joi
+      .number()
+      .required()
+      .min(0)
+      .messages({
+        "number.base": "Stock must be a number.",
+        "number.min": "Stock cannot be negative.",
+        "any.required": "Stock is required.",
+      })
+      .default(0),
+    retailPrice: joi.number().required().min(0).messages({
       "number.base": "Retail price must be a number.",
-      "number.min": "Retail price cannot be less than 0.",
+      "number.min": "Retail price cannot be negative.",
       "any.required": "Retail price is required.",
+    }),
+    wholesalePrice: joi.number().min(0).required().messages({
+      "number.base": "Wholesale price must be a number.",
+      "number.min": "Wholesale price cannot be negative.",
+      "any.required": "Wholesale price is required.",
     }),
   })
   .options({ abortEarly: false, allowUnknown: true }); // Allow extra fields, only validate required
@@ -78,13 +94,15 @@ const validateProduct = async (req) => {
 
     return value;
   } catch (error) {
+    console.log("Product Validation error:", error);
+
     console.log(
       "Product Validation error: " +
-        error.details.map((err) => err.message).join(", ")
+        error?.details?.map((err) => err.message).join(", ")
     );
     throw new customError(
       "Product Validation error: " +
-        error.details.map((err) => err.message).join(", "),
+        error?.details?.map((err) => err.message).join(", "),
       400
     );
   }

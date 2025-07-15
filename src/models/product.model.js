@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
-const { string } = require("joi");
+const { string, required } = require("joi");
 
 const reviewSchema = new mongoose.Schema({
   rating: {
@@ -87,6 +87,7 @@ const productSchema = new mongoose.Schema(
     ],
     manufactureCountry: {
       type: String,
+      trim: true,
     },
     rating: {
       type: Number,
@@ -114,10 +115,10 @@ const productSchema = new mongoose.Schema(
     },
 
     //bar code
-    barcode: {
+    qrCode: {
       type: String,
     },
-    qrcode: {
+    barCode: {
       type: String,
     },
 
@@ -141,10 +142,22 @@ const productSchema = new mongoose.Schema(
     },
 
     // Inventory & Price for Single Variant
+    size: {
+      type: String,
+      trim: true,
+      enum: ["S", "M", "L", "XL", "XXL", "XXXL", "Custom", "N/A"],
+      default: "N/A",
+    },
+    color: {
+      type: String,
+      trim: true,
+      default: "N/A",
+    },
 
     stock: {
       type: Number,
       min: 0,
+      required: true,
     },
     warehouseLocation: {
       type: String,
@@ -166,6 +179,7 @@ const productSchema = new mongoose.Schema(
     wholesalePrice: {
       type: Number,
       min: 0,
+      required: true,
     },
     wholesaleProfitMargin: {
       type: Number,
@@ -201,19 +215,6 @@ const productSchema = new mongoose.Schema(
 productSchema.pre("save", function (next) {
   if (this.isModified("name")) {
     this.slug = slugify(this.name, { lower: true, strict: true });
-  }
-  next();
-});
-
-// auto-generate sku from product  name color and size
-productSchema.pre("save", function (next) {
-  if (!this.sku) {
-    const namePrefix = this.name?.slice(0, 3).toUpperCase() || "NON";
-    const colorPrefix = this.color?.slice(0, 2).toUpperCase() || "CL";
-    const sizePrefix = this.size?.toString().toUpperCase() || "SZ";
-    const timestamp = Date.now().toString().slice(-6);
-
-    this.sku = `${namePrefix}-${colorPrefix}-${sizePrefix}-${timestamp}`;
   }
   next();
 });

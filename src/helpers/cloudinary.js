@@ -67,4 +67,31 @@ const deleteCloudinaryFile = async (publicId) => {
   }
 };
 
-module.exports = { cloudinaryFileUpload, deleteCloudinaryFile };
+// uplload barcode to cloudinary
+const uploadBarcodeToCloudinary = async (barcodeBase64) => {
+  if (!barcodeBase64) return null;
+
+  try {
+    const result = await cloudinary.uploader.upload(barcodeBase64, {
+      resource_type: "image",
+      folder: "barcodes",
+      format: "png",
+    });
+
+    // Optimize delivery by resizing and applying auto-format and auto-quality
+    const optimizeUrl = cloudinary.url(result.public_id, {
+      fetch_format: "auto",
+      quality: "auto",
+    });
+
+    return { result, optimizeUrl };
+  } catch (error) {
+    console.error("Cloudinary Barcode Upload Error:", error.message);
+    return null;
+  }
+};
+module.exports = {
+  cloudinaryFileUpload,
+  deleteCloudinaryFile,
+  uploadBarcodeToCloudinary,
+};
