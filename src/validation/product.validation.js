@@ -7,7 +7,6 @@ const productSchema = joi
       "string.empty": "Name is required.",
       "any.required": "Name is required.",
     }),
-
     description: joi.string().trim().required().messages({
       "string.empty": "Description is required.",
       "any.required": "Description is required.",
@@ -24,42 +23,68 @@ const productSchema = joi
       "string.empty": "Brand is required.",
       "any.required": "Brand is required.",
     }),
-    discountId: joi.string().trim().optional(),
-    tag: joi.array().items(joi.string()).optional(),
+    warrantyInformation: joi
+      .string()
+      .trim()
+      .default("No warranty info")
+      .messages({
+        "string.empty": "Warranty information cannot be empty.",
+        "any.required": "Warranty information is required.",
+      }),
+    variantType: joi
+      .string()
+      .valid("singleVariant", "multipleVariant")
+      .required()
+      .messages({
+        "any.only": "Variant type must be 'singleVariant' or 'multipleVariant'",
+        "any.required": "Variant type is required.",
+      }),
+    retailPrice: joi.number().min(0).required().messages({
+      "number.base": "Retail price must be a number.",
+      "number.min": "Retail price cannot be less than 0.",
+      "any.required": "Retail price is required.",
+    }),
   })
-  .options({ abortEarly: false }); // Validate all fields, not just the first error
+  .options({ abortEarly: false, allowUnknown: true }); // Allow extra fields, only validate required
 
 const validateProduct = async (req) => {
   try {
     const value = await productSchema.validateAsync(req.body);
-    //   now manually check req.file and req.files
+
+    // Manual image validation (if needed)
     if (!req.files) {
       throw new customError("Please provide at least one image", 400);
     }
-
     if (
+      !req.files.image ||
+      !req.files.thumbnail ||
       req.files.image[0].fieldname !== "image" ||
       req.files.thumbnail[0].fieldname !== "thumbnail"
     ) {
       throw new customError(
-        "Please provide a valid image name fieldName (image || thumbnail)",
+        "Please provide both image and thumbnail files",
         400
       );
     }
-
+    if (req.files.image.length === 0 || req.files.thumbnail.length === 0) {
+      throw new customError("Image and thumbnail cannot be empty", 400);
+    }
+    if (req.files.image.length > 10) {
+      throw new customError("You can upload a maximum of 10 images", 400);
+    }
     if (req.files.thumbnail.length > 1) {
-      throw new customError("You can upload a maximum of 1 images", 400);
+      throw new customError("You can upload only one thumbnail", 400);
     }
-    if (req.files.image.length > 15) {
-      throw new customError("You can upload a maximum of 15 images", 400);
-    }
+
     return value;
   } catch (error) {
     console.log(
-      "product Validation error " + error.details.map((err) => err.message)
+      "Product Validation error: " +
+        error.details.map((err) => err.message).join(", ")
     );
     throw new customError(
-      "product Validation error " + error.details.map((err) => err.message),
+      "Product Validation error: " +
+        error.details.map((err) => err.message).join(", "),
       400
     );
   }

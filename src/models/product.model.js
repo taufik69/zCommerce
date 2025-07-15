@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
-const { string, number } = require("joi");
+const { string } = require("joi");
 
 const reviewSchema = new mongoose.Schema({
   rating: {
@@ -94,6 +94,7 @@ const productSchema = new mongoose.Schema(
     },
     warrantyInformation: {
       type: String,
+      required: true,
       default: "No warranty info",
     },
     shippingInformation: {
@@ -114,7 +115,7 @@ const productSchema = new mongoose.Schema(
 
     //bar code
     barcode: {
-      type: Number,
+      type: String,
     },
     qrcode: {
       type: String,
@@ -175,8 +176,7 @@ const productSchema = new mongoose.Schema(
 
     alertQuantity: {
       type: Number,
-      default: 0,
-      min: 0,
+      default: 5,
     },
     stockAlert: {
       type: Boolean,
