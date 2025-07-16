@@ -31,14 +31,6 @@ const productSchema = joi
         "string.empty": "Warranty information cannot be empty.",
         "any.required": "Warranty information is required.",
       }),
-    variantType: joi
-      .string()
-      .valid("singleVariant", "multipleVariant")
-      .required()
-      .messages({
-        "any.only": "Variant type must be 'singleVariant' or 'multipleVariant'",
-        "any.required": "Variant type is required.",
-      }),
 
     stock: joi
       .number()
@@ -71,25 +63,14 @@ const validateProduct = async (req) => {
     if (!req.files) {
       throw new customError("Please provide at least one image", 400);
     }
-    if (
-      !req.files.image ||
-      !req.files.thumbnail ||
-      req.files.image[0].fieldname !== "image" ||
-      req.files.thumbnail[0].fieldname !== "thumbnail"
-    ) {
-      throw new customError(
-        "Please provide both image and thumbnail files",
-        400
-      );
+    if (!req.files.image || req.files.image[0].fieldname !== "image") {
+      throw new customError("Please provide both image files", 400);
     }
-    if (req.files.image.length === 0 || req.files.thumbnail.length === 0) {
-      throw new customError("Image and thumbnail cannot be empty", 400);
+    if (req.files.image.length === 0) {
+      throw new customError("Image cannot be empty", 400);
     }
     if (req.files.image.length > 10) {
       throw new customError("You can upload a maximum of 10 images", 400);
-    }
-    if (req.files.thumbnail.length > 1) {
-      throw new customError("You can upload only one thumbnail", 400);
     }
 
     return value;

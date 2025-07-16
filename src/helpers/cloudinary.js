@@ -74,7 +74,6 @@ const uploadBarcodeToCloudinary = async (barcodeBase64) => {
   try {
     const result = await cloudinary.uploader.upload(barcodeBase64, {
       resource_type: "image",
-      folder: "barcodes",
       format: "png",
     });
 

@@ -109,3 +109,5 @@ variantSchema.pre("save", async function (next) {
 
   next();
 });
+
+module.exports = mongoose.model("Variant", variantSchema);

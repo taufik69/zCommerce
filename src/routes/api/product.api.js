@@ -15,4 +15,44 @@ _.route("/createproduct").post(
   ]),
   Product.createProduct
 );
+
+_.route("/getproduct").get(
+  // authGuard,
+  // authorize("product", "view"),
+  Product.getAllProducts
+);
+
+_.route("/getproduct/:slug").get(
+  // authGuard,
+  // authorize("product", "view"),
+  Product.getProductBySlug
+);
+_.route("/updateproductinfo/:slug").put(
+  // authGuard,
+  // authorize("product", "edit"),
+  Product.updateProductInfoBySlug
+);
+_.route("/addproductimage/:slug").post(
+  // authGuard,
+  // authorize("product", "edit"),
+  multipleFileUploadWithFields([{ name: "image", maxCount: 10 }]),
+  Product.addProductImage
+);
+
+_.route("/deleteproductimage/:slug").delete(
+  // authGuard,
+  // authorize("product", "edit"),
+  Product.deleteProductImage
+);
+
+_.route("/productperpage").get(
+  // authGuard,
+  // authorize("product", "view"),
+  Product.getProductsWithPagination
+);
+_.route("/deleteproduct/:slug").delete(
+  // authGuard,
+  // authorize("product", "delete"),
+  Product.deleteProductBySlug
+);
 module.exports = _;

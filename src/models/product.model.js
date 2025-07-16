@@ -71,9 +71,6 @@ const productSchema = new mongoose.Schema(
       ref: "Discount",
     },
 
-    thumbnail: {
-      type: String,
-    },
     image: [
       {
         type: String,
@@ -138,7 +135,7 @@ const productSchema = new mongoose.Schema(
     variantType: {
       type: String,
       enum: ["singleVariant", "multipleVariant"],
-      required: true,
+      default: "singleVariant",
     },
 
     // Inventory & Price for Single Variant
