@@ -109,5 +109,31 @@ variantSchema.pre("save", async function (next) {
 
   next();
 });
+// after variant save then update product model variant array
+variantSchema.post("save", async function (doc) {
+  if (this.isNew) {
+    const Product = require("./product.model");
+    const result = await Product.findOne({ _id: doc.product });
+    console.log(result); // For debugging
+    // Remove the return statement!
+    if (result) {
+      result.variant.push(doc._id);
+      await result.save();
+    } else {
+      throw new customError("Product not found", 404);
+    }
+  } else if (this.isModified("variantName")) {
+    const Product = require("./product.model");
+    const result = await Product.findOne({ _id: doc.product });
+    console.log(result); // For debugging
+  }
+});
+// after variant delete then remove from product model variant array
+variantSchema.post("remove", async function (doc) {
+  const Product = require("./product.model");
+  await Product.findByIdAndUpdate(doc.product, {
+    $pull: { variant: doc._id },
+  });
+});
 
 module.exports = mongoose.model("Variant", variantSchema);

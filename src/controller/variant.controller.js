@@ -11,6 +11,7 @@ exports.createVariant = asynchandeler(async (req, res, next) => {
   // Proceed with saving the variant
   const variantData = new variant(validatedData);
   await variantData.save();
+  // after variant save
 
   return apiResponse.sendSuccess(
     res,
