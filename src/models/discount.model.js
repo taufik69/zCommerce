@@ -7,10 +7,12 @@ const discountSchema = new mongoose.Schema(
     discountValidFrom: {
       type: Date,
       required: true,
+      trim: true,
     },
     discountValidTo: {
       type: Date,
       required: true,
+      trim: true,
     },
     discountName: {
       type: String,
@@ -27,6 +29,7 @@ const discountSchema = new mongoose.Schema(
       type: String,
       enum: ["tk", "percentance"],
       required: true,
+      trim: true,
     },
     discountValueByAmount: {
       type: Number,
@@ -43,23 +46,28 @@ const discountSchema = new mongoose.Schema(
       enum: ["flat", "category", "product", "subCategory"],
       required: true,
       default: null,
+      trim: true,
     },
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
+      trim: true,
     },
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
+      trim: true,
     },
     subCategory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Subcategory",
+      trim: true,
     },
 
     isActive: {
       type: Boolean,
       default: true,
+      trim: true,
     },
   },
   {

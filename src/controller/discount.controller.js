@@ -66,7 +66,9 @@ exports.getAllDiscounts = asynchandeler(async (req, res) => {
 // @desc search discount with the help of slug
 exports.getDiscountBySlug = asynchandeler(async (req, res) => {
   const slug = req.params.slug;
-  const discount = await Discount.findOne({ slug });
+  const discount = await Discount.findOne({ slug }).populate(
+    "category subCategory product"
+  );
   if (!discount) {
     throw new customError("Discount not found", 404);
   }
@@ -89,11 +91,43 @@ exports.updateDiscount = asynchandeler(async (req, res) => {
     throw new customError("Discount not found", 404);
   }
 
+  // if category exist then add discount id into category model
+  const category = await Category.findById(updates.category);
+
+  if (category) {
+    // first remove the previous discount id
+    await Category.updateOne(
+      { _id: discount.category },
+      { $set: { discount: null } }
+    );
+    category.discount = discount._id;
+    await category.save();
+  }
+  // if subcategory exist then add discount id into subcategory model
+  const subcategory = await Subcategory.findById(updates.subCategory);
+  if (subcategory) {
+    await Subcategory.updateOne(
+      { _id: discount.subCategory },
+      { $set: { discount: null } }
+    );
+    subcategory.discount = discount._id;
+    await subcategory.save();
+  }
+  // if product exist then add discount id into product model
+  const product = await Product.findById(updates.product);
+  if (product) {
+    await Product.updateOne(
+      { _id: discount.product },
+      { $set: { discount: null } }
+    );
+    product.discount = discount._id;
+    await product.save();
+  }
+
   // Update only the fields provided in the request body
   Object.keys(updates).forEach((key) => {
     discount[key] = updates[key];
   });
-
   // Save the updated discount to the database
   await discount.save();
 
@@ -158,8 +192,30 @@ exports.deleteDiscount = asynchandeler(async (req, res) => {
 
   // Find the discount by slug
   const discount = await Discount.findOneAndDelete({ slug });
+  // now delete discount id from category model
   if (!discount) {
     throw new customError("Discount not found", 404);
+  }
+  if (discount.category) {
+    await Category.updateOne(
+      { _id: discount.category },
+      { $set: { discount: null } }
+    );
+  }
+
+  // now delete discount id from subcategory model
+  if (discount.subCategory) {
+    await Subcategory.updateOne(
+      { _id: discount.subCategory },
+      { $set: { discount: null } }
+    );
+  }
+  // now delete discount id from product model
+  if (discount.product) {
+    await Product.updateOne(
+      { _id: discount.product },
+      { $set: { discount: null } }
+    );
   }
 
   // Send success response
