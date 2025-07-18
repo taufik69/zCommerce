@@ -1,5 +1,6 @@
 const { apiResponse } = require("../utils/apiResponse");
 const variant = require("../models/variant.model");
+const product = require("../models/product.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const validateVariant = require("../validation/variant.validation");
@@ -12,6 +13,16 @@ exports.createVariant = asynchandeler(async (req, res, next) => {
   const variantData = new variant(validatedData);
   await variantData.save();
   // after variant save
+  if (!variantData) {
+    throw new customError("Failed to create variant", 500);
+  }
+  // push the variant to the product's variants array
+  const productData = await product.findById(variantData.product);
+  if (!productData) {
+    throw new customError("Product not found", 404);
+  }
+  productData.variant.push(variantData._id);
+  await productData.save();
 
   return apiResponse.sendSuccess(
     res,
