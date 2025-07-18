@@ -2,8 +2,10 @@ const { apiResponse } = require("../utils/apiResponse");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 
-// @desc make a discount controller
 const Discount = require("../models/discount.model");
+const Category = require("../models/category.model");
+const Subcategory = require("../models/subcategory.model");
+const Product = require("../models/product.model");
 const validateDiscount = require("../validation/discount.validation");
 
 // @desc create a new discount
@@ -21,6 +23,25 @@ exports.createDiscount = asynchandeler(async (req, res) => {
 
   await discount.save();
 
+  // if category exist then add discount id into category model
+  const category = await Category.findById(value.category);
+  if (category) {
+    category.discount = discount._id;
+    await category.save();
+  }
+  // if subcategory exist then add discount id into subcategory model
+  const subcategory = await Subcategory.findById(value.subCategory);
+  if (subcategory) {
+    subcategory.discount = discount._id;
+    await subcategory.save();
+  }
+  // if product exist then add discount id into product model
+  const product = await Product.findById(value.product);
+  if (product) {
+    product.discount = discount._id;
+    await product.save();
+  }
+
   return apiResponse.sendSuccess(
     res,
     201,
@@ -31,7 +52,9 @@ exports.createDiscount = asynchandeler(async (req, res) => {
 
 // @desc get all discounts
 exports.getAllDiscounts = asynchandeler(async (req, res) => {
-  const discounts = await Discount.find();
+  const discounts = await Discount.find().populate(
+    "category subCategory product"
+  );
   return apiResponse.sendSuccess(
     res,
     200,

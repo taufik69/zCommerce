@@ -40,8 +40,21 @@ const discountSchema = new mongoose.Schema(
     },
     discountPlan: {
       type: String,
-      enum: ["flat", "category", "product"],
+      enum: ["flat", "category", "product", "subCategory"],
       required: true,
+      default: null,
+    },
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+    },
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+    },
+    subCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Subcategory",
     },
 
     isActive: {
