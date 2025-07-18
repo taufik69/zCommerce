@@ -52,9 +52,9 @@ exports.createDiscount = asynchandeler(async (req, res) => {
 
 // @desc get all discounts
 exports.getAllDiscounts = asynchandeler(async (req, res) => {
-  const discounts = await Discount.find().populate(
-    "category subCategory product"
-  );
+  const discounts = await Discount.find()
+    .populate("category subCategory product")
+    .sort({ createdAt: -1 });
   return apiResponse.sendSuccess(
     res,
     200,
@@ -161,6 +161,27 @@ exports.deactivateDiscount = asynchandeler(async (req, res) => {
     "Discount deactivated successfully",
     discount
   );
+});
+
+//@desc pagination form discount
+exports.getDiscountPagination = asynchandeler(async (req, res) => {
+  const { limit, page } = req.query;
+  const skip = (page - 1) * limit;
+  const discounts = await Discount.find()
+    .skip(skip)
+    .limit(limit)
+    .sort({ createdAt: -1 })
+    .populate("category subCategory product");
+  const total = await Discount.countDocuments();
+  const totalPages = Math.ceil(total / limit);
+
+  return apiResponse.sendSuccess(res, 200, "Discounts fetched successfully", {
+    discounts,
+    page: parseInt(page),
+    limit: parseInt(limit),
+    total: parseInt(total),
+    totalPages: parseInt(totalPages),
+  });
 });
 
 // @desc active discount  by slug
