@@ -20,7 +20,7 @@ exports.createPermission = async (req, res) => {
 
 // Get all permissions
 exports.getAllPermissions = async (req, res) => {
-  const permissions = await Permission.find();
+  const permissions = await Permission.find().sort({ createdAt: -1 });
   return apiResponse.sendSuccess(
     res,
     200,

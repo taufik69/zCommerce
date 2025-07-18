@@ -32,7 +32,7 @@ exports.createBrand = asynchandeler(async (req, res, next) => {
 
 // get all brands
 exports.getAllBrands = asynchandeler(async (req, res, next) => {
-  const brands = await Brand.find({ isActive: true });
+  const brands = await Brand.find({ isActive: true }).sort({ createdAt: -1 });
   return apiResponse.sendSuccess(res, 200, "Brands fetched successfully", {
     brands,
   });
@@ -66,15 +66,14 @@ exports.updateBrand = asynchandeler(async (req, res) => {
   if (req?.files?.length) {
     // Delete all old images from Cloudinary
     const deletePromises = brand.image.map(async (imageUrl) => {
-      const regex = /\/([a-zA-Z0-9_-]+)\?/;
-      const match = imageUrl.match(regex);
-      const publicId = match ? match[1] : null;
+      const match = imageUrl.split("/");
+      const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
 
       if (!publicId) {
         throw new customError("Invalid image URL", 400);
       }
 
-      await deleteCloudinaryFile(publicId);
+      await deleteCloudinaryFile(publicId.split("?")[0]);
     });
 
     await Promise.all(deletePromises); // Wait for all deletions to complete
@@ -117,20 +116,20 @@ exports.deleteBrand = asynchandeler(async (req, res) => {
 
   // Delete all images from Cloudinary
   const deletePromises = brand.image.map(async (imageUrl) => {
-    const regex = /\/([a-zA-Z0-9_-]+)\?/; // Adjust the regex to match your URL structure
-    const match = imageUrl.match(regex);
-    const publicId = match ? match[1] : null;
+    const match = imageUrl.split("/");
+    const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
+    console.log("publicId", publicId.split("?")[0]);
 
     if (!publicId) {
       throw new customError("Invalid image URL", 400);
     }
 
-    await deleteCloudinaryFile(publicId);
+    await deleteCloudinaryFile(publicId.split("?")[0]);
   });
   await Promise.all(deletePromises); // Wait for all deletions to complete
 
   // delete the brand from the database
-  await Brand.deleteOne({ slug });
+  // await Brand.deleteOne({ slug });
 
   // Send success response
   apiResponse.sendSuccess(res, 200, "Brand deleted successfully", {
