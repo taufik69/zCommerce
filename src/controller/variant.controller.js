@@ -34,7 +34,10 @@ exports.createVariant = asynchandeler(async (req, res, next) => {
 
 // @desc get all  variant
 exports.getAllVariants = asynchandeler(async (req, res, next) => {
-  const variants = await variant.find().select("-updatedAt");
+  const variants = await variant
+    .find()
+    .populate("product")
+    .select("-updatedAt");
   return apiResponse.sendSuccess(
     res,
     200,
@@ -46,7 +49,10 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
 // @desc get single variant
 exports.getSingleVariant = asynchandeler(async (req, res, next) => {
   const slug = req.params.slug;
-  const singleVariant = await variant.findOne({ slug }).select("-updatedAt");
+  const singleVariant = await variant
+    .findOne({ slug })
+    .populate("product")
+    .select("-updatedAt");
   if (!singleVariant) {
     throw new customError("Variant not found", 404);
   }
@@ -119,6 +125,13 @@ exports.deleteVariant = asynchandeler(async (req, res) => {
   if (!deletedVariant) {
     throw new customError("Variant not found", 404);
   }
+  // remve the variant from the product's variants array
+  const productData = await product.findById(deletedVariant.product);
+  if (!productData) {
+    throw new customError("Product not found", 404);
+  }
+  productData.variant.pull(deletedVariant._id);
+  await productData.save();
   return apiResponse.sendSuccess(
     res,
     200,
