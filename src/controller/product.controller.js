@@ -229,9 +229,9 @@ exports.updateProductInfoBySlug = asynchandeler(async (req, res) => {
   if (req?.body?.name || req?.body?.color || req?.body?.size) {
     // ✅ DELETE PREVIOUS QR CODE
     if (product.qrCode) {
-      const regex = /\/v1\/(.*?)\?/;
-      const match = product.qrCode.match(regex);
-      const qrCodePublicId = match ? match[1] : null;
+      const match = product.qrCode.split("/");
+      const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
+      const qrCodePublicId = publicId.split("?")[0]; // Remove any query parameters
       if (qrCodePublicId) {
         await deleteCloudinaryFile(qrCodePublicId);
       }
@@ -239,11 +239,12 @@ exports.updateProductInfoBySlug = asynchandeler(async (req, res) => {
 
     // ✅ DELETE PREVIOUS BARCODE
     if (product.barCode) {
-      const regex = /\/v1\/(.*?)\?/;
-      const match = product.barCode.match(regex);
-      const barcodePublicId = match ? match[1] : null;
-      if (barcodePublicId) {
-        await deleteCloudinaryFile(barcodePublicId);
+      // Match the regex and extract the ID
+      const match = product.barCode.split("/");
+      const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
+
+      if (publicId) {
+        await deleteCloudinaryFile(publicId.split("?")[0]);
       }
     }
 
