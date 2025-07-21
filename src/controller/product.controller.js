@@ -206,7 +206,7 @@ exports.getProductBySlug = asynchandeler(async (req, res) => {
     "category subcategory brand variant discount"
   );
   if (!product) {
-    return apiResponse.sendError(res, 404, "Product not found");
+    throw new customError(404, "Product not found");
   }
   return apiResponse.sendSuccess(
     res,
@@ -299,10 +299,13 @@ exports.updateProductInfoBySlug = asynchandeler(async (req, res) => {
     product.qrCode = qrCodeUrl || null;
     product.barCode = barcodeUrl || null;
   }
+  if (req?.body.tag) {
+    product.tag = req.body.tag;
+  }
 
   // ✅ UPDATE OTHER FIELDS
   Object.keys(req.body).forEach((key) => {
-    if (!["name", "color", "size"].includes(key)) {
+    if (!["name", "color", "size", "tag"].includes(key)) {
       product[key] = req.body[key] || product[key];
     }
   });
@@ -428,4 +431,55 @@ exports.deleteProductBySlug = asynchandeler(async (req, res) => {
 
   await Product.deleteOne({ slug });
   return apiResponse.sendSuccess(res, 200, "Product deleted successfully");
+});
+
+// @desc get product review by slug
+exports.getProductReviewBySlug = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const product = await Product.findOne({ slug }).select("reviews ");
+  if (!product) {
+    throw new customError(404, "Product not found");
+  }
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Product fetched successfully",
+    product
+  );
+});
+
+// @desc update product review by slug
+exports.updateProductReviewBySlug = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const product = await Product.findOne({ slug });
+  if (!product) {
+    throw new customError(404, "Product not found");
+  }
+  product.reviews.push(req.body);
+  await product.save();
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Product review updated successfully",
+    product
+  );
+});
+
+//@desc remove product review by slug
+exports.removeProductReviewBySlug = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const product = await Product.findOne({ slug });
+  if (!product) {
+    throw new customError(404, "Product not found");
+  }
+  product.reviews = product.reviews.filter(
+    (review) => review._id.toString() !== req.body.id
+  );
+  await product.save();
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Product review removed successfully",
+    product
+  );
 });

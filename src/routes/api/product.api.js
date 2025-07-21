@@ -55,4 +55,21 @@ _.route("/deleteproduct/:slug").delete(
   // authorize("product", "delete"),
   Product.deleteProductBySlug
 );
+_.route("/product-review/:slug").get(
+  // authGuard,
+  // authorize("product", "view"),
+  Product.getProductReviewBySlug
+);
+
+_.route("/product-comment/:slug").post(
+  // authGuard,
+  // authorize("product", "edit"),
+  Product.updateProductReviewBySlug
+);
+
+_.route("/remove-comment/:slug").delete(
+  // authGuard,
+  // authorize("product", "edit"),
+  Product.removeProductReviewBySlug
+);
 module.exports = _;

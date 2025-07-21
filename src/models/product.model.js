@@ -3,29 +3,26 @@ const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
 const { string, required } = require("joi");
 
-const reviewSchema = new mongoose.Schema({
-  rating: {
-    type: Number,
-    required: true,
-    min: 0,
-    max: 5,
+const reviewSchema = new mongoose.Schema(
+  {
+    rating: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 5,
+    },
+    comment: {
+      type: String,
+      required: true,
+    },
+
+    reviewer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
   },
-  comment: {
-    type: String,
-    required: true,
-  },
-  date: {
-    type: Date,
-    default: Date.now,
-  },
-  reviewerName: {
-    type: String,
-    required: true,
-  },
-  reviewerEmail: {
-    type: String,
-  },
-});
+  { timestamps: true }
+);
 
 const productSchema = new mongoose.Schema(
   {
