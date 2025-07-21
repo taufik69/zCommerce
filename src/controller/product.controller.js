@@ -11,7 +11,6 @@ const {
   uploadBarcodeToCloudinary,
 } = require("../helpers/cloudinary");
 const { validateProduct } = require("../validation/product.validation");
-const { log } = require("console");
 
 // Create a new product (only required fields)
 exports.createProduct = asynchandeler(async (req, res) => {
