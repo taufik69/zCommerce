@@ -32,20 +32,23 @@ const discountSchema = Joi.object({
     "number.min": "Discount value by percentage cannot be less than 0",
   }),
   discountPlan: Joi.string()
-    .valid("flat", "category", "product")
+    .valid("flat", "category", "product", "subCategory")
     .required()
     .messages({
       "any.only":
-        "Discount plan must be one of 'flat', 'category', or 'product'",
+        "Discount plan must be one of 'flat', 'category',  ,subCategory or product",
       "any.required": "Discount plan is required",
     }),
-  // targetCategory: Joi.string().optional().messages({
-  //   "string.base": "Target category must be a valid ID",
-  // }),
-  // targetProduct: Joi.string().allow(null).optional().messages({
-  //   "string.base": "Target product must be a valid ID",
-  // }),
-}).options({ abortEarly: false }); // Validate all fields, not just the first error
+  category: Joi.string().optional().allow(null).messages({
+    "string.base": "Category must be a valid ID",
+  }),
+  subCategory: Joi.string().optional().allow(null).messages({
+    "string.base": "Subcategory must be a valid ID",
+  }),
+  product: Joi.string().optional().allow(null).messages({
+    "string.base": "Product must be a valid ID",
+  }),
+}).options({ abortEarly: false, allowUnknown: true }); // Validate all fields, not just the first error
 
 const validateDiscount = async (req) => {
   try {

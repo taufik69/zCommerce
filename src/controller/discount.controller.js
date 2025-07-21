@@ -2,8 +2,10 @@ const { apiResponse } = require("../utils/apiResponse");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 
-// @desc make a discount controller
 const Discount = require("../models/discount.model");
+const Category = require("../models/category.model");
+const Subcategory = require("../models/subcategory.model");
+const Product = require("../models/product.model");
 const validateDiscount = require("../validation/discount.validation");
 
 // @desc create a new discount
@@ -21,6 +23,25 @@ exports.createDiscount = asynchandeler(async (req, res) => {
 
   await discount.save();
 
+  // if category exist then add discount id into category model
+  const category = await Category.findById(value.category);
+  if (category) {
+    category.discount = discount._id;
+    await category.save();
+  }
+  // if subcategory exist then add discount id into subcategory model
+  const subcategory = await Subcategory.findById(value.subCategory);
+  if (subcategory) {
+    subcategory.discount = discount._id;
+    await subcategory.save();
+  }
+  // if product exist then add discount id into product model
+  const product = await Product.findById(value.product);
+  if (product) {
+    product.discount = discount._id;
+    await product.save();
+  }
+
   return apiResponse.sendSuccess(
     res,
     201,
@@ -31,7 +52,9 @@ exports.createDiscount = asynchandeler(async (req, res) => {
 
 // @desc get all discounts
 exports.getAllDiscounts = asynchandeler(async (req, res) => {
-  const discounts = await Discount.find();
+  const discounts = await Discount.find()
+    .populate("category subCategory product")
+    .sort({ createdAt: -1 });
   return apiResponse.sendSuccess(
     res,
     200,
@@ -43,7 +66,9 @@ exports.getAllDiscounts = asynchandeler(async (req, res) => {
 // @desc search discount with the help of slug
 exports.getDiscountBySlug = asynchandeler(async (req, res) => {
   const slug = req.params.slug;
-  const discount = await Discount.findOne({ slug });
+  const discount = await Discount.findOne({ slug }).populate(
+    "category subCategory product"
+  );
   if (!discount) {
     throw new customError("Discount not found", 404);
   }
@@ -66,11 +91,43 @@ exports.updateDiscount = asynchandeler(async (req, res) => {
     throw new customError("Discount not found", 404);
   }
 
+  // if category exist then add discount id into category model
+  const category = await Category.findById(updates.category);
+
+  if (category) {
+    // first remove the previous discount id
+    await Category.updateOne(
+      { _id: discount.category },
+      { $set: { discount: null } }
+    );
+    category.discount = discount._id;
+    await category.save();
+  }
+  // if subcategory exist then add discount id into subcategory model
+  const subcategory = await Subcategory.findById(updates.subCategory);
+  if (subcategory) {
+    await Subcategory.updateOne(
+      { _id: discount.subCategory },
+      { $set: { discount: null } }
+    );
+    subcategory.discount = discount._id;
+    await subcategory.save();
+  }
+  // if product exist then add discount id into product model
+  const product = await Product.findById(updates.product);
+  if (product) {
+    await Product.updateOne(
+      { _id: discount.product },
+      { $set: { discount: null } }
+    );
+    product.discount = discount._id;
+    await product.save();
+  }
+
   // Update only the fields provided in the request body
   Object.keys(updates).forEach((key) => {
     discount[key] = updates[key];
   });
-
   // Save the updated discount to the database
   await discount.save();
 
@@ -106,6 +163,27 @@ exports.deactivateDiscount = asynchandeler(async (req, res) => {
   );
 });
 
+//@desc pagination form discount
+exports.getDiscountPagination = asynchandeler(async (req, res) => {
+  const { limit, page } = req.query;
+  const skip = (page - 1) * limit;
+  const discounts = await Discount.find()
+    .skip(skip)
+    .limit(limit)
+    .sort({ createdAt: -1 })
+    .populate("category subCategory product");
+  const total = await Discount.countDocuments();
+  const totalPages = Math.ceil(total / limit);
+
+  return apiResponse.sendSuccess(res, 200, "Discounts fetched successfully", {
+    discounts,
+    page: parseInt(page),
+    limit: parseInt(limit),
+    total: parseInt(total),
+    totalPages: parseInt(totalPages),
+  });
+});
+
 // @desc active discount  by slug
 exports.activateDiscount = asynchandeler(async (req, res) => {
   const { slug } = req.query;
@@ -135,8 +213,30 @@ exports.deleteDiscount = asynchandeler(async (req, res) => {
 
   // Find the discount by slug
   const discount = await Discount.findOneAndDelete({ slug });
+  // now delete discount id from category model
   if (!discount) {
     throw new customError("Discount not found", 404);
+  }
+  if (discount.category) {
+    await Category.updateOne(
+      { _id: discount.category },
+      { $set: { discount: null } }
+    );
+  }
+
+  // now delete discount id from subcategory model
+  if (discount.subCategory) {
+    await Subcategory.updateOne(
+      { _id: discount.subCategory },
+      { $set: { discount: null } }
+    );
+  }
+  // now delete discount id from product model
+  if (discount.product) {
+    await Product.updateOne(
+      { _id: discount.product },
+      { $set: { discount: null } }
+    );
   }
 
   // Send success response

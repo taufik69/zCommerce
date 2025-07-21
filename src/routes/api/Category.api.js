@@ -66,4 +66,10 @@ _.route("/categories-sort").get(
   Category.getCategoriesWithSort
 );
 
+_.route("/category-pagination").get(
+  // authGuard,
+  // authorize("category", "view"),
+  Category.getCategoryPagination
+);
+
 module.exports = _;

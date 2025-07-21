@@ -35,11 +35,13 @@ exports.createSubCategory = asynchandeler(async (req, res) => {
 
 // @desc    Get all subcategories
 exports.getAllSubCategory = asynchandeler(async (req, res) => {
-  const subCategories = await Subcategory.find().populate("category", {
-    name: 1,
-    slug: 1,
-    isActive: 1,
-  });
+  const subCategories = await Subcategory.find()
+    .populate("category", {
+      name: 1,
+      slug: 1,
+      isActive: 1,
+    })
+    .sort({ createdAt: -1 });
   if (!subCategories) {
     throw new customError("Subcategories not found", 404);
   }

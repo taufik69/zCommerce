@@ -34,14 +34,19 @@ _.route("/discount/:slug")
   );
 
 _.route("/discount/deactive").post(
-  authGuard,
-  authorize("discount", "update"),
+  // authGuard,
+  // authorize("discount", "update"),
   discountController.deactivateDiscount
 );
 _.route("/discount/active").post(
-  authGuard,
-  authorize("discount", "update"),
+  // authGuard,
+  // authorize("discount", "update"),
   discountController.activateDiscount
+);
+_.route("/discountpagination").get(
+  // authGuard,
+  // authorize("discount", "view"),
+  discountController.getDiscountPagination
 );
 
 module.exports = _;

@@ -37,7 +37,8 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
   const variants = await variant
     .find()
     .populate("product")
-    .select("-updatedAt");
+    .select("-updatedAt")
+    .sort({ createdAt: -1 });
   return apiResponse.sendSuccess(
     res,
     200,

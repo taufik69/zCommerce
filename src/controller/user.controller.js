@@ -327,7 +327,8 @@ exports.getAllUser = asynchandeler(async (_, res) => {
     .populate([{ path: "roles" }])
     .populate("wishList")
     .populate("permission")
-    .lean();
+    .lean()
+    .sort({ createdAt: -1 });
   return apiResponse.sendSuccess(res, 200, "User fetched successfully", users);
 });
 

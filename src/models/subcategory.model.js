@@ -21,6 +21,10 @@ const subcategorySchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
+    discount: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Discount",
+    },
     isActive: {
       type: Boolean,
       default: true,

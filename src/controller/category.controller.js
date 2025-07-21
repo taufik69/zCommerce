@@ -32,7 +32,8 @@ exports.getAllCategories = asynchandeler(async (req, res) => {
       path: "subcategories",
       select: "-updatedAt -createdAt",
     })
-    .select("-updatedAt -createdAt");
+    .select("-updatedAt -createdAt")
+    .sort({ createdAt: -1 });
   // send success response
   apiResponse.sendSuccess(res, 200, "Categories fetched successfully", {
     categories,
@@ -71,16 +72,15 @@ exports.updateCategory = asynchandeler(async (req, res) => {
     // delete the old image from cloudinary
     const imageUrl = category.image;
     // Regex to extract the ID
-    const regex = /\/([a-zA-Z0-9_-]+)\?/;
 
     // Match the regex and extract the ID
-    const match = imageUrl.match(regex);
-    const publicId = match ? match[1] : null;
+    const match = imageUrl.split("/");
+    const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
 
     if (!publicId) {
       throw new customError("Invalid image URL", 400);
     }
-    await deleteCloudinaryFile(publicId);
+    await deleteCloudinaryFile(publicId.split("?")[0]);
     // upload the new image into cloudinary
     const { optimizeUrl } = await cloudinaryFileUpload(req.files[0].path);
     optimizeUrlCloudinary = optimizeUrl;
@@ -108,16 +108,15 @@ exports.deleteCategory = asynchandeler(async (req, res) => {
 
   // Delete the old image from Cloudinary
   const imageUrl = category.image;
-  const regex = /\/([a-zA-Z0-9_-]+)\?/; // Regex to extract the ID
-  const match = imageUrl.match(regex);
-  const publicId = match ? match[1] : null;
+  const match = imageUrl.split("/");
+  const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
 
   if (!publicId) {
     throw new customError("Invalid image URL", 400);
   }
 
   // Delete the image from Cloudinary
-  await deleteCloudinaryFile(publicId);
+  await deleteCloudinaryFile(publicId.split("?")[0]);
 
   // Delete the category document from the database
   await Category.findOneAndDelete({ slug, isActive: true });
@@ -125,6 +124,7 @@ exports.deleteCategory = asynchandeler(async (req, res) => {
   // Send success response
   apiResponse.sendSuccess(res, 200, "Category deleted successfully", {
     slug,
+    category,
   });
 });
 
@@ -194,5 +194,28 @@ exports.getCategoriesWithSort = asynchandeler(async (req, res) => {
   // send success response
   apiResponse.sendSuccess(res, 200, "Categories fetched successfully", {
     categories,
+  });
+});
+
+//@desc pagination of category
+exports.getCategoryPagination = asynchandeler(async (req, res) => {
+  const { limit, page } = req.query;
+  const skip = (page - 1) * limit;
+  const categories = await Category.find()
+    .skip(skip)
+    .limit(limit)
+    .sort({
+      createdAt: -1,
+    })
+    .populate("subcategories discount");
+  const total = await Category.countDocuments();
+  const totalPages = Math.ceil(total / limit);
+  // send success response
+  apiResponse.sendSuccess(res, 200, "Categories fetched successfully", {
+    categories,
+    page,
+    limit,
+    total,
+    totalPages,
   });
 });
