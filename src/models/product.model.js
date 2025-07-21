@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
-const { string, required } = require("joi");
+
 
 const reviewSchema = new mongoose.Schema(
   {
@@ -56,16 +56,19 @@ const productSchema = new mongoose.Schema(
     brand: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Brand",
+      default: null,
     },
     variant: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Variant",
+        default: null,
       },
     ],
     discount: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Discount",
+      default: null,
     },
 
     image: [

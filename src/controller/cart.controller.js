@@ -16,13 +16,13 @@ exports.addToCart = asynchandeler(async (req, res) => {
     );
   }
 
-  const product = await Product.findById(productId);
+  const product = await Product.findById(productId)
   if (!product) {
     throw new customError("Product not found", 404);
   }
 
   const price = product.discountPrice || product.retailPrice || product.price;
-  console.log(product.discountPrice, product.retailPrice, product.price);
+  console.log(product);
 
   return;
 
