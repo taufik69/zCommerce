@@ -117,3 +117,50 @@ exports.addToCart = asynchandeler(async (req, res) => {
   await cart.save();
   apiResponse.sendSuccess(res, 201, "Product added to cart", cart);
 });
+
+//@desc cart quantity
+exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
+  const userId = req?.user?._id;
+  const { cartId } = req.params;
+  const cart = await Cart.findOne({
+    $or: [
+      { user: userId },
+      { user: "687f69506c48eb6386dc5f6d" },
+      { _id: cartId },
+    ],
+  });
+  if (!cart) {
+    throw new customError("Cart not found", 404);
+  }
+
+  if (cart.discountPrice || cart.discountPercentance) {
+    if (cart.items[0].quantity > 1) {
+      console.log(cart);
+      cart.items[0].quantity -= 1;
+      cart.items[0].totalPrice -= cart.items[0].price;
+      cart.totalAmountOfWholeProduct = cart.items[0].totalPrice;
+    } else {
+      cart.items[0].quantity = cart.items[0].quantity;
+      cart.items[0].totalPrice = cart.items[0].totalPrice;
+      cart.totalAmountOfWholeProduct = cart.items[0].totalPrice;
+    }
+  } else {
+    if (cart.items[0].quantity > 1) {
+      cart.items[0].quantity -= 1;
+      cart.items[0].totalPrice -= cart.items[0].reatailPrice;
+      cart.totalAmountOfWholeProduct = cart.items[0].totalPrice;
+    } else {
+      cart.items[0].quantity = cart.items[0].quantity;
+      cart.items[0].totalPrice = cart.items[0].totalPrice;
+      cart.totalAmountOfWholeProduct = cart.items[0].totalPrice;
+    }
+  }
+
+  await cart.save();
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Cart quantity decreased successfully",
+    cart
+  );
+});
