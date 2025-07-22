@@ -5,8 +5,8 @@ const cartSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true,
-    unique: true, // One cart per user
   },
+
   items: [
     {
       product: {
@@ -30,14 +30,22 @@ const cartSchema = new mongoose.Schema({
         required: true,
         default: 0,
       },
+      reatailPrice: {
+        type: Number,
+        required: true,
+        default: 0,
+      },
     },
   ],
   coupon: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Coupon",
-    default: null,
   },
-  discount: {
+  discountPrice: {
+    type: Number,
+    default: 0,
+  },
+  discountPercentance: {
     type: Number,
     default: 0,
   },
