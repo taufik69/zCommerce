@@ -15,7 +15,7 @@ _.route("/get-wishtlist").get(
   wishListController.getAllWishList
 );
 
-_.route("/delete-wishtlist/:slug").delete(
+_.route("/delete-wishtlist").delete(
   //   authGuard,
   //   authorize("wishlist", "delete"),
   wishListController.deleteWishlist
