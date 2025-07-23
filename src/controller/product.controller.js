@@ -238,8 +238,8 @@ exports.updateProductInfoBySlug = asynchandeler(async (req, res) => {
     const size = req.body.size || product.size;
 
     const namePrefix = name?.slice(0, 3).toUpperCase() || "NON";
-    const colorPrefix = color?.slice(0, 2).toUpperCase() || "CL";
-    const sizePrefix = size?.toString().toUpperCase() || "SZ";
+    const colorPrefix = color[0]?.slice(0, 2).toUpperCase() || "CL";
+    const sizePrefix = size[0]?.toString().toUpperCase() || "SZ";
     const timestamp = Date.now().toString().slice(-6);
     const sku = `${namePrefix}-${colorPrefix}-${sizePrefix}-${timestamp}`;
 
@@ -278,19 +278,23 @@ exports.updateProductInfoBySlug = asynchandeler(async (req, res) => {
 
     // ✅ SET NEW DATA
     product.name = req.body.name || product.name;
-    product.color = req.body.color || product.color;
-    product.size = req.body.size || product.size;
-    product.sku = sku;
+    product.sku = sku.toUpperCase();
     product.qrCode = qrCodeUrl || null;
     product.barCode = barcodeUrl || null;
   }
   if (req?.body.tag) {
     product.tag = req.body.tag;
   }
+  if (req.body.color) {
+    product.color = req.body.color;
+  }
+  if (req.body.size) {
+    product.size = req.body.size;
+  }
 
   // ✅ UPDATE OTHER FIELDS
   Object.keys(req.body).forEach((key) => {
-    if (!["name", "color", "size", "tag"].includes(key)) {
+    if (!["name", "color", "size", "tag", "color", "size"].includes(key)) {
       product[key] = req.body[key] || product[key];
     }
   });
