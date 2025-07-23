@@ -34,8 +34,8 @@ exports.createProduct = asynchandeler(async (req, res) => {
   // Generate SKU based on name, color, size, and timestamp
 
   const namePrefix = name?.slice(0, 3).toUpperCase() || "NON";
-  const colorPrefix = color?.slice(0, 2).toUpperCase() || "CL";
-  const sizePrefix = size?.toString().toUpperCase() || "SZ";
+  const colorPrefix = color[0]?.slice(0, 2).toUpperCase() || "CL";
+  const sizePrefix = size[0]?.toString().toUpperCase() || "SZ";
   const timestamp = Date.now().toString().slice(-6);
   const sku = `${namePrefix}-${colorPrefix}-${sizePrefix}-${timestamp}`;
 

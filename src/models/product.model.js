@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
 
-
 const reviewSchema = new mongoose.Schema(
   {
     rating: {
@@ -139,17 +138,21 @@ const productSchema = new mongoose.Schema(
     },
 
     // Inventory & Price for Single Variant
-    size: {
-      type: String,
-      trim: true,
-      enum: ["S", "M", "L", "XL", "XXL", "XXXL", "Custom", "N/A"],
-      default: "N/A",
-    },
-    color: {
-      type: String,
-      trim: true,
-      default: "N/A",
-    },
+    size: [
+      {
+        type: String,
+        trim: true,
+        enum: ["S", "M", "L", "XL", "XXL", "XXXL", "Custom", "N/A"],
+        default: "N/A",
+      },
+    ],
+    color: [
+      {
+        type: String,
+        trim: true,
+        default: "N/A",
+      },
+    ],
 
     stock: {
       type: Number,
