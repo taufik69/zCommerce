@@ -10,7 +10,7 @@ exports.createPermission = async (req, res) => {
   const permission = new Permission({ permissionName, actions });
   await permission.save();
 
-  return apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     201,
     "Permission created successfully",
@@ -21,7 +21,7 @@ exports.createPermission = async (req, res) => {
 // Get all permissions
 exports.getAllPermissions = async (req, res) => {
   const permissions = await Permission.find().sort({ createdAt: -1 });
-  return apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     200,
     "Permissions fetched successfully",
@@ -34,7 +34,7 @@ exports.getPermissionBySlug = async (req, res) => {
   const { slug } = req.params;
   const permission = await Permission.findOne({ slug: slug });
   if (!permission) throw new customError("Permission not found", 404);
-  return apiResponse.sendSuccess(
+   apiResponse.sendSuccess(
     res,
     200,
     "Permission fetched successfully",
@@ -52,7 +52,7 @@ exports.updatePermission = async (req, res) => {
     { new: true }
   );
   if (!permission) throw new customError("Permission not found", 404);
-  return apiResponse.sendSuccess(
+   apiResponse.sendSuccess(
     res,
     200,
     "Permission updated successfully",
@@ -69,7 +69,7 @@ exports.deactivatePermission = async (req, res) => {
     { new: true }
   );
   if (!permission) throw new customError("Permission not found", 404);
-  return apiResponse.sendSuccess(
+   apiResponse.sendSuccess(
     res,
     200,
     "Permission deactivated  successfully",
@@ -86,7 +86,7 @@ exports.activePermission = async (req, res) => {
     { new: true }
   );
   if (!permission) throw new customError("Permission not found", 404);
-  return apiResponse.sendSuccess(
+   apiResponse.sendSuccess(
     res,
     200,
     "Permission activated  successfully",
@@ -99,7 +99,7 @@ exports.deletePermission = async (req, res) => {
   const { slug } = req.params;
   const permission = await Permission.findOneAndDelete({ slug: slug });
   if (!permission) throw new customError("Permission not found", 404);
-  return apiResponse.sendSuccess(
+   apiResponse.sendSuccess(
     res,
     200,
     "Permission deleted successfully",

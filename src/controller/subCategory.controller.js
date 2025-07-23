@@ -30,7 +30,7 @@ exports.createSubCategory = asynchandeler(async (req, res) => {
   await categoryToUpdate.save();
 
   // Return the created subcategory in the response
-  return apiResponse.sendSuccess(res, 201, "Subcategory created", subCategory);
+   apiResponse.sendSuccess(res, 201, "Subcategory created", subCategory);
 });
 
 // @desc    Get all subcategories
@@ -45,7 +45,7 @@ exports.getAllSubCategory = asynchandeler(async (req, res) => {
   if (!subCategories) {
     throw new customError("Subcategories not found", 404);
   }
-  return apiResponse.sendSuccess(
+   apiResponse.sendSuccess(
     res,
     200,
     "Subcategories found",
@@ -64,7 +64,7 @@ exports.getSubCategoryBySlug = asynchandeler(async (req, res) => {
   if (!subCategory) {
     throw new customError("Subcategory not found", 404);
   }
-  return apiResponse.sendSuccess(res, 200, "Subcategory found", subCategory);
+   apiResponse.sendSuccess(res, 200, "Subcategory found", subCategory);
 });
 
 // @desc    Update a subcategory by slug
@@ -100,7 +100,7 @@ exports.updateSubCategory = asynchandeler(async (req, res) => {
   await subCategory.save();
 
   // Send success response
-  return apiResponse.sendSuccess(res, 200, "Subcategory updated", subCategory);
+  apiResponse.sendSuccess(res, 200, "Subcategory updated", subCategory);
 });
 
 // @desc    Delete a subcategory by slug
@@ -122,7 +122,7 @@ exports.deleteSubCategory = asynchandeler(async (req, res) => {
   });
 
   // Send success response
-  return apiResponse.sendSuccess(res, 200, "Subcategory deleted", subCategory);
+   apiResponse.sendSuccess(res, 200, "Subcategory deleted", subCategory);
 });
 
 // @desc    Activate a subcategory by slug
@@ -166,7 +166,7 @@ exports.getInactiveSubCategories = asynchandeler(async (req, res) => {
   if (!subCategories) {
     throw new customError("Inactive subcategories not found", 404);
   }
-  return apiResponse.sendSuccess(
+   apiResponse.sendSuccess(
     res,
     200,
     "Inactive subcategories found",
@@ -182,7 +182,7 @@ exports.getActiveSubCategories = asynchandeler(async (req, res) => {
   if (!subCategories) {
     throw new customError("Active subcategories not found", 404);
   }
-  return apiResponse.sendSuccess(
+   apiResponse.sendSuccess(
     res,
     200,
     "Active subcategories found",

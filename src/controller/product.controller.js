@@ -105,12 +105,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
 
   await product.save();
 
-  return apiResponse.sendSuccess(
-    res,
-    201,
-    "Product created successfully",
-    product
-  );
+  apiResponse.sendSuccess(res, 201, "Product created successfully", product);
 });
 
 //@desc Get all porducts using pipeline aggregation
@@ -190,12 +185,7 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
       $sort: { createdAt: -1 }, // Sort by createdAt in descending order
     },
   ]);
-  return apiResponse.sendSuccess(
-    res,
-    200,
-    "Products fetched successfully",
-    products
-  );
+  apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
 });
 
 //@desc Get product by slug
@@ -207,12 +197,7 @@ exports.getProductBySlug = asynchandeler(async (req, res) => {
   if (!product) {
     throw new customError(404, "Product not found");
   }
-  return apiResponse.sendSuccess(
-    res,
-    200,
-    "Product fetched successfully",
-    product
-  );
+  apiResponse.sendSuccess(res, 200, "Product fetched successfully", product);
 });
 
 //@desc Update product by slug and when update name then change the sku as well as qrCode and barcode
@@ -312,12 +297,7 @@ exports.updateProductInfoBySlug = asynchandeler(async (req, res) => {
 
   await product.save();
 
-  return apiResponse.sendSuccess(
-    res,
-    200,
-    "Product updated successfully",
-    product
-  );
+  apiResponse.sendSuccess(res, 200, "Product updated successfully", product);
 });
 
 //@desc Add images to product by slug
@@ -345,12 +325,7 @@ exports.addProductImage = asynchandeler(async (req, res) => {
 
   await product.save();
 
-  return apiResponse.sendSuccess(
-    res,
-    200,
-    "Image(s) added successfully",
-    product
-  );
+  apiResponse.sendSuccess(res, 200, "Image(s) added successfully", product);
 });
 
 //@desc find the product by slug and select image and send image urls and delte this image from cloudinary
@@ -382,12 +357,7 @@ exports.deleteProductImage = asynchandeler(async (req, res) => {
 
   await product.save();
 
-  return apiResponse.sendSuccess(
-    res,
-    200,
-    "Image(s) deleted successfully",
-    product
-  );
+  apiResponse.sendSuccess(res, 200, "Image(s) deleted successfully", product);
 });
 
 //@desc  get products with pagination and sorting
@@ -400,12 +370,7 @@ exports.getProductsWithPagination = asynchandeler(async (req, res) => {
     .limit(limit)
     .sort({ createdAt: -1 })
     .populate("category subcategory brand variant discount");
-  return apiResponse.sendSuccess(
-    res,
-    200,
-    "Product fetched successfully",
-    products
-  );
+  apiResponse.sendSuccess(res, 200, "Product fetched successfully", products);
 });
 
 //@desc delete product by slug and whenn delete product then delete all images from cloudinary
@@ -430,7 +395,7 @@ exports.deleteProductBySlug = asynchandeler(async (req, res) => {
   }
 
   await Product.deleteOne({ slug });
-  return apiResponse.sendSuccess(res, 200, "Product deleted successfully");
+  apiResponse.sendSuccess(res, 200, "Product deleted successfully");
 });
 
 // @desc get product review by slug
@@ -440,12 +405,7 @@ exports.getProductReviewBySlug = asynchandeler(async (req, res) => {
   if (!product) {
     throw new customError(404, "Product not found");
   }
-  return apiResponse.sendSuccess(
-    res,
-    200,
-    "Product fetched successfully",
-    product
-  );
+  apiResponse.sendSuccess(res, 200, "Product fetched successfully", product);
 });
 
 // @desc update product review by slug
@@ -457,7 +417,7 @@ exports.updateProductReviewBySlug = asynchandeler(async (req, res) => {
   }
   product.reviews.push(req.body);
   await product.save();
-  return apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     200,
     "Product review updated successfully",
@@ -476,7 +436,7 @@ exports.removeProductReviewBySlug = asynchandeler(async (req, res) => {
     (review) => review._id.toString() !== req.body.id
   );
   await product.save();
-  return apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     200,
     "Product review removed successfully",

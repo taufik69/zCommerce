@@ -24,7 +24,7 @@ exports.createVariant = asynchandeler(async (req, res, next) => {
   productData.variant.push(variantData._id);
   await productData.save();
 
-  return apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     201,
     "Variant created successfully",
@@ -39,12 +39,7 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
     .populate("product")
     .select("-updatedAt")
     .sort({ createdAt: -1 });
-  return apiResponse.sendSuccess(
-    res,
-    200,
-    "Variants fetched successfully",
-    variants
-  );
+  apiResponse.sendSuccess(res, 200, "Variants fetched successfully", variants);
 });
 
 // @desc get single variant
@@ -57,7 +52,7 @@ exports.getSingleVariant = asynchandeler(async (req, res, next) => {
   if (!singleVariant) {
     throw new customError("Variant not found", 404);
   }
-  return apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     200,
     "Variant fetched successfully",
@@ -77,7 +72,7 @@ exports.updateVariant = asynchandeler(async (req, res) => {
   if (!updatedVariant) {
     throw new customError("Variant not found", 404);
   }
-  return apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     200,
     "Variant updated successfully",
@@ -94,7 +89,7 @@ exports.deactivateVariant = asynchandeler(async (req, res) => {
   }
   variantToDeactivate.isActive = false;
   await variantToDeactivate.save();
-  return apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     200,
     "Variant deactivated successfully",
@@ -111,7 +106,7 @@ exports.activateVariant = asynchandeler(async (req, res) => {
   }
   variantToActivate.isActive = true;
   await variantToActivate.save();
-  return apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     200,
     "Variant activated successfully",
@@ -133,7 +128,7 @@ exports.deleteVariant = asynchandeler(async (req, res) => {
   }
   productData.variant.pull(deletedVariant._id);
   await productData.save();
-  return apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     200,
     "Variant deleted successfully",

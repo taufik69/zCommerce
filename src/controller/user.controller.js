@@ -194,7 +194,7 @@ exports.logout = asynchandeler(async (req, res) => {
     sameSite: "none",
   });
 
-  return apiResponse.sendSuccess(res, 200, "Logout successful");
+  apiResponse.sendSuccess(res, 200, "Logout successful");
 });
 
 // send email verification
@@ -224,7 +224,7 @@ exports.sendEmailVerification = asynchandeler(async (req, res) => {
     html: `<a href="${verifyUrl}">Click to verify your email</a>`,
   });
 
-  return apiResponse.sendSuccess(res, 200, "Verification email sent");
+  apiResponse.sendSuccess(res, 200, "Verification email sent");
 });
 
 // verify email
@@ -242,7 +242,7 @@ exports.verifyEmail = asynchandeler(async (req, res) => {
   user.resetPasswordExpires = undefined;
   await user.save();
 
-  return apiResponse.sendSuccess(res, 200, "Email verified successfully");
+  apiResponse.sendSuccess(res, 200, "Email verified successfully");
 });
 
 //forgot password
@@ -272,7 +272,7 @@ exports.forgotPassword = asynchandeler(async (req, res) => {
     html: `<a href="${resetUrl}">Click to reset your password</a>`,
   });
 
-  return apiResponse.sendSuccess(res, 200, "Password reset email sent");
+  apiResponse.sendSuccess(res, 200, "Password reset email sent");
 });
 
 // reset password
@@ -290,7 +290,7 @@ exports.resetPassword = asynchandeler(async (req, res) => {
   user.resetPasswordExpires = undefined;
   await user.save();
 
-  return apiResponse.sendSuccess(res, 200, "Password reset successful");
+  apiResponse.sendSuccess(res, 200, "Password reset successful");
 });
 
 //change paassword
@@ -346,14 +346,14 @@ exports.getUserbyEmailOrPhone = asynchandeler(async (req, res) => {
       { path: "cart" },
     ]);
   if (!user) throw new customError("User not found", 404);
-  return apiResponse.sendSuccess(res, 200, "User fetched successfully", user);
+  apiResponse.sendSuccess(res, 200, "User fetched successfully", user);
 });
 
 //get me routes
 exports.getMe = asynchandeler(async (req, res) => {
   const user = req.user;
 
-  return apiResponse.sendSuccess(res, 200, "User fetched successfully", user);
+  apiResponse.sendSuccess(res, 200, "User fetched successfully", user);
 });
 
 // search a user andd add permissin in  permission array
@@ -372,7 +372,7 @@ exports.addPermissionToUser = asynchandeler(async (req, res) => {
   user.permissions.push(permission._id);
   await user.save();
 
-  return apiResponse.sendSuccess(res, 200, "Permission added successfully", {
+  apiResponse.sendSuccess(res, 200, "Permission added successfully", {
     user,
     permission,
   });
@@ -395,7 +395,7 @@ exports.removePermissionFromUser = asynchandeler(async (req, res) => {
   );
   await user.save();
 
-  return apiResponse.sendSuccess(res, 200, "Permission removed successfully", {
+  apiResponse.sendSuccess(res, 200, "Permission removed successfully", {
     user,
     permission,
   });

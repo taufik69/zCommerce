@@ -32,6 +32,7 @@ exports.getAllCategories = asynchandeler(async (req, res) => {
       path: "subcategories",
       select: "-updatedAt -createdAt",
     })
+    .populate("discount")
     .select("-updatedAt -createdAt")
     .sort({ createdAt: -1 });
   // send success response
@@ -48,6 +49,7 @@ exports.getCategoryBySlug = asynchandeler(async (req, res) => {
       path: "subcategories",
       select: "-updatedAt -createdAt",
     })
+    .populate("discount")
     .select("-updatedAt -createdAt");
 
   if (!category) {

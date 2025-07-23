@@ -72,12 +72,7 @@ exports.getDiscountBySlug = asynchandeler(async (req, res) => {
   if (!discount) {
     throw new customError("Discount not found", 404);
   }
-  return apiResponse.sendSuccess(
-    res,
-    200,
-    "Discount fetched successfully",
-    discount
-  );
+  apiResponse.sendSuccess(res, 200, "Discount fetched successfully", discount);
 });
 
 // @desc update a discount by slug
@@ -155,7 +150,7 @@ exports.deactivateDiscount = asynchandeler(async (req, res) => {
   await discount.save();
 
   // Send success response
-  return apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     200,
     "Discount deactivated successfully",
@@ -175,7 +170,7 @@ exports.getDiscountPagination = asynchandeler(async (req, res) => {
   const total = await Discount.countDocuments();
   const totalPages = Math.ceil(total / limit);
 
-  return apiResponse.sendSuccess(res, 200, "Discounts fetched successfully", {
+  apiResponse.sendSuccess(res, 200, "Discounts fetched successfully", {
     discounts,
     page: parseInt(page),
     limit: parseInt(limit),
@@ -199,7 +194,7 @@ exports.activateDiscount = asynchandeler(async (req, res) => {
   await discount.save();
 
   // Send success response
-  return apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     200,
     "Discount activated successfully",
@@ -240,10 +235,5 @@ exports.deleteDiscount = asynchandeler(async (req, res) => {
   }
 
   // Send success response
-  return apiResponse.sendSuccess(
-    res,
-    200,
-    "Discount deleted successfully",
-    discount
-  );
+  apiResponse.sendSuccess(res, 200, "Discount deleted successfully", discount);
 });
