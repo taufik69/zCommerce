@@ -12,6 +12,7 @@ const userRoutes = require("./api/user.api");
 const permissionRoutes = require("./api/permisson.api");
 const cupuonRoutes = require("./api/coupon.api");
 const cartRoutes = require("./api/cart.api");
+const wishListRoutes = require("./api/wishList.api");
 _.use("/auth", userRoutes);
 _.use(categoryRoutes);
 _.use(subcategoryRoutes);
@@ -23,6 +24,7 @@ _.use(roleRoutes);
 _.use("/permission", permissionRoutes);
 _.use("/coupon", cupuonRoutes);
 _.use("/cart", cartRoutes);
+_.use("/wishList", wishListRoutes);
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });
