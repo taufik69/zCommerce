@@ -21,39 +21,6 @@ exports.registerUser = asynchandeler(async (req, res) => {
     throw new customError("Email or phone already in use", 409);
   }
 
-  // Find default role
-  let roleIds = [];
-  if (
-    req.body.roles &&
-    Array.isArray(req.body.roles) &&
-    req.body.roles.length > 0
-  ) {
-    roleIds = req.body.roles;
-  } else {
-    const defaultRole = await Role.findOne({ name: "user" });
-    if (!defaultRole) throw new customError("Default user role not found", 500);
-    roleIds = [defaultRole._id];
-  }
-
-  // Find default permission (example: view permission for user)
-  let permissionIds = [];
-  if (
-    req.body.permissions &&
-    Array.isArray(req.body.permissions) &&
-    req.body.permissions.length > 0
-  ) {
-    permissionIds = req.body.permissions;
-  } else {
-    const defaultPermission = await Permission.findOne({
-      permissionName: "user",
-      actions: { $in: ["view"] },
-    });
-    if (!defaultPermission) {
-      throw new customError("Default user permission not found", 500);
-    }
-    permissionIds = [defaultPermission._id];
-  }
-
   // Create user
   const user = new User({
     name,
@@ -61,8 +28,8 @@ exports.registerUser = asynchandeler(async (req, res) => {
     password,
     phone,
     image: image || null,
-    roles: roleIds,
-    permissions: permissionIds,
+    roles: ["687f69506c48eb6386dc5f6b"],
+    permissions: ["688349a1e7a73135ef6c3969"],
   });
 
   await user.save();
@@ -73,10 +40,13 @@ exports.registerUser = asynchandeler(async (req, res) => {
       path: "roles",
       select: "-__v -createdAt -updatedAt",
     })
+    .populate("permissions")
     .select(
       "-password -__v -resetPasswordToken -resetPasswordExpires -updatedAt -wishList -cart -newsLetterSubscribe -lastlogin -lastLogout -createdAt -refreshToken -twoFactorEnabled -newsLetterSubscribe -isEmailVerified -isPhoneVerified"
     );
-
+  userObj.isEmailVerified = false;
+  userObj.isPhoneVerified = false;
+  await userObj.save();
   return apiResponse.sendSuccess(res, 201, "Registration successful", userObj);
 });
 
