@@ -113,81 +113,9 @@ exports.createProduct = asynchandeler(async (req, res) => {
 
 //@desc Get all porducts using pipeline aggregation
 exports.getAllProducts = asynchandeler(async (req, res) => {
-  const products = await Product.aggregate([
-    {
-      $lookup: {
-        from: "categories",
-        localField: "category",
-        foreignField: "_id",
-        as: "categoryDetails",
-      },
-    },
-    {
-      $unwind: {
-        path: "$categoryDetails",
-        preserveNullAndEmptyArrays: true,
-      },
-    },
-    {
-      $lookup: {
-        from: "subcategories",
-        localField: "subcategory",
-        foreignField: "_id",
-        as: "subcategoryDetails",
-      },
-    },
-    {
-      $unwind: {
-        path: "$subcategoryDetails",
-        preserveNullAndEmptyArrays: true,
-      },
-    },
-    {
-      $lookup: {
-        from: "brands",
-        localField: "brand",
-        foreignField: "_id",
-        as: "brandDetails",
-      },
-    },
-    {
-      $unwind: {
-        path: "$brandDetails",
-        preserveNullAndEmptyArrays: true,
-      },
-    },
-    {
-      $lookup: {
-        from: "variants",
-        localField: "_id",
-        foreignField: "product",
-        as: "variants",
-      },
-    },
-    {
-      $unwind: {
-        path: "$variants",
-        preserveNullAndEmptyArrays: true,
-      },
-    },
-    {
-      $lookup: {
-        from: "discounts",
-        localField: "discount",
-        foreignField: "_id",
-        as: "discountDetails",
-      },
-    },
-    {
-      $unwind: {
-        path: "$discountDetails",
-        preserveNullAndEmptyArrays: true,
-      },
-    },
-    {
-      $sort: { createdAt: -1 }, // Sort by createdAt in descending order
-    },
-  ]);
+  const products = await Product.find().populate(
+    "category subcategory brand variant discount"
+  );
   apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
 });
 
