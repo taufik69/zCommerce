@@ -1,21 +1,70 @@
+require("dotenv").config();
 const { apiResponse } = require("../utils/apiResponse");
 const variant = require("../models/variant.model");
 const product = require("../models/product.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const validateVariant = require("../validation/variant.validation");
+const bwipjs = require("bwip-js");
+const QRCode = require("qrcode");
+const { uploadBarcodeToCloudinary } = require("../helpers/cloudinary");
 
 // @desc create  variant controller
 exports.createVariant = asynchandeler(async (req, res, next) => {
   // Validate the request body
   const validatedData = await validateVariant(req);
-  // Proceed with saving the variant
-  const variantData = new variant(validatedData);
-  await variantData.save();
   // after variant save
+
+  // Proceed with saving the variant
+  const variantData = new variant({ validatedData, ...req.body });
+  await variantData.save();
   if (!variantData) {
     throw new customError("Failed to create variant", 500);
   }
+  // now make Qr code and barcode and update variant
+  // Generate barcode using bwip-js
+  const barcode = await bwipjs.toBuffer({
+    bcid: "code128",
+    text: `${validatedData.sku}-${Date.now()}`.toLocaleUpperCase().slice(0, 13), // Unique identifier
+    scale: 3,
+    height: 10,
+    includetext: true,
+    textxalign: "center",
+    backgroundcolor: "FFFFFF",
+    // No need for output: 'svg'
+  });
+
+  const base64Barcode = `data:image/png;base64,${barcode.toString("base64")}`;
+  // upload barcode to cloudinary
+  const { optimizeUrl: barcodeUrl } = await uploadBarcodeToCloudinary(
+    base64Barcode
+  );
+
+  // Generate QR code
+
+  const qrCode = await QRCode.toBuffer(
+    JSON.stringify(
+      `${
+        process.env.PRODUCT_QR_URL || "https://www.facebook.com/zahirulislamdev"
+      }`
+    ), // next time add a frontend product deatil page link
+    {
+      errorCorrectionLevel: "H",
+      margin: 2,
+      width: 200,
+      height: 200,
+      type: "png",
+    }
+  );
+  const base64qrCode = `data:image/png;base64,${qrCode.toString("base64")}`;
+
+  const { optimizeUrl: qrCodeUrl } = await uploadBarcodeToCloudinary(
+    base64qrCode
+  );
+  variantData.barCode = barcodeUrl;
+  variantData.qrCode = qrCodeUrl;
+  await variantData.save();
+
   // push the variant to the product's variants array
   const productData = await product.findById(variantData.product);
   if (!productData) {
@@ -66,7 +115,7 @@ exports.updateVariant = asynchandeler(async (req, res) => {
   // const validatedData = await validateVariant(req);
   const updatedVariant = await variant.findOneAndUpdate(
     { slug },
-    { $set: req.body },
+    { ...req.body },
     { new: true }
   );
   if (!updatedVariant) {

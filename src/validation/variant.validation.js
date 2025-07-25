@@ -2,19 +2,25 @@ const Joi = require("joi");
 const { customError } = require("../lib/CustomError");
 
 const VariantSchema = Joi.object({
+  product: Joi.string().required().messages({
+    "string.empty": "Product ID is required",
+    "any.required": "Product ID is required",
+  }),
+  sku: Joi.string().trim().messages({
+    "string.empty": "SKU is required",
+    "any.required": "SKU is required",
+  }),
   variantName: Joi.string().required().trim().messages({
     "string.empty": "Variant name is required",
     "any.required": "Variant name is required",
   }),
-  size: Joi.string()
-    .required()
-    .valid("S", "M", "L", "XL", "XXL", "XXXL", "Custom")
-    .messages({
-      "string.empty": "Size is required",
-      "any.required": "Size is required",
-      "any.only": "Size must be one of S, M, L, XL, XXL, XXXL, Custom",
-    }),
-  color: Joi.string().required().trim().messages({
+
+  size: Joi.array().required().messages({
+    "string.empty": "Size is required",
+    "any.required": "Size is required",
+    "any.only": "Size must be one of S, M, L, XL, XXL, XXXL, Custom",
+  }),
+  color: Joi.array().required().messages({
     "string.empty": "Color is required",
     "any.required": "Color is required",
   }),
@@ -23,35 +29,52 @@ const VariantSchema = Joi.object({
     "number.min": "Stock variant cannot be less than 0",
     "any.required": "Stock variant is required",
   }),
+  purchasePrice: Joi.number().required().min(0).messages({
+    "number.base": "Purchase price must be a number",
+    "number.min": "Purchase price cannot be less than 0",
+    "any.required": "Purchase price is required",
+  }),
   retailPrice: Joi.number().required().min(0).messages({
     "number.base": "Retail price must be a number",
     "number.min": "Retail price cannot be less than 0",
     "any.required": "Retail price is required",
   }),
-  retailProfitMargin: Joi.number().required().min(0).max(100).messages({
-    "number.base": "Retail profit margin must be a number",
-    "number.min": "Retail profit margin cannot be less than 0",
-    "number.max": "Retail profit margin cannot be more than 100",
-    "any.required": "Retail profit margin is required",
+  retailProfitMarginbyPercentance: Joi.number()
+
+    .min(0)
+    .max(100)
+    .messages({
+      "number.base": "Retail profit margin must be a number",
+      "number.min": "Retail profit margin cannot be less than 0",
+      "number.max": "Retail profit margin cannot be more than 100",
+      "any.required": "Retail profit margin is required",
+    }),
+  retailProfitMarginbyAmount: Joi.number().optional().min(0).messages({
+    "number.base": "Retail profit margin by amount must be a number",
+    "number.min": "Retail profit margin by amount cannot be less than 0",
   }),
   wholesalePrice: Joi.number().required().min(0).messages({
     "number.base": "Wholesale price must be a number",
     "number.min": "Wholesale price cannot be less than 0",
     "any.required": "Wholesale price is required",
   }),
-  wholesaleProfitMargin: Joi.number().required().min(0).max(100).messages({
-    "number.base": "Wholesale profit margin must be a number",
-    "number.min": "Wholesale profit margin cannot be less than 0",
-    "number.max": "Wholesale profit margin cannot be more than 100",
-    "any.required": "Wholesale profit margin is required",
+  wholesaleProfitMarginPercentage: Joi.number()
+
+    .min(0)
+    .max(100)
+    .messages({
+      "number.base": "Wholesale profit margin must be a number",
+      "number.min": "Wholesale profit margin cannot be less than 0",
+      "number.max": "Wholesale profit margin cannot be more than 100",
+      "any.required": "Wholesale profit margin is required",
+    }),
+  wholesaleProfitMarginAmount: Joi.number().optional().min(0).messages({
+    "number.base": "Wholesale profit margin by amount must be a number",
+    "number.min": "Wholesale profit margin by amount cannot be less than 0",
   }),
-  alertVariantStock: Joi.number().required().min(5).messages({
-    "number.base": "Alert variant stock must be a number",
-    "number.min": "Alert variant stock cannot be less than 5",
-    "any.required": "Alert variant stock is required",
-  }),
-  isActive: Joi.boolean().optional().messages({
-    "boolean.base": "isActive must be a boolean value",
+  alertQuantity: Joi.number().optional().min(0).messages({
+    "number.base": "Alert quantity must be a number",
+    "number.min": "Alert quantity cannot be less than 0",
   }),
 }).options({ abortEarly: false, allowUnknown: true });
 

@@ -158,7 +158,6 @@ const productSchema = new mongoose.Schema(
     stock: {
       type: Number,
       min: 0,
-      required: true,
     },
     warehouseLocation: {
       type: String,
@@ -173,7 +172,6 @@ const productSchema = new mongoose.Schema(
     },
     retailPrice: {
       type: Number,
-      required: true,
       min: 0,
     },
     retailProfitMarginbyPercentance: {
@@ -190,7 +188,6 @@ const productSchema = new mongoose.Schema(
     wholesalePrice: {
       type: Number,
       min: 0,
-      required: true,
     },
     wholesaleProfitMarginPercentage: {
       type: Number,

@@ -20,17 +20,35 @@ const variantSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    size: {
+
+    sku: {
       type: String,
       trim: true,
-      enum: ["S", "M", "L", "XL", "XXL", "XXXL", "Custom", "N/A"],
-      default: "N/A",
     },
-    color: {
+
+    //bar code
+    qrCode: {
       type: String,
-      trim: true,
-      default: "N/A",
     },
+    barCode: {
+      type: String,
+    },
+    size: [
+      {
+        type: String,
+        trim: true,
+
+        default: "N/A",
+      },
+    ],
+    color: [
+      {
+        type: String,
+        trim: true,
+        default: "N/A",
+      },
+    ],
+
     // Quantity / stock
     stockVariant: {
       type: Number,
@@ -43,26 +61,53 @@ const variantSchema = new mongoose.Schema(
       default: 5,
     },
     // Pricing
+    purchasePrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
     retailPrice: {
       type: Number,
       required: true,
       min: 0,
     },
-    retailProfitMargin: {
+    retailProfitMarginbyPercentance: {
       type: Number,
       min: 0,
       max: 100,
+      default: 0,
+    },
+    retailProfitMarginbyAmount: {
+      type: Number,
+      min: 0,
       default: 0,
     },
     wholesalePrice: {
       type: Number,
       min: 0,
     },
-    wholesaleProfitMargin: {
+    wholesaleProfitMarginPercentage: {
       type: Number,
       min: 0,
       max: 100,
       default: 0,
+    },
+    wholesaleProfitMarginAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    alertQuantity: {
+      type: Number,
+      default: 5,
+    },
+    stockAlert: {
+      type: Boolean,
+      default: false,
+    },
+    instock: {
+      type: Boolean,
     },
     isActive: {
       type: Boolean,
@@ -71,8 +116,8 @@ const variantSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
+    // toJSON: { virtuals: true },
+    // toObject: { virtuals: true },
   }
 );
 
@@ -84,12 +129,13 @@ variantSchema.pre("save", function (next) {
   next();
 });
 
-// virtuals
-variantSchema.virtual("retailProfitAmount").get(function () {
-  return (this.retailPrice * this.retailProfitMargin) / 100;
-});
-variantSchema.virtual("wholesaleProfitAmount").get(function () {
-  return (this.wholesalePrice * this.wholesaleProfitMargin) / 100;
+// findOneAndUpdate then change the slug
+variantSchema.pre("findOneAndUpdate", function (next) {
+  const update = this.getUpdate();
+  if (update.variantName) {
+    update.slug = slugify(update.variantName, { lower: true, strict: true });
+  }
+  next();
 });
 
 // Check for duplicate variant by size, color, product
