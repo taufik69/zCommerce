@@ -4,7 +4,7 @@ exports.asynchandeler = (func) => {
       await func(req, res, next);
     } catch (error) {
       console.log("Error in async handler:", error);
-      next(error);
+      next(error); // call error middleware
     }
   };
 };
