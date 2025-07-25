@@ -42,6 +42,11 @@ const productSchema = joi
         "any.required": "Stock is required.",
       })
       .default(0),
+    purchasePrice: joi.number().required().min(0).messages({
+      "number.base": "Purchase price must be a number.",
+      "number.min": "Purchase price cannot be negative.",
+      "any.required": "Purchase price is required.",
+    }),
     retailPrice: joi.number().required().min(0).messages({
       "number.base": "Retail price must be a number.",
       "number.min": "Retail price cannot be negative.",

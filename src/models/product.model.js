@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
+const { updateProductInfoBySlug } = require("../controller/product.controller");
 
 const reviewSchema = new mongoose.Schema(
   {
@@ -107,7 +108,7 @@ const productSchema = new mongoose.Schema(
     // stock key unit
     sku: {
       type: String,
-      unique: true,
+      trim: true,
     },
 
     //bar code
@@ -142,7 +143,7 @@ const productSchema = new mongoose.Schema(
       {
         type: String,
         trim: true,
-        enum: ["S", "M", "L", "XL", "XXL", "XXXL", "Custom", "N/A"],
+        // enum: ["S", "M", "L", "XL", "XXL", "XXXL", "Custom", "N/A"],
         default: "N/A",
       },
     ],
@@ -165,15 +166,25 @@ const productSchema = new mongoose.Schema(
     },
 
     // Pricing
+    purchasePrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
     retailPrice: {
       type: Number,
       required: true,
       min: 0,
     },
-    retailProfitMargin: {
+    retailProfitMarginbyPercentance: {
       type: Number,
       min: 0,
       max: 100,
+      default: 0,
+    },
+    retailProfitMarginbyAmount: {
+      type: Number,
+      min: 0,
       default: 0,
     },
     wholesalePrice: {
@@ -181,10 +192,15 @@ const productSchema = new mongoose.Schema(
       min: 0,
       required: true,
     },
-    wholesaleProfitMargin: {
+    wholesaleProfitMarginPercentage: {
       type: Number,
       min: 0,
       max: 100,
+      default: 0,
+    },
+    wholesaleProfitMarginAmount: {
+      type: Number,
+      min: 0,
       default: 0,
     },
 
@@ -206,8 +222,8 @@ const productSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
+    // toJSON: { virtuals: true },
+    // toObject: { virtuals: true },
   }
 );
 
@@ -232,18 +248,6 @@ productSchema.pre("save", async function (next) {
     );
   }
   next();
-});
-
-//  Virtual Field: Retail Profit Amount
-productSchema.virtual("retailProfitAmount").get(function () {
-  if (!this.retailPrice || !this.retailProfitMargin) return 0;
-  return (this.retailPrice * this.retailProfitMargin) / 100;
-});
-
-//  Virtual Field: Wholesale Profit Amount
-productSchema.virtual("wholesaleProfitAmount").get(function () {
-  if (!this.wholesalePrice || !this.wholesaleProfitMargin) return 0;
-  return (this.wholesalePrice * this.wholesaleProfitMargin) / 100;
 });
 
 const Product = mongoose.model("Product", productSchema);
