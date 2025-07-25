@@ -30,7 +30,7 @@ exports.createSubCategory = asynchandeler(async (req, res) => {
   await categoryToUpdate.save();
 
   // Return the created subcategory in the response
-   apiResponse.sendSuccess(res, 201, "Subcategory created", subCategory);
+  apiResponse.sendSuccess(res, 201, "Subcategory created", subCategory);
 });
 
 // @desc    Get all subcategories
@@ -41,16 +41,12 @@ exports.getAllSubCategory = asynchandeler(async (req, res) => {
       slug: 1,
       isActive: 1,
     })
+    .populate("discount")
     .sort({ createdAt: -1 });
   if (!subCategories) {
     throw new customError("Subcategories not found", 404);
   }
-   apiResponse.sendSuccess(
-    res,
-    200,
-    "Subcategories found",
-    subCategories
-  );
+  apiResponse.sendSuccess(res, 200, "Subcategories found", subCategories);
 });
 
 // @desc    Get a subcategory by slug
@@ -64,7 +60,7 @@ exports.getSubCategoryBySlug = asynchandeler(async (req, res) => {
   if (!subCategory) {
     throw new customError("Subcategory not found", 404);
   }
-   apiResponse.sendSuccess(res, 200, "Subcategory found", subCategory);
+  apiResponse.sendSuccess(res, 200, "Subcategory found", subCategory);
 });
 
 // @desc    Update a subcategory by slug
@@ -122,7 +118,7 @@ exports.deleteSubCategory = asynchandeler(async (req, res) => {
   });
 
   // Send success response
-   apiResponse.sendSuccess(res, 200, "Subcategory deleted", subCategory);
+  apiResponse.sendSuccess(res, 200, "Subcategory deleted", subCategory);
 });
 
 // @desc    Activate a subcategory by slug
@@ -166,7 +162,7 @@ exports.getInactiveSubCategories = asynchandeler(async (req, res) => {
   if (!subCategories) {
     throw new customError("Inactive subcategories not found", 404);
   }
-   apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     200,
     "Inactive subcategories found",
@@ -182,7 +178,7 @@ exports.getActiveSubCategories = asynchandeler(async (req, res) => {
   if (!subCategories) {
     throw new customError("Active subcategories not found", 404);
   }
-   apiResponse.sendSuccess(
+  apiResponse.sendSuccess(
     res,
     200,
     "Active subcategories found",
