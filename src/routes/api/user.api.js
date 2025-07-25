@@ -20,5 +20,5 @@ _.get(
 );
 _.get("/getme", authGuard, authController.getMe);
 _.put("/add-user-permission", authGuard, authController.addPermissionToUser);
-// _.put("/remove-user-permission/:id", authGuard, authController.removePermissionFromUser);
+_.put("/remove-user-permission/:id", authGuard, authController.removePermissionFromUser);
 module.exports = _;
