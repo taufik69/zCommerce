@@ -1,3 +1,4 @@
+require("dotenv").config();
 const Product = require("../models/product.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
@@ -22,6 +23,8 @@ exports.createProduct = asynchandeler(async (req, res) => {
     category,
     subcategory,
     brand,
+    sku,
+    purchasePrice,
     wholesalePrice,
     retailPrice,
     warrantyInformation,
@@ -31,35 +34,12 @@ exports.createProduct = asynchandeler(async (req, res) => {
     color,
   } = value;
 
-  // Generate SKU based on name, color, size, and timestamp
-
-  const namePrefix = name?.slice(0, 3).toUpperCase() || "NON";
-  const colorPrefix = color[0]?.slice(0, 2).toUpperCase() || "CL";
-  const sizePrefix = size[0]?.toString().toUpperCase() || "SZ";
-  const timestamp = Date.now().toString().slice(-6);
-  const sku = `${namePrefix}-${colorPrefix}-${sizePrefix}-${timestamp}`;
-
-  // make a qr code for product
-  const qrCodeData = {
-    name,
-    brand,
-    retailPrice,
-  };
-
-  const qrCode = await QRCode.toBuffer(JSON.stringify(qrCodeData), {
-    errorCorrectionLevel: "H",
-  });
-  const base64qrCode = `data:image/png;base64,${qrCode.toString("base64")}`;
-
-  // upload qr code to cloudinary
-  const { optimizeUrl: qrCodeUrl } = await uploadBarcodeToCloudinary(
-    base64qrCode
-  );
-
   // Generate barcode using bwip-js
   const barcode = await bwipjs.toBuffer({
     bcid: "code128",
-    text: sku,
+    text: `${name.toString().replace(" ", "")}-${brand
+      .toString()
+      .replace(" ", "")}-${Date.now()}`.slice(0, 13), // Unique identifier
     scale: 3,
     height: 10,
     includetext: true,
@@ -85,7 +65,6 @@ exports.createProduct = asynchandeler(async (req, res) => {
   // Create product
   const product = new Product({
     name,
-    qrCode: qrCodeUrl || null,
     barCode: barcodeUrl || null,
     sku,
     description,
@@ -94,6 +73,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
     brand,
     size,
     color,
+    purchasePrice,
     wholesalePrice,
     retailPrice,
     warrantyInformation,
@@ -104,6 +84,31 @@ exports.createProduct = asynchandeler(async (req, res) => {
   });
 
   await product.save();
+
+  // now create QR code and update product with QR code
+
+  const qrCode = await QRCode.toBuffer(
+    JSON.stringify(
+      `${
+        process.env.PRODUCT_QR_URL || "https://www.facebook.com/zahirulislamdev"
+      }`
+    ), // next time add a frontend product deatil page link
+    {
+      errorCorrectionLevel: "H",
+      margin: 2,
+      width: 200,
+      height: 200,
+      type: "png",
+    }
+  );
+  const base64qrCode = `data:image/png;base64,${qrCode.toString("base64")}`;
+
+  const { optimizeUrl: qrCodeUrl } = await uploadBarcodeToCloudinary(
+    base64qrCode
+  );
+  product.qrCode = qrCodeUrl || null;
+  await product.save();
+  // Send success response
 
   apiResponse.sendSuccess(res, 201, "Product created successfully", product);
 });
