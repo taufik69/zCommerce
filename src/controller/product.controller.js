@@ -37,9 +37,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
   // Generate barcode using bwip-js
   const barcode = await bwipjs.toBuffer({
     bcid: "code128",
-    text: `${name.toString().replace(" ", "")}-${brand
-      .toString()
-      .replace(" ", "")}-${Date.now()}`.slice(0, 13), // Unique identifier
+    text: `${sku}-${Date.now()}`.toLocaleUpperCase().slice(0, 13), // Unique identifier
     scale: 3,
     height: 10,
     includetext: true,
@@ -209,102 +207,18 @@ exports.getProductBySlug = asynchandeler(async (req, res) => {
 exports.updateProductInfoBySlug = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
-  const product = await Product.findOne({ slug });
+  const product = await Product.findOneAndUpdate(
+    { slug },
+    { ...req.body },
+    {
+      new: true,
+      runValidators: true,
+    }
+  ).populate("category subcategory brand variant discount");
 
   if (!product) {
     throw new customError(404, "Product not found");
   }
-
-  if (req?.body?.name || req?.body?.color || req?.body?.size) {
-    // ✅ DELETE PREVIOUS QR CODE
-    if (product.qrCode) {
-      const match = product.qrCode.split("/");
-      const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
-      const qrCodePublicId = publicId.split("?")[0]; // Remove any query parameters
-      if (qrCodePublicId) {
-        await deleteCloudinaryFile(qrCodePublicId);
-      }
-    }
-
-    // ✅ DELETE PREVIOUS BARCODE
-    if (product.barCode) {
-      // Match the regex and extract the ID
-      const match = product.barCode.split("/");
-      const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
-
-      if (publicId) {
-        await deleteCloudinaryFile(publicId.split("?")[0]);
-      }
-    }
-
-    // ✅ GENERATE SKU
-    const name = req.body.name;
-    const color = req.body.color || product.color;
-    const size = req.body.size || product.size;
-
-    const namePrefix = name?.slice(0, 3).toUpperCase() || "NON";
-    const colorPrefix = color[0]?.slice(0, 2).toUpperCase() || "CL";
-    const sizePrefix = size[0]?.toString().toUpperCase() || "SZ";
-    const timestamp = Date.now().toString().slice(-6);
-    const sku = `${namePrefix}-${colorPrefix}-${sizePrefix}-${timestamp}`;
-
-    // ✅ GENERATE QR CODE
-    const qrCodeData = {
-      name,
-      brand: req.body.brand || product.brand,
-      retailPrice: req.body.retailPrice || product.retailPrice,
-    };
-
-    const qrCode = await QRCode.toBuffer(JSON.stringify(qrCodeData), {
-      errorCorrectionLevel: "H",
-    });
-    const base64qrCode = `data:image/png;base64,${qrCode.toString("base64")}`;
-
-    const { optimizeUrl: qrCodeUrl } = await uploadBarcodeToCloudinary(
-      base64qrCode
-    );
-
-    // ✅ GENERATE BARCODE
-    const barcode = await bwipjs.toBuffer({
-      bcid: "code128",
-      text: sku,
-      scale: 3,
-      height: 10,
-      includetext: true,
-      textxalign: "center",
-      backgroundcolor: "FFFFFF",
-    });
-
-    const base64Barcode = `data:image/png;base64,${barcode.toString("base64")}`;
-
-    const { optimizeUrl: barcodeUrl } = await uploadBarcodeToCloudinary(
-      base64Barcode
-    );
-
-    // ✅ SET NEW DATA
-    product.name = req.body.name || product.name;
-    product.sku = sku.toUpperCase();
-    product.qrCode = qrCodeUrl || null;
-    product.barCode = barcodeUrl || null;
-  }
-  if (req?.body.tag) {
-    product.tag = req.body.tag;
-  }
-  if (req.body.color) {
-    product.color = req.body.color;
-  }
-  if (req.body.size) {
-    product.size = req.body.size;
-  }
-
-  // ✅ UPDATE OTHER FIELDS
-  Object.keys(req.body).forEach((key) => {
-    if (!["name", "color", "size", "tag", "color", "size"].includes(key)) {
-      product[key] = req.body[key] || product[key];
-    }
-  });
-
-  await product.save();
 
   apiResponse.sendSuccess(res, 200, "Product updated successfully", product);
 });
@@ -410,7 +324,9 @@ exports.deleteProductBySlug = asynchandeler(async (req, res) => {
 // @desc get product review by slug
 exports.getProductReviewBySlug = asynchandeler(async (req, res) => {
   const { slug } = req.params;
-  const product = await Product.findOne({ slug }).select("reviews ");
+  const product = await Product.findOne({ slug })
+    .select("reviews")
+    .populate("reviews.reviewer", "name email image phone");
   if (!product) {
     throw new customError(404, "Product not found");
   }

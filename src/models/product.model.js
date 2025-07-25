@@ -235,6 +235,15 @@ productSchema.pre("save", function (next) {
   next();
 });
 
+// when changing prouct name then change the slug using findoneandupdate
+productSchema.pre("findOneAndUpdate", async function (next) {
+  const update = this.getUpdate();
+  if (update.name) {
+    update.slug = slugify(update.name, { lower: true, strict: true });
+  }
+  next();
+});
+
 // Ensure unique slug
 productSchema.pre("save", async function (next) {
   const existingProduct = await this.constructor.findOne({ slug: this.slug });
