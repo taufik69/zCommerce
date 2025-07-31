@@ -47,12 +47,12 @@ const productSchema = joi
       "number.min": "Purchase price cannot be negative.",
       "any.required": "Purchase price is required.",
     }),
-    retailPrice: joi.number().required().min(0).messages({
+    retailPrice: joi.number().min(0).messages({
       "number.base": "Retail price must be a number.",
       "number.min": "Retail price cannot be negative.",
       "any.required": "Retail price is required.",
     }),
-    wholesalePrice: joi.number().min(0).required().messages({
+    wholesalePrice: joi.number().min(0).messages({
       "number.base": "Wholesale price must be a number.",
       "number.min": "Wholesale price cannot be negative.",
       "any.required": "Wholesale price is required.",
