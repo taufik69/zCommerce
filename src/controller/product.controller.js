@@ -299,3 +299,16 @@ exports.removeProductReviewBySlug = asynchandeler(async (req, res) => {
     product
   );
 });
+
+//@dese get all multiple variant products
+exports.getAllMultipleVariantProducts = asynchandeler(async (req, res) => {
+  const products = await Product.find({ variantType: "multipleVariant" })
+    .populate("category subcategory brand variant discount")
+    .sort({ createdAt: -1 });
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Multiple variant products fetched successfully",
+    products
+  );
+});

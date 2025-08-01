@@ -72,4 +72,9 @@ _.route("/remove-comment/:slug").delete(
   // authorize("product", "edit"),
   Product.removeProductReviewBySlug
 );
+_.route("/multiplevarinatproduct").get(
+  // authGuard,
+  // authorize("product", "view"),
+  Product.getAllMultipleVariantProducts
+);
 module.exports = _;
