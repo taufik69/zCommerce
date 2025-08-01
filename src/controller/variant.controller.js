@@ -7,7 +7,7 @@ const { asynchandeler } = require("../lib/asyncHandeler");
 const validateVariant = require("../validation/variant.validation");
 const bwipjs = require("bwip-js");
 const QRCode = require("qrcode");
-const Product = require("../models/product.model");
+
 const { uploadBarcodeToCloudinary } = require("../helpers/cloudinary");
 
 // @desc create  variant controller
@@ -20,11 +20,7 @@ exports.createVariant = asynchandeler(async (req, res, next) => {
   const variantData = new variant({ validatedData, ...req.body });
 
   await variantData.save();
-  await Product.findOneAndUpdate(
-    { _id: variantData.product },
-    { variantType: "multipleVariant" },
-    { new: true }
-  );
+
   if (!variantData) {
     throw new customError("Failed to create variant", 500);
   }

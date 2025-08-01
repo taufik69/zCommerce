@@ -107,6 +107,8 @@ exports.createProduct = asynchandeler(async (req, res) => {
   product.qrCode = qrCodeUrl || null;
   if (stock && size && color && sku) {
     product.variantType = "singleVariant";
+  } else {
+    product.variantType = "multipleVariant";
   }
   await product.save();
   // Send success response
