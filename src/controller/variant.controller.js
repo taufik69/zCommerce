@@ -17,6 +17,7 @@ exports.createVariant = asynchandeler(async (req, res, next) => {
 
   // Proceed with saving the variant
   const variantData = new variant({ validatedData, ...req.body });
+  variantData.variantType = "multipleVariant";
   await variantData.save();
   if (!variantData) {
     throw new customError("Failed to create variant", 500);
