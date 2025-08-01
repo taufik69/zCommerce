@@ -1,10 +1,10 @@
 require("dotenv").config();
+const bwipjs = require("bwip-js");
+const QRCode = require("qrcode");
 const Product = require("../models/product.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { apiResponse } = require("../utils/apiResponse");
-const bwipjs = require("bwip-js");
-const QRCode = require("qrcode");
 
 const {
   cloudinaryFileUpload,
@@ -145,7 +145,6 @@ exports.updateProductInfoBySlug = asynchandeler(async (req, res) => {
     { ...req.body },
     {
       new: true,
-      runValidators: true,
     }
   ).populate("category subcategory brand variant discount");
 
