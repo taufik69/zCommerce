@@ -166,7 +166,6 @@ const productSchema = new mongoose.Schema(
     // Pricing
     purchasePrice: {
       type: Number,
-      required: true,
       min: 0,
     },
     retailPrice: {
