@@ -118,7 +118,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
 
 //@desc Get all porducts using pipeline aggregation
 exports.getAllProducts = asynchandeler(async (req, res) => {
-  const {category, subcategory, brand, minPrice, maxPrice} = req.query;
+  const { category, subcategory, brand, minPrice, maxPrice } = req.query;
 
   const query = {};
   if (category) query.category = category;
@@ -130,8 +130,6 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
     query.retailPrice = { $gte: minPrice, $lte: maxPrice };
   }
 
-
-  
   const products = await Product.find(query).populate(
     "category subcategory brand variant discount"
   );
@@ -140,7 +138,6 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
 
 //@desc Get product by slug
 exports.getProductBySlug = asynchandeler(async (req, res) => {
-  
   const { slug } = req.params;
   const product = await Product.findOne({ slug }).populate(
     "category subcategory brand variant discount"

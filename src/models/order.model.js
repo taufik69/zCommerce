@@ -2,18 +2,18 @@ const mongoose = require("mongoose");
 
 const orderSchema = new mongoose.Schema(
   {
-    // User (registered or guest)
+    // USER INFO (Registered or Guest)
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null, // guest users will have null
+      default: null,
     },
     guestId: {
-      type: String,
+      type: String, // For guest users tracking
       default: null,
     },
 
-    // Order Items Snapshot
+    // ORDER ITEMS SNAPSHOT
     items: [
       {
         productId: {
@@ -32,13 +32,13 @@ const orderSchema = new mongoose.Schema(
           required: true,
         },
         totalPrice: {
-          type: Number, // quantity * unitPrice
+          type: Number,
           required: true,
         },
       },
     ],
 
-    // Shipping Info
+    // SHIPPING INFO
     shippingInfo: {
       fullName: { type: String, required: true },
       phone: { type: String, required: true },
@@ -56,13 +56,13 @@ const orderSchema = new mongoose.Schema(
       },
     },
 
-    // Delivery Charge
+    // DELIVERY CHARGE
     deliveryCharge: {
       type: Number,
       required: true,
     },
 
-    // Coupon/Discount
+    // COUPON / DISCOUNT
     coupon: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Coupon",
@@ -73,9 +73,9 @@ const orderSchema = new mongoose.Schema(
       default: 0,
     },
 
-    // Amounts
+    // FINAL AMOUNTS
     subtotal: {
-      type: Number,
+      type: Number, // total of items before delivery or discount
       required: true,
     },
     totalAmount: {
@@ -83,7 +83,7 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Payment
+    // PAYMENT INFO
     paymentMethod: {
       type: String,
       enum: ["cod", "sslcommerz"],
@@ -95,14 +95,32 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
     },
 
-    // Order Status
+    // SSLCommerz Payment Gateway Specific
+    transactionId: {
+      type: String, // sslcommerz transaction_id
+      default: null,
+    },
+    valId: {
+      type: String, // sslcommerz val_id used to verify
+      default: null,
+    },
+    currency: {
+      type: String,
+      default: "BDT",
+    },
+    paymentGatewayData: {
+      type: mongoose.Schema.Types.Mixed, // store full SSLCommerz response if needed
+      default: {},
+    },
+
+    // ORDER STATUS
     orderStatus: {
       type: String,
       enum: ["pending", "processing", "shipped", "delivered", "cancelled"],
       default: "pending",
     },
 
-    // Optional Invoice
+    // INVOICE ID (Optional)
     invoiceId: {
       type: String,
       default: null,
