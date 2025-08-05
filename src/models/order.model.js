@@ -68,21 +68,22 @@ const orderSchema = new mongoose.Schema(
       ref: "Coupon",
       default: null,
     },
+
+    totalAmount: {
+      type: Number, // subtotal + deliveryCharge - discount
+      required: true,
+    },
+
     discountAmount: {
       type: Number,
       default: 0,
     },
 
     // FINAL AMOUNTS
-    subtotal: {
+    finalAmount: {
       type: Number, // total of items before delivery or discount
       required: true,
     },
-    totalAmount: {
-      type: Number, // subtotal + deliveryCharge - discount
-      required: true,
-    },
-
     // PAYMENT INFO
     paymentMethod: {
       type: String,
