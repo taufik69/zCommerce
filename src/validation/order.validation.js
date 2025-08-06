@@ -5,36 +5,11 @@ const orderSchema = Joi.object({
   user: Joi.string().optional().allow(null),
   guestId: Joi.string().optional().allow(null),
 
-  items: Joi.array()
-    .items(
-      Joi.object({
-        productId: Joi.string().required().messages({
-          "any.required": "Product ID is required",
-          "string.base": "Product ID must be a string",
-        }),
-        productTitle: Joi.string().optional(),
-        quantity: Joi.number().min(1).required().messages({
-          "any.required": "Quantity is required",
-          "number.base": "Quantity must be a number",
-          "number.min": "Quantity must be at least 1",
-        }),
-        unitPrice: Joi.number().required().messages({
-          "any.required": "Unit price is required",
-          "number.base": "Unit price must be a number",
-        }),
-        totalPrice: Joi.number().required().messages({
-          "any.required": "Total price is required",
-          "number.base": "Total price must be a number",
-        }),
-      })
-    )
-    .min(1)
-    .required()
-    .messages({
-      "array.base": "Items must be an array",
-      "array.min": "At least one item is required",
-      "any.required": "Items are required",
-    }),
+  items: Joi.array().items(Joi.string().required()).required().messages({
+    "array.base": "Items must be an array",
+    "array.min": "At least one item is required",
+    "any.required": "Items are required",
+  }),
 
   shippingInfo: Joi.object({
     fullName: Joi.string().trim().required().messages({
@@ -62,7 +37,7 @@ const orderSchema = Joi.object({
       }),
   }).required(),
 
-  deliveryCharge: Joi.number().required().messages({
+  deliveryCharge: Joi.string().required().messages({
     "any.required": "Delivery charge is required",
     "number.base": "Delivery charge must be a number",
   }),
@@ -94,7 +69,7 @@ const orderSchema = Joi.object({
     .default("pending"),
 
   invoiceId: Joi.string().optional().allow(null),
-}).options({ abortEarly: false }); // all validation errors at once
+}).options({ abortEarly: false, allowUnknown: true }); // all validation errors at once
 
 const validateOrder = async (req) => {
   try {

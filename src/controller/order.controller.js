@@ -4,16 +4,20 @@ const Coupon = require("../models/coupon.model");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { customError } = require("../lib/CustomError");
+const DeliverCharge = require("../models/delivery.model");
 const { v4: uuidv4 } = require("uuid");
 const SSLCommerzPayment = require("sslcommerz-lts");
+const cartModel = require("../models/cart.model");
 
-// Config
-const deliveryChargeMap = {
-  inside_dhaka: 60,
-  outside_dhaka: 120,
-  sub_area: 100,
+// applyDeliveryCharge
+const applyDeliveryCharge = async (deliveryChargeID) => {
+  if (!deliveryChargeID) return 0;
+  const dlc = await DeliverCharge.findById({ _id: "6891ca2e9e4264e8bce16938" });
+  console.log("====================================");
+  console.log(dlc);
+  console.log("====================================");
+  // return deliveryCharge.deliveryCharge;
 };
-
 // Coupon utility
 const applyCouponDiscount = async (code, subtotal) => {
   if (!code)
@@ -26,6 +30,9 @@ const applyCouponDiscount = async (code, subtotal) => {
   if (coupon.expiry && now > coupon.expiry)
     throw new customError("Coupon expired", 400);
 
+  if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit)
+    throw new customError("Coupon usage limit exceeded", 400);
+
   let discountAmount = 0;
   if (coupon.discountType === "percentage") {
     discountAmount = (subtotal * coupon.discountValue) / 100;
@@ -33,11 +40,9 @@ const applyCouponDiscount = async (code, subtotal) => {
     discountAmount = coupon.discountValue;
   }
 
-  if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
-    discountAmount = coupon.maxDiscount;
-  }
-
-  const discountedAmount = subtotal - discountAmount;
+  const discountedAmount = Math.round(subtotal - discountAmount);
+  // incrase the coupon usage count
+  await Coupon.updateOne({ _id: coupon._id }, { $inc: { usedCount: 1 } });
 
   return { discountedAmount, discountAmount, coupon };
 };
@@ -45,7 +50,8 @@ const applyCouponDiscount = async (code, subtotal) => {
 // Main controller
 exports.createOrder = asynchandeler(async (req, res) => {
   const userId = req.user?._id;
-  const { items, shippingInfo, paymentMethod, couponCode } = req.body;
+  const { items, shippingInfo, paymentMethod, couponCode, deliveryCharge } =
+    req.body;
 
   if (!items || items.length === 0) {
     throw new customError("No order items provided", 400);
@@ -55,47 +61,58 @@ exports.createOrder = asynchandeler(async (req, res) => {
   let totalPriceofProducts = 0;
   const productUpdatePromises = [];
 
-  for (let item of items) {
-    const product = await Product.findById(item.productId);
-    if (!product) throw new customError("Product not found", 404);
-    if (product.stock < item.quantity) {
-      throw new customError(
-        `Insufficient stock for ${product.productTitle}`,
-        400
-      );
+  const cartItems = await cartModel.findOne({
+    user: userId || null,
+    guestId: req.body.guestId || null,
+  });
+
+  if (!cartItems) {
+    throw new customError("Cart not found", 404);
+  }
+  for (const item of cartItems.items) {
+    const product = await Product.findById(item.product);
+    if (!product) {
+      throw new customError(`Product not found`, 404);
     }
 
-    totalPriceofProducts += product.price * item.quantity;
+    totalPriceofProducts += item.totalPrice;
+    // decrease product stock
+    productUpdatePromises.push(
+      Product.updateOne(
+        { _id: item.product },
+        { $inc: { stock: -item.quantity } }
+      )
+    );
+  }
+  await Promise.all(productUpdatePromises);
 
-    // Prepare to reduce stock
-    product.stock -= item.quantity;
-    productUpdatePromises.push(product.save());
+  if (totalPriceofProducts <= 0) {
+    throw new customError("No products in the cart", 400);
   }
 
-  // Step 2: Coupon apply
-  const { discountedAmount, discountAmount, coupon } =
+  // Step 2: Apply coupon
+  const { discountedAmount, discountAmount, coupon, couponId } =
     await applyCouponDiscount(couponCode, totalPriceofProducts);
 
-  // Step 3: Delivery zone charge
-  const deliveryZone = shippingInfo.deliveryZone;
-  if (!deliveryZone || !deliveryChargeMap[deliveryZone]) {
-    throw new customError("Invalid delivery zone", 400);
-  }
-  const deliveryCharge = deliveryChargeMap[deliveryZone];
+  // Step 3: Calculate delivery charge
+  const deliveryChargeAmount = await applyDeliveryCharge(deliveryCharge);
+  // console.log("====================================");
+  // console.log(deliveryChargeAmount);
+  // console.log("====================================");
+  return;
+  // Step 4: Final amount calculation (no delivery charge)
+  const finalAmount = discountedAmount + deliveryChargeAmount;
 
-  // Step 4: Final amount calculation
-  const finalAmount = discountedAmount + deliveryCharge;
-
-  // Step 5: Invoice ID
+  // Step 5: Generate invoice ID
   const invoiceId = `INV-${uuidv4().slice(0, 8).toUpperCase()}`;
 
-  // Step 6: Order create
+  // Step 6: Create order
   const order = await Order.create({
     user: userId || null,
     guestId: req.body.guestId || null,
     items: items.map((item) => ({
       productId: item.productId,
-      productTitle: item.productTitle,
+      productName: item.productName,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       totalPrice: item.unitPrice * item.quantity,
@@ -103,8 +120,8 @@ exports.createOrder = asynchandeler(async (req, res) => {
     shippingInfo,
     totalAmount: totalPriceofProducts,
     discountAmount,
-    deliveryCharge,
     finalAmount,
+    deliveryCharge: deliveryChargeAmount,
     paymentMethod,
     invoiceId,
     paymentStatus: paymentMethod === "cod" ? "unpaid" : "pending",
@@ -112,10 +129,10 @@ exports.createOrder = asynchandeler(async (req, res) => {
     coupon: coupon ? coupon._id : undefined,
   });
 
-  // Step 7: Reduce stock
+  // Step 7: Update stock
   await Promise.all(productUpdatePromises);
 
-  // Step 8: Handle payment
+  // Step 8: Handle SSLCommerz
   if (paymentMethod === "sslcommerz") {
     const data = {
       total_amount: finalAmount,
@@ -143,19 +160,23 @@ exports.createOrder = asynchandeler(async (req, res) => {
       process.env.SSLC_STORE_ID,
       process.env.SSLC_STORE_PASSWORD,
       false
-    ); // false = live, true = sandbox
+    );
     const sslRes = await sslcz.init(data);
+    if (sslRes.status === "FAILED") {
+      throw new customError(sslRes.status, 400);
+    }
 
-    return res.status(200).json(
-      apiResponse(true, {
-        message: "SSLCommerz initiated",
-        paymentUrl: sslRes.GatewayPageURL,
-        orderId: order._id,
-      })
+    apiResponse.sendSuccess(
+      res,
+      201,
+      "Order placed successfully (SSLCommerz)",
+      {
+        redirectUrl: sslRes.GatewayPageURL,
+      }
     );
   }
 
-  // Step 9: Send response (COD)
+  // Step 9: Response for COD
   res.status(201).json(
     apiResponse(true, {
       message: "Order placed successfully (COD)",

@@ -14,29 +14,7 @@ const orderSchema = new mongoose.Schema(
     },
 
     // ORDER ITEMS SNAPSHOT
-    items: [
-      {
-        productId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
-          required: true,
-        },
-        productTitle: String,
-        quantity: {
-          type: Number,
-          required: true,
-          default: 1,
-        },
-        unitPrice: {
-          type: Number,
-          required: true,
-        },
-        totalPrice: {
-          type: Number,
-          required: true,
-        },
-      },
-    ],
+    items: [{ type: mongoose.Schema.Types.ObjectId, ref: "Cart" }],
 
     // SHIPPING INFO
     shippingInfo: {
@@ -58,8 +36,8 @@ const orderSchema = new mongoose.Schema(
 
     // DELIVERY CHARGE
     deliveryCharge: {
-      type: Number,
-      required: true,
+      type: mongoose.Types.ObjectId,
+      ref: "DeliveryCharge",
     },
 
     // COUPON / DISCOUNT

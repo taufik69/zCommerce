@@ -12,9 +12,6 @@ const couponSchema = new mongoose.Schema({
   usedCount: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
   // Coupon can be applied to specific products, categories, or subcategories
-  products: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
-  categories: [{ type: mongoose.Schema.Types.ObjectId, ref: "Category" }],
-  subcategories: [{ type: mongoose.Schema.Types.ObjectId, ref: "Subcategory" }],
 });
 
 // make a slug using code
