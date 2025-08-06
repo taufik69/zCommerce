@@ -22,4 +22,6 @@ deliverySchema.pre("save", async function (next) {
   }
   next();
 });
-module.exports = mongoose.model("DeliveryCharge", deliverySchema);
+
+const Delivery = mongoose.model("Delivery", deliverySchema);
+module.exports = Delivery;

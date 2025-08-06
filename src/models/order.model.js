@@ -14,7 +14,7 @@ const orderSchema = new mongoose.Schema(
     },
 
     // ORDER ITEMS SNAPSHOT
-    items: [{ type: mongoose.Schema.Types.ObjectId, ref: "Cart" }],
+    items: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
 
     // SHIPPING INFO
     shippingInfo: {
