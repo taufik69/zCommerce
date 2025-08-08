@@ -129,7 +129,7 @@ exports.deleteBrand = asynchandeler(async (req, res) => {
   await Promise.all(deletePromises); // Wait for all deletions to complete
 
   // delete the brand from the database
-  // await Brand.deleteOne({ slug });
+  await Brand.deleteOne({ slug });
 
   // Send success response
   apiResponse.sendSuccess(res, 200, "Brand deleted successfully", {
