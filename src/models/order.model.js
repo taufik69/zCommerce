@@ -21,6 +21,8 @@ const orderSchema = new mongoose.Schema(
       fullName: { type: String, required: true },
       phone: { type: String, required: true },
       address: { type: String, required: true },
+      email: { type: String },
+      state: { type: String },
       city: { type: String },
       postalCode: { type: String },
       country: {
@@ -70,8 +72,8 @@ const orderSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ["pending", "paid", "failed"],
-      default: "pending",
+      enum: ["pending", "paid", "failed", "unpaid"],
+      default: "unpaid",
     },
 
     // SSLCommerz Payment Gateway Specific
