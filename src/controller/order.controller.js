@@ -183,26 +183,65 @@ exports.createOrder = asynchandeler(async (req, res) => {
 🙏 আমাদের সাথে থাকার জন্য ধন্যবাদ!
 ☎ সহায়তার জন্য কল করুন: ${process.env.ORDER_HOT_LINE_NUMBER}`;
 
-      const data = await sendSMS(shippingInfo?.phone, message);
-      if (data.response_code == 200) {
-        apiResponse.sendSuccess(res, 201, "Order placed successfully", order);
-      }
+      // const data = await sendSMS(shippingInfo?.phone, message);
+      // if (data.response_code == 200) {
+      //   apiResponse.sendSuccess(res, 201, "Order placed successfully", order);
+      // }
     }
 
     // Step 10: Clear cart
-    await cartModel.deleteOne({
-      user: userId || null,
-      guestId: req.body.guestId || null,
-    });
+    // await cartModel.deleteOne({
+    //   user: userId || null,
+    //   guestId: req.body.guestId || null,
+    // });
 
     // Step 11: SSLCommerz or COD Success
     if (paymentMethod === "sslcommerz") {
-      // The SSLCommerz logic remains the same
-      // ...
-    }
+      const data = {
+        total_amount: Math.round(finalAmount),
+        currency: "BDT",
+        tran_id: invoiceId, // required, must be unique per transaction
+        success_url: `${process.env.BACKEND_URL}/payment/success`,
+        fail_url: `${process.env.BACKEND_URL}/payment/fail`,
+        cancel_url: `${process.env.BACKEND_URL}/payment/cancel`,
+        ipn_url: `${process.env.BACKEND_URL}/payment/ipn`,
+        product_name:
+          (totalProductInfo && totalProductInfo?.map((item) => item.name)).join(
+            ","
+          ) || "Computer.",
+        product_category: "Electronic",
+        product_profile: "general",
+        shipping_method: "Courier",
+        ship_name: "Customer Name",
+        ship_add1: shippingInfo.fullName,
+        ship_postcode: shippingInfo.postalCode || 1000,
+        ship_city: "Dhaka",
+        ship_country: "Bangladesh",
+        cus_name: shippingInfo.fullName, // required
+        cus_email: shippingInfo.email || "taufikislam172@gmail.com", // required
+        cus_add1: shippingInfo.address, // required
+        cus_phone: shippingInfo.phone, // required
+      };
 
-    // Final success response
-    apiResponse.sendSuccess(res, 201, "Order placed successfully", order);
+      const is_live = process.env.NODE_ENV === "production" ? true : false;
+      const sslcz = new SSLCommerzPayment(
+        process.env.SSLC_STORE_ID,
+        process.env.SSLC_STORE_PASSWORD,
+        is_live
+      );
+      const response = await sslcz.init(data);
+      // Redirect the user to payment gateway
+
+      console.log("Redirecting to: ", response.GatewayPageURL);
+      return res.status(301).redirect(response.GatewayPageURL);
+      // apiResponse.sendSuccess(res, 201, "Order placed successfully", {
+      //   url: response.GatewayPageURL,
+      //   order,
+      // });
+    } else {
+      // Final success response
+      apiResponse.sendSuccess(res, 201, "Order placed successfully", order);
+    }
   } catch (error) {
     // If order creation or any subsequent step fails, we must rollback stock and coupon usage
     if (order && order._id) {

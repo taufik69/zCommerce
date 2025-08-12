@@ -15,6 +15,7 @@ const cartRoutes = require("./api/cart.api");
 const wishListRoutes = require("./api/wishList.api");
 const deliveryChargeRoutes = require("./api/deliveryCharge.api");
 const orderRoutes = require("./api/order.api");
+const paymentRoutes = require("./api/payment.api");
 _.use("/auth", userRoutes);
 _.use(categoryRoutes);
 _.use(subcategoryRoutes);
@@ -29,6 +30,7 @@ _.use("/cart", cartRoutes);
 _.use("/wishList", wishListRoutes);
 _.use("/delivery-charge", deliveryChargeRoutes);
 _.use("/order", orderRoutes);
+_.use("/payment", paymentRoutes);
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });
