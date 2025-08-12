@@ -174,7 +174,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
       const message = `🙋‍♂️ প্রিয় ${shippingInfo?.fullName},
 📦 আপনার অর্ডার #${order?.invoiceId} সফলভাবে সম্পন্ন হয়েছে ✅
 💰 মোট দাম: ৳ ${order?.finalAmount}
-🙏 আমাদের সাথে থাকার জন্য ধন্যবাদ!
+আমাদের সাথে থাকার জন্য ধন্যবাদ!
 ☎ সহায়তার জন্য কল করুন: ${process.env.ORDER_HOT_LINE_NUMBER}`;
 
       // const data = await sendSMS(shippingInfo?.phone, message);
@@ -227,11 +227,11 @@ exports.createOrder = asynchandeler(async (req, res) => {
       // Redirect the user to payment gateway
 
       console.log("Redirecting to: ", response.GatewayPageURL);
-      return res.status(301).redirect(response.GatewayPageURL);
-      // apiResponse.sendSuccess(res, 201, "Order placed successfully", {
-      //   url: response.GatewayPageURL,
-      //   order,
-      // });
+      // return res.status(301).redirect(response.GatewayPageURL);
+      apiResponse.sendSuccess(res, 201, "Order placed successfully", {
+        url: response.GatewayPageURL,
+        order,
+      });
     } else {
       // Final success response
       apiResponse.sendSuccess(res, 201, "Order placed successfully", order);
