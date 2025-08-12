@@ -133,7 +133,9 @@ exports.orderTemplate = (order, shippingInfo, invoice, totalProductInfo) => {
                             <strong>শহর:</strong> ${shippingInfo.city}<br>
                             <strong>ফোন:</strong> ${shippingInfo.phone}<br>
                             <strong>পেমেন্ট পদ্ধতি:</strong> ${
-                              order.paymentMethod
+                              order.paymentMethod == "cod"
+                                ? "cash on delivery"
+                                : "online payment"
                             }
                         </p>
 

@@ -19,6 +19,8 @@ const fs = require("fs");
 const path = require("path");
 const { sendEmail } = require("../helpers/nodemailer");
 const { orderTemplate } = require("../emailTemplate/orderTemplate");
+const e = require("express");
+const { sendSMS } = require("../helpers/sms");
 
 // applyDeliveryCharge
 const applyDeliveryCharge = async (deliveryChargeID) => {
@@ -44,9 +46,9 @@ const applyCouponDiscount = async (code, subtotal) => {
 
   let discountAmount = 0;
   if (coupon.discountType === "percentage") {
-    discountAmount = (subtotal * coupon.discountValue) / 100;
+    discountAmount = Math.round((subtotal * coupon.discountValue) / 100);
   } else if (coupon.discountType === "fixed") {
-    discountAmount = coupon.discountValue;
+    discountAmount = Math.round(coupon.discountValue);
   }
 
   // ensure the discounted amount is not negative
@@ -77,9 +79,9 @@ exports.createOrder = asynchandeler(async (req, res) => {
   for (const item of cart.items) {
     const product = await Product.findById(item.product);
     totalProductInfo.push({
-      name: product.name,
-      quantity: item.quantity,
-      totalPrice: item.totalPrice,
+      name: product?.name,
+      quantity: item?.quantity,
+      totalPrice: item?.totalPrice,
     });
     if (!product) throw new customError(`Product not found`, 404);
     if (product.stock < item.quantity) {
@@ -166,13 +168,26 @@ exports.createOrder = asynchandeler(async (req, res) => {
         invoice,
         totalProductInfo
       );
-      await sendEmail(
-        shippingInfo.email,
+      const data = await sendEmail(
+        shippingInfo?.email,
         "Order Confirmation",
         orderTemplateHtml
       );
+      if (data) {
+        apiResponse.sendSuccess(res, 201, "Order placed successfully", order);
+      }
+    } else {
+      const message = `🙋‍♂️ প্রিয় ${shippingInfo?.fullName},
+📦 আপনার অর্ডার #${order?.invoiceId} সফলভাবে সম্পন্ন হয়েছে ✅
+💰 মোট দাম: ৳ ${order?.finalAmount}
+🙏 আমাদের সাথে থাকার জন্য ধন্যবাদ!
+☎ সহায়তার জন্য কল করুন: ${process.env.ORDER_HOT_LINE_NUMBER}`;
+
+      const data = await sendSMS(shippingInfo?.phone, message);
+      if (data.response_code == 200) {
+        apiResponse.sendSuccess(res, 201, "Order placed successfully", order);
+      }
     }
-    return res.end("Order placed successfully");
 
     // Step 10: Clear cart
     await cartModel.deleteOne({
