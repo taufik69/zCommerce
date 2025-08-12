@@ -1,7 +1,7 @@
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { apiResponse } = require("../utils/apiResponse");
-
+const SSLCommerzPayment = require("sslcommerz-lts");
 // @desc success payment
 exports.successPayment = asynchandeler(async (req, res) => {
   apiResponse.sendSuccess(res, 200, "Payment successful", req.body);
@@ -25,7 +25,12 @@ exports.ipnPayment = asynchandeler(async (req, res) => {
     return apiResponse.sendError(res, 400, "Validation ID missing in IPN");
   }
 
-  const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+  const is_live = process.env.NODE_ENV === "production" ? true : false;
+  const sslcz = new SSLCommerzPayment(
+    process.env.SSLC_STORE_ID,
+    process.env.SSLC_STORE_PASSWORD,
+    is_live
+  );
   const validationResponse = await sslcz.validate({ val_id });
 
   if (

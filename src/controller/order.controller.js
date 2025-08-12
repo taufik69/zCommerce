@@ -11,12 +11,6 @@ const { customError } = require("../lib/CustomError");
 const { v4: uuidv4 } = require("uuid");
 const SSLCommerzPayment = require("sslcommerz-lts");
 const cartModel = require("../models/cart.model");
-// require the nodemailer for sending emails
-const nodemailer = require("nodemailer");
-// require the pdfkit for generating pdf invoices
-const PDFDocument = require("pdfkit");
-const fs = require("fs");
-const path = require("path");
 const { sendEmail } = require("../helpers/nodemailer");
 const { orderTemplate } = require("../emailTemplate/orderTemplate");
 const e = require("express");
