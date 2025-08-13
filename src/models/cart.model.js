@@ -40,6 +40,12 @@ const cartSchema = new mongoose.Schema({
       },
     },
   ],
+  color: {
+    type: String,
+  },
+  size: {
+    type: String,
+  },
   coupon: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Coupon",
@@ -59,4 +65,4 @@ const cartSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model("Cart", cartSchema);
+module.exports = mongoose.models.Cart || mongoose.model("Cart", cartSchema);

@@ -23,5 +23,6 @@ deliverySchema.pre("save", async function (next) {
   next();
 });
 
-const Delivery = mongoose.model("Delivery", deliverySchema);
+const Delivery =
+  mongoose.models.Delivery || mongoose.model("Delivery", deliverySchema);
 module.exports = Delivery;

@@ -39,7 +39,7 @@ const orderSchema = new mongoose.Schema(
     // DELIVERY CHARGE
     deliveryCharge: {
       type: mongoose.Types.ObjectId,
-      ref: "DeliveryCharge",
+      ref: "Delivery",
     },
 
     // COUPON / DISCOUNT

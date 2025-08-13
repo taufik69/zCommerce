@@ -73,6 +73,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
   for (const item of cart.items) {
     const product = await Product.findById(item.product);
     totalProductInfo.push({
+      productId: product?._id,
       name: product?.name,
       quantity: item?.quantity,
       totalPrice: item?.totalPrice,
@@ -108,7 +109,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
     order = await Order.create({
       user: userId || null,
       guestId: req.body.guestId || null,
-      items: cart.items,
+      items: totalProductInfo.map((item) => item.productId),
       shippingInfo,
       totalAmount: totalPriceofProducts,
       discountAmount,
@@ -178,16 +179,16 @@ exports.createOrder = asynchandeler(async (req, res) => {
 ☎ সহায়তার জন্য কল করুন: ${process.env.ORDER_HOT_LINE_NUMBER}`;
 
       // const data = await sendSMS(shippingInfo?.phone, message);
-      // if (data.response_code == 200) {
-      //   apiResponse.sendSuccess(res, 201, "Order placed successfully", order);
-      // }
+      if (data.response_code == 202) {
+        console.log(" send sms sucessfully");
+      }
     }
 
     // Step 10: Clear cart
-    // await cartModel.deleteOne({
-    //   user: userId || null,
-    //   guestId: req.body.guestId || null,
-    // });
+    await cartModel.deleteOne({
+      user: userId || null,
+      guestId: req.body.guestId || null,
+    });
 
     // Step 11: SSLCommerz or COD Success
     if (paymentMethod === "sslcommerz") {
@@ -267,4 +268,45 @@ exports.createOrder = asynchandeler(async (req, res) => {
     }
     throw error; // Re-throw the error for the async handler to catch
   }
+});
+
+// @desc Get all orders
+
+exports.getAllOrders = asynchandeler(async (req, res) => {
+  const orders = await Order.find().populate("items").lean();
+  apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
+});
+
+//@desc get single order
+exports.getSingleOrder = asynchandeler(async (req, res) => {
+  const { id } = req.params;
+  const singleOrder = await Order.findOne({ _id: id });
+  if (!singleOrder) {
+    throw new customError("Order not found", 404);
+  }
+  apiResponse.sendSuccess(res, 200, "Order fetched successfully", singleOrder);
+});
+
+//@desc find oder by id and update orderStatus
+exports.updateOrder = asynchandeler(async (req, res) => {
+  const { id } = req.params;
+  const { orderStatus } = req.body;
+  const singleOrder = await Order.findOne({ _id: id });
+  if (!singleOrder) {
+    throw new customError("Order not found", 404);
+  }
+  singleOrder.orderStatus = orderStatus;
+  await singleOrder.save();
+  apiResponse.sendSuccess(res, 200, "Order updated successfully", singleOrder);
+});
+
+//@desc find oder by id and delete order
+exports.deleteOrder = asynchandeler(async (req, res) => {
+  const { id } = req.params;
+  const singleOrder = await Order.findOne({ _id: id });
+  if (!singleOrder) {
+    throw new customError("Order not found", 404);
+  }
+  await Order.deleteOne({ _id: id });
+  apiResponse.sendSuccess(res, 200, "Order deleted successfully", singleOrder);
 });

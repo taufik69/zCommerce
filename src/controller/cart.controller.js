@@ -3,12 +3,13 @@ const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const Product = require("../models/product.model");
 const Cart = require("../models/cart.model");
+
 //@desc add to cart
 exports.addToCart = asynchandeler(async (req, res) => {
   const userId = req?.user?._id || null;
   const guestId = req?.body?.guestId || null;
 
-  const { productId, quantity } = req.body;
+  const { productId, quantity, color, size } = req.body;
 
   if (!quantity || quantity <= 0) {
     throw new customError(
@@ -77,6 +78,8 @@ exports.addToCart = asynchandeler(async (req, res) => {
       user: userId || null,
       guestId: guestId || null,
       items: [],
+      color,
+      size,
       totalAmountOfWholeProduct: 0,
     });
   }
