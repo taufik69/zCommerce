@@ -54,7 +54,7 @@ const applyCouponDiscount = async (code, subtotal) => {
 
 // Main controller
 exports.createOrder = asynchandeler(async (req, res) => {
-  const userId = req.user?._id;
+  const userId = req.user?._id || req.body.user || null;
   const { shippingInfo, paymentMethod, couponCode, deliveryCharge } = req.body;
 
   // Step 1: Load Cart
@@ -77,6 +77,9 @@ exports.createOrder = asynchandeler(async (req, res) => {
       name: product?.name,
       quantity: item?.quantity,
       totalPrice: item?.totalPrice,
+      reatailPrice: item?.reatailPrice,
+      size: item?.size,
+      color: item?.color,
     });
     if (!product) throw new customError(`Product not found`, 404);
     if (product.stock < item.quantity) {
@@ -109,7 +112,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
     order = await Order.create({
       user: userId || null,
       guestId: req.body.guestId || null,
-      items: totalProductInfo.map((item) => item.productId),
+      items: totalProductInfo,
       shippingInfo,
       totalAmount: totalPriceofProducts,
       discountAmount,
@@ -168,17 +171,19 @@ exports.createOrder = asynchandeler(async (req, res) => {
         "Order Confirmation",
         orderTemplateHtml
       );
-      if (data) {
-        apiResponse.sendSuccess(res, 201, "Order placed successfully", order);
+      if (!data) {
+        throw new customError("Failed to send email", 500);
       }
-    } else {
-      const message = `🙋‍♂️ প্রিয় ${shippingInfo?.fullName},
-📦 আপনার অর্ডার #${order?.invoiceId} সফলভাবে সম্পন্ন হয়েছে ✅
-💰 মোট দাম: ৳ ${order?.finalAmount}
-আমাদের সাথে থাকার জন্য ধন্যবাদ!
-☎ সহায়তার জন্য কল করুন: ${process.env.ORDER_HOT_LINE_NUMBER}`;
+    }
 
-      // const data = await sendSMS(shippingInfo?.phone, message);
+    if (shippingInfo.phone) {
+      const message = `🙋‍♂️ প্রিয় ${shippingInfo?.fullName},
+    📦 আপনার অর্ডার #${order?.invoiceId} সফলভাবে সম্পন্ন হয়েছে ✅
+    💰 মোট দাম: ৳ ${order?.finalAmount}
+    আমাদের সাথে থাকার জন্য ধন্যবাদ!
+    ☎ সহায়তার জন্য কল করুন: ${process.env.ORDER_HOT_LINE_NUMBER}`;
+
+      const data = await sendSMS(shippingInfo?.phone, message);
       if (data.response_code == 202) {
         console.log(" send sms sucessfully");
       }
@@ -273,14 +278,26 @@ exports.createOrder = asynchandeler(async (req, res) => {
 // @desc Get all orders
 
 exports.getAllOrders = asynchandeler(async (req, res) => {
-  const orders = await Order.find().populate("items").lean();
+  const orders = await Order.find()
+    .populate("user")
+    .populate("items.productId")
+    .populate("deliveryCharge")
+    .populate("coupon")
+    .sort({ createdAt: -1 })
+    .lean();
   apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
 });
 
 //@desc get single order
 exports.getSingleOrder = asynchandeler(async (req, res) => {
   const { id } = req.params;
-  const singleOrder = await Order.findOne({ _id: id });
+  const singleOrder = await Order.findOne({ _id: id })
+    .populate("user")
+    .populate("items.productId")
+    .populate("deliveryCharge")
+    .populate("coupon")
+    .sort({ createdAt: -1 })
+    .lean();
   if (!singleOrder) {
     throw new customError("Order not found", 404);
   }

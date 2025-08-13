@@ -5,8 +5,9 @@ const Product = require("../models/product.model");
 const Cart = require("../models/cart.model");
 
 //@desc add to cart
+
 exports.addToCart = asynchandeler(async (req, res) => {
-  const userId = req?.user?._id || null;
+  const userId = req?.user?._id || req.body.user || null;
   const guestId = req?.body?.guestId || null;
 
   const { productId, quantity, color, size } = req.body;
@@ -77,9 +78,18 @@ exports.addToCart = asynchandeler(async (req, res) => {
     cart = new Cart({
       user: userId || null,
       guestId: guestId || null,
-      items: [],
-      color,
-      size,
+      items: [
+        {
+          product: product._id,
+          quantity: quantity,
+          price: price,
+          reatailPrice: product.retailPrice,
+          totalPrice: Math.round(price * quantity),
+          color,
+          size,
+        },
+      ],
+
       totalAmountOfWholeProduct: 0,
     });
   }
@@ -101,6 +111,8 @@ exports.addToCart = asynchandeler(async (req, res) => {
       price: price,
       reatailPrice: product.retailPrice,
       totalPrice: Math.round(price * quantity),
+      color,
+      size,
     });
   }
 

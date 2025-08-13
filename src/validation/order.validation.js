@@ -16,7 +16,7 @@ const orderSchema = Joi.object({
       "any.required": "Full name is required",
       "string.empty": "Full name cannot be empty",
     }),
-    phone: Joi.string().trim().required().messages({
+    phone: Joi.string().trim().messages({
       "any.required": "Phone number is required",
       "string.empty": "Phone number cannot be empty",
     }),

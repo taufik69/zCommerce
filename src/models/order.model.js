@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const Product = require("./product.model");
 
 const orderSchema = new mongoose.Schema(
   {
@@ -14,12 +15,26 @@ const orderSchema = new mongoose.Schema(
     },
 
     // ORDER ITEMS SNAPSHOT
-    items: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
+    items: [
+      {
+        productId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+        name: String,
+        quantity: Number,
+        totalPrice: Number,
+        retailPrice: Number,
+        size: String,
+        color: String,
+      },
+    ],
 
     // SHIPPING INFO
     shippingInfo: {
       fullName: { type: String, required: true },
-      phone: { type: String, required: true },
+      phone: { type: String },
       address: { type: String, required: true },
       email: { type: String },
       state: { type: String },

@@ -38,14 +38,15 @@ const cartSchema = new mongoose.Schema({
         required: true,
         default: 0,
       },
+      color: {
+        type: String,
+      },
+      size: {
+        type: String,
+      },
     },
   ],
-  color: {
-    type: String,
-  },
-  size: {
-    type: String,
-  },
+
   coupon: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Coupon",
