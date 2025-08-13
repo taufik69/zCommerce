@@ -2,6 +2,7 @@ const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { sendSMS } = require("../helpers/sms");
+const { default: axios } = require("axios");
 
 exports.sendSMS = asynchandeler(async (req, res) => {
   const { message, phoneNumber } = req.body;
@@ -22,4 +23,16 @@ exports.sendBulkSMS = asynchandeler(async (req, res) => {
   }
   const result = await sendSMS(phoneNumber, message);
   return apiResponse.sendSuccess(res, 200, "SMS sent successfully", result);
+});
+
+// @desc check sms balace
+exports.smsBlance = asynchandeler(async (req, res) => {
+  const response = await axios.get(
+    `http://bulksmsbd.net/api/getBalanceApi?api_key=${process.env.BULK_SMS_API_KEY}`
+  );
+  if (response.data.error) {
+    throw new customError(response.data.error, 400);
+  }
+
+  return apiResponse.sendSuccess(res, 202, "SMS balace", response.data);
 });
