@@ -18,7 +18,8 @@ app.use(
       "http://localhost:5172",
       "http://localhost:5174",
       "https://smartsoftnextjs-ecommerce-git-main-wasim-mahamods-projects.vercel.app",
-      "https://smartsoftnextjs-ecommerce.vercel.app"
+      "https://smartsoftnextjs-ecommerce.vercel.app",
+      "https://z-ecommerce-seven.vercel.app"
     ],
     credentials: true,
   })
