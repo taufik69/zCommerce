@@ -121,6 +121,21 @@ const orderSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // COURIER
+    courier: {
+      name: {
+        type: String,
+        enum: ["pathao", "redx", "steadfast", "ecourier", "deliverytiger"],
+        default: null,
+      },
+      trackingId: { type: String, default: null },
+      rawResponse: { type: mongoose.Schema.Types.Mixed, default: null },
+      status: {
+        type: String,
+        enum: ["pending", "dispatched", "accepted", "delivered", "cancelled"],
+        default: "pending",
+      },
+    },
   },
   { timestamps: true }
 );
