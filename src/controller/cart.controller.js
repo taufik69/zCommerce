@@ -5,7 +5,6 @@ const Product = require("../models/product.model");
 const Cart = require("../models/cart.model");
 
 //@desc add to cart
-
 exports.addToCart = asynchandeler(async (req, res) => {
   const userId = req?.user?._id || req.body.user || null;
   const guestId = req?.body?.guestId || null;
