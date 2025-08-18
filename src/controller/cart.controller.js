@@ -37,6 +37,8 @@ exports.addToCart = asynchandeler(async (req, res) => {
   if (!product) {
     throw new customError("Product not found", 404);
   }
+  console.log(product);
+  return;
 
   // calculate the price with discount
   let priceWithDiscount = 0;

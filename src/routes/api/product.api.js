@@ -77,4 +77,5 @@ _.route("/multiplevarinatproduct").get(
   // authorize("product", "view"),
   Product.getAllMultipleVariantProducts
 );
+
 module.exports = _;

@@ -16,6 +16,8 @@ class PathaoCourier extends BaseCourier {
       }
       const order = await Order.findById(orderId);
       if (!order) throw new customError("Order not found", 404);
+      console.log(order);
+      return;
 
       const response = await axios.post(
         `${marchantInfo.baseURL}/create-order`,
