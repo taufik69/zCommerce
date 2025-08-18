@@ -1,0 +1,64 @@
+const joi = require("joi");
+const { customError } = require("../lib/CustomError");
+
+const merchantSchema = joi.object(
+  {
+    merchantID: joi.string().trim().required().messages({
+      "string.empty": "Merchant ID is required.",
+      "any.required": "Merchant ID is required.",
+    }),
+    merchantSecret: joi.string().trim().required().messages({
+      "string.empty": "Merchant Secret is required.",
+      "any.required": "Merchant Secret is required.",
+    }),
+    baseURL: joi.string().trim().uri().messages({
+      "string.empty": "Base URL is required.",
+      "string.uri": "Base URL must be a valid URL.",
+    }),
+    serviceProvider: joi.string().trim().required().messages({
+      "string.empty": "Service Provider is required.",
+      "any.required": "Service Provider is required.",
+    }),
+    merchantName: joi.string().trim().required().messages({
+      "string.empty": "Merchant Name is required.",
+      "any.required": "Merchant Name is required.",
+    }),
+    merchantEmail: joi
+      .string()
+      .trim()
+      .required()
+      .email()
+      .pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(com)$/)
+      .messages({
+        "string.empty": "Merchant Email is required.",
+        "any.required": "Merchant Email is required.",
+        "string.email": "Merchant Email must be a valid email address.",
+        "string.pattern.base": "Merchant Email must end with .com",
+      }),
+    merchantPhone: joi
+      .string()
+      .trim()
+      .required()
+      .pattern(/^01[0-9]{9}$/)
+      .messages({
+        "string.empty": "Merchant Phone is required.",
+        "any.required": "Merchant Phone is required.",
+        "string.pattern.base":
+          "Merchant Phone must be a valid Bangladeshi phone number starting with 01.",
+      }),
+  },
+  { abortEarly: false, allowUnknown: true }
+);
+
+exports.validateMerchant = async (req) => {
+  try {
+    const value = await merchantSchema.validateAsync(req.body);
+    return value;
+  } catch (error) {
+    console.log("Validation error " + error.details.map((err) => err.message));
+    throw new customError(
+      "Validation error " + error.details.map((err) => err.message),
+      400
+    );
+  }
+};
