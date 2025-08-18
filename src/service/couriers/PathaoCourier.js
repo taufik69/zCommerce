@@ -1,23 +1,33 @@
 // services/couriers/PathaoCourier.js
 const axios = require("axios");
 const BaseCourier = require("./BaseCourier");
-const Order = require("../../models/orderModel");
+const Order = require("../../models/order.model");
 const { customError } = require("../../lib/CustomError");
 
 class PathaoCourier extends BaseCourier {
-  async createOrder(orderId) {
+  async createOrder(marchantInfo, orderId) {
     try {
+      console.log("Creating Pathao order for orderId:", marchantInfo, orderId);
+      if (!marchantInfo || !marchantInfo.merchantID) {
+        throw new customError("Merchant information is required", 400);
+      }
+      if (!orderId) {
+        throw new customError("Order ID is required", 400);
+      }
       const order = await Order.findById(orderId);
       if (!order) throw new customError("Order not found", 404);
 
-      const response = await axios.post(`https://api.pathao.com/create-order`, {
-        api_key: process.env.PATHAO_API_KEY,
-        invoiceId: order.invoiceId,
-        recipient_name: order.shippingInfo.fullName,
-        recipient_phone: order.shippingInfo.phone,
-        recipient_address: order.shippingInfo.address,
-        amount: order.finalAmount,
-      });
+      const response = await axios.post(
+        `${marchantInfo.baseURL}/create-order`,
+        {
+          api_key: marchantInfo.merchantID,
+          invoiceId: order.invoiceId,
+          recipient_name: order.shippingInfo.fullName,
+          recipient_phone: order.shippingInfo.phone,
+          recipient_address: order.shippingInfo.address,
+          amount: order.finalAmount,
+        }
+      );
 
       const trackingId = response.data.tracking_id || "PATHAO123";
 
