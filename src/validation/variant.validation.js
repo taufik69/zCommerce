@@ -2,7 +2,7 @@ const Joi = require("joi");
 const { customError } = require("../lib/CustomError");
 
 const VariantSchema = Joi.object({
-  product: Joi.string().required().messages({
+  product: Joi.string().messages({
     "string.empty": "Product ID is required",
     "any.required": "Product ID is required",
   }),
@@ -10,31 +10,31 @@ const VariantSchema = Joi.object({
     "string.empty": "SKU is required",
     "any.required": "SKU is required",
   }),
-  variantName: Joi.string().required().trim().messages({
+  variantName: Joi.string().trim().messages({
     "string.empty": "Variant name is required",
     "any.required": "Variant name is required",
   }),
 
-  size: Joi.array().required().messages({
+  size: Joi.array().messages({
     "string.empty": "Size is required",
     "any.required": "Size is required",
     "any.only": "Size must be one of S, M, L, XL, XXL, XXXL, Custom",
   }),
-  color: Joi.array().required().messages({
+  color: Joi.array().messages({
     "string.empty": "Color is required",
     "any.required": "Color is required",
   }),
-  stockVariant: Joi.number().required().min(0).messages({
+  stockVariant: Joi.number().min(0).messages({
     "number.base": "Stock variant must be a number",
     "number.min": "Stock variant cannot be less than 0",
     "any.required": "Stock variant is required",
   }),
-  purchasePrice: Joi.number().required().min(0).messages({
+  purchasePrice: Joi.number().min(0).messages({
     "number.base": "Purchase price must be a number",
     "number.min": "Purchase price cannot be less than 0",
     "any.required": "Purchase price is required",
   }),
-  retailPrice: Joi.number().required().min(0).messages({
+  retailPrice: Joi.number().min(0).messages({
     "number.base": "Retail price must be a number",
     "number.min": "Retail price cannot be less than 0",
     "any.required": "Retail price is required",
@@ -53,7 +53,7 @@ const VariantSchema = Joi.object({
     "number.base": "Retail profit margin by amount must be a number",
     "number.min": "Retail profit margin by amount cannot be less than 0",
   }),
-  wholesalePrice: Joi.number().required().min(0).messages({
+  wholesalePrice: Joi.number().min(0).messages({
     "number.base": "Wholesale price must be a number",
     "number.min": "Wholesale price cannot be less than 0",
     "any.required": "Wholesale price is required",

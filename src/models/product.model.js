@@ -7,13 +7,13 @@ const reviewSchema = new mongoose.Schema(
   {
     rating: {
       type: Number,
-      required: true,
+      required: false,
       min: 0,
       max: 5,
     },
     comment: {
       type: String,
-      required: true,
+      required: false,
     },
 
     reviewer: {
@@ -36,22 +36,22 @@ const productSchema = new mongoose.Schema(
     },
     name: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
     description: {
       type: String,
-      required: true,
+      required: false,
     },
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
-      required: true,
+      required: false,
     },
     subcategory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Subcategory",
-      required: true,
+      required: false,
     },
     brand: {
       type: mongoose.Schema.Types.ObjectId,
@@ -92,7 +92,7 @@ const productSchema = new mongoose.Schema(
     },
     warrantyInformation: {
       type: String,
-      required: true,
+      required: false,
       default: "No warranty info",
     },
     shippingInformation: {

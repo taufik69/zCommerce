@@ -3,23 +3,23 @@ const { customError } = require("../lib/CustomError");
 
 const productSchema = joi
   .object({
-    name: joi.string().trim().required().messages({
+    name: joi.string().trim().messages({
       "string.empty": "Name is required.",
       "any.required": "Name is required.",
     }),
-    description: joi.string().trim().required().messages({
+    description: joi.string().trim().messages({
       "string.empty": "Description is required.",
       "any.required": "Description is required.",
     }),
-    category: joi.string().trim().required().messages({
+    category: joi.string().trim().messages({
       "string.empty": "Category is required.",
       "any.required": "Category is required.",
     }),
-    subcategory: joi.string().trim().required().messages({
+    subcategory: joi.string().trim().messages({
       "string.empty": "Subcategory is required.",
       "any.required": "Subcategory is required.",
     }),
-    brand: joi.string().trim().required().messages({
+    brand: joi.string().trim().messages({
       "string.empty": "Brand is required.",
       "any.required": "Brand is required.",
     }),

@@ -7,7 +7,7 @@ const variantSchema = new mongoose.Schema(
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
-      required: true,
+      required: false,
     },
     slug: {
       type: String,
@@ -17,7 +17,7 @@ const variantSchema = new mongoose.Schema(
     },
     variantName: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
 
@@ -52,7 +52,7 @@ const variantSchema = new mongoose.Schema(
     // Quantity / stock
     stockVariant: {
       type: Number,
-      required: true,
+      required: false,
       min: 0,
     },
     alertVariantStock: {
@@ -63,12 +63,12 @@ const variantSchema = new mongoose.Schema(
     // Pricing
     purchasePrice: {
       type: Number,
-      required: true,
+      required: false,
       min: 0,
     },
     retailPrice: {
       type: Number,
-      required: true,
+      required: false,
       min: 0,
     },
     retailProfitMarginbyPercentance: {
