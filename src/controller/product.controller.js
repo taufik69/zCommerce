@@ -120,31 +120,44 @@ exports.createProduct = asynchandeler(async (req, res) => {
 exports.getAllProducts = asynchandeler(async (req, res) => {
   const { category, subcategory, brand, minPrice, maxPrice } = req.query;
 
-  console.log(req.query)
+  console.log(req.query);
   const query = {};
   if (category) query.category = category;
   if (subcategory) query.subcategory = subcategory;
   if (brand) query.brand = brand;
-  // please do not delete this code 
+  // please do not delete this code
   // if (minPrice) query.retailPrice = { $gte: minPrice };
   // if (maxPrice) query.retailPrice = { $lte: maxPrice };
   // if (minPrice && maxPrice) {
   //   query.retailPrice = { $gte: minPrice, $lte: maxPrice };
   // }
 
-  const products = await Product.find(query).populate(
-    "category subcategory brand variant discount"
-  );
+  const products = await Product.find(query)
+    .populate({
+      path: "category",
+      populate: {
+        path: "discount",
+      },
+      select: "-subcategories -createdAt -updatedAt",
+    })
+    .populate("brand variant discount")
+    .select("-updatedAt -createdAt");
   apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
 });
-
 
 //@desc Get product by slug
 exports.getProductBySlug = asynchandeler(async (req, res) => {
   const { slug } = req.params;
-  const product = await Product.findOne({ slug }).populate(
-    "category subcategory brand variant discount"
-  );
+  const product = await Product.findOne({ slug })
+    .populate({
+      path: "category",
+      populate: {
+        path: "discount",
+      },
+      select: "-subcategories -createdAt -updatedAt",
+    })
+    .populate("brand variant discount")
+    .select("-updatedAt -createdAt");
   if (!product) {
     throw new customError(404, "Product not found");
   }

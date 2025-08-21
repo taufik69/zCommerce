@@ -4,11 +4,10 @@ const { customError } = require("../lib/CustomError");
 const VariantSchema = Joi.object({
   product: Joi.string().messages({
     "string.empty": "Product ID is required",
-    "any.required": "Product ID is required",
+
   }),
   sku: Joi.string().trim().messages({
     "string.empty": "SKU is required",
-    "any.required": "SKU is required",
   }),
   variantName: Joi.string().trim().messages({
     "string.empty": "Variant name is required",
@@ -17,7 +16,7 @@ const VariantSchema = Joi.object({
 
   size: Joi.array().messages({
     "string.empty": "Size is required",
-    "any.required": "Size is required",
+
     "any.only": "Size must be one of S, M, L, XL, XXL, XXXL, Custom",
   }),
   color: Joi.array().messages({
@@ -27,17 +26,17 @@ const VariantSchema = Joi.object({
   stockVariant: Joi.number().min(0).messages({
     "number.base": "Stock variant must be a number",
     "number.min": "Stock variant cannot be less than 0",
-    "any.required": "Stock variant is required",
+
   }),
   purchasePrice: Joi.number().min(0).messages({
     "number.base": "Purchase price must be a number",
     "number.min": "Purchase price cannot be less than 0",
-    "any.required": "Purchase price is required",
+ 
   }),
   retailPrice: Joi.number().min(0).messages({
     "number.base": "Retail price must be a number",
     "number.min": "Retail price cannot be less than 0",
-    "any.required": "Retail price is required",
+
   }),
   retailProfitMarginbyPercentance: Joi.number()
 
@@ -47,7 +46,7 @@ const VariantSchema = Joi.object({
       "number.base": "Retail profit margin must be a number",
       "number.min": "Retail profit margin cannot be less than 0",
       "number.max": "Retail profit margin cannot be more than 100",
-      "any.required": "Retail profit margin is required",
+
     }),
   retailProfitMarginbyAmount: Joi.number().optional().min(0).messages({
     "number.base": "Retail profit margin by amount must be a number",
@@ -56,7 +55,7 @@ const VariantSchema = Joi.object({
   wholesalePrice: Joi.number().min(0).messages({
     "number.base": "Wholesale price must be a number",
     "number.min": "Wholesale price cannot be less than 0",
-    "any.required": "Wholesale price is required",
+  
   }),
   wholesaleProfitMarginPercentage: Joi.number()
 
@@ -66,7 +65,7 @@ const VariantSchema = Joi.object({
       "number.base": "Wholesale profit margin must be a number",
       "number.min": "Wholesale profit margin cannot be less than 0",
       "number.max": "Wholesale profit margin cannot be more than 100",
-      "any.required": "Wholesale profit margin is required",
+      
     }),
   wholesaleProfitMarginAmount: Joi.number().optional().min(0).messages({
     "number.base": "Wholesale profit margin by amount must be a number",
