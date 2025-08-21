@@ -120,21 +120,24 @@ exports.createProduct = asynchandeler(async (req, res) => {
 exports.getAllProducts = asynchandeler(async (req, res) => {
   const { category, subcategory, brand, minPrice, maxPrice } = req.query;
 
+  console.log(req.query)
   const query = {};
   if (category) query.category = category;
   if (subcategory) query.subcategory = subcategory;
   if (brand) query.brand = brand;
-  if (minPrice) query.retailPrice = { $gte: minPrice };
-  if (maxPrice) query.retailPrice = { $lte: maxPrice };
-  if (minPrice && maxPrice) {
-    query.retailPrice = { $gte: minPrice, $lte: maxPrice };
-  }
+  // please do not delete this code 
+  // if (minPrice) query.retailPrice = { $gte: minPrice };
+  // if (maxPrice) query.retailPrice = { $lte: maxPrice };
+  // if (minPrice && maxPrice) {
+  //   query.retailPrice = { $gte: minPrice, $lte: maxPrice };
+  // }
 
   const products = await Product.find(query).populate(
     "category subcategory brand variant discount"
   );
   apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
 });
+
 
 //@desc Get product by slug
 exports.getProductBySlug = asynchandeler(async (req, res) => {
