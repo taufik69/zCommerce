@@ -12,12 +12,6 @@ const validateDiscount = require("../validation/discount.validation");
 exports.createDiscount = asynchandeler(async (req, res) => {
   const value = await validateDiscount(req);
 
-  // check if the discount already exists
-  const existingDiscount = await Discount.findOne({ slug: value.slug });
-  if (existingDiscount) {
-    throw new customError("Discount with this slug already exists", 400);
-  }
-
   // create a new discount
   const discount = new Discount(value);
 
@@ -40,6 +34,16 @@ exports.createDiscount = asynchandeler(async (req, res) => {
   if (product) {
     product.discount = discount._id;
     await product.save();
+  }
+
+  // if discount plan is flat then set discount value set the the discountValueByAmount and discountValueByPercentance to the every product
+
+  if (value.discountPlan === "flat") {
+    const products = await Product.find();
+    for (const product of products) {
+      product.discount = discount._id;
+      await product.save();
+    }
   }
 
   return apiResponse.sendSuccess(
