@@ -133,14 +133,14 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
   }
 
   const products = await Product.find(query)
-    .populate({
-      path: "category",
-      populate: {
-        path: "discount",
-      },
-      select: "-subcategories -createdAt -updatedAt",
-    })
-    .populate("brand variant discount")
+    // .populate({
+    //   path: "category",
+    //   populate: {
+    //     path: "discount",
+    //   },
+    //   select: "-subcategories -createdAt -updatedAt",
+    // })
+    .populate("category brand variant discount")
     .select("-updatedAt -createdAt");
   apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
 });
