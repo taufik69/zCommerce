@@ -14,6 +14,8 @@ const { uploadBarcodeToCloudinary } = require("../helpers/cloudinary");
 exports.createVariant = asynchandeler(async (req, res, next) => {
   // Validate the request body
   const validatedData = await validateVariant(req);
+  console.log(validatedData);
+  return;
   // after variant save
 
   // Proceed with saving the variant
@@ -64,7 +66,7 @@ exports.createVariant = asynchandeler(async (req, res, next) => {
   const { optimizeUrl: qrCodeUrl } = await uploadBarcodeToCloudinary(
     base64qrCode
   );
-  variantData.barCode = `${Date.now()}`.toLocaleUpperCase().slice(0, 13);
+  variantData.barCode = req.body.barCode;
   variantData.qrCode = qrCodeUrl;
   await variantData.save();
 
