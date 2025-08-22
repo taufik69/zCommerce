@@ -32,6 +32,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
     stock,
     size,
     color,
+    barCode,
   } = value;
 
   // Generate barcode using bwip-js
@@ -63,7 +64,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
   // Create product
   const product = new Product({
     name,
-    barCode: `${Date.now()}`.toLocaleUpperCase().slice(0, 13) || null,
+    barCode: barCode || `${Date.now()}`.toLocaleUpperCase().slice(0, 13),
     sku,
     description,
     category,
