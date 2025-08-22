@@ -63,7 +63,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
   // Create product
   const product = new Product({
     name,
-    barCode: `${sku}-${Date.now()}`.toLocaleUpperCase().slice(0, 13) || null,
+    barCode: `${Date.now()}`.toLocaleUpperCase().slice(0, 13) || null,
     sku,
     description,
     category,
