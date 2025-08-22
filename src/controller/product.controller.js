@@ -35,22 +35,22 @@ exports.createProduct = asynchandeler(async (req, res) => {
   } = value;
 
   // Generate barcode using bwip-js
-  const barcode = await bwipjs.toBuffer({
-    bcid: "code128",
-    text: `${sku}-${Date.now()}`.toLocaleUpperCase().slice(0, 13), // Unique identifier
-    scale: 3,
-    height: 10,
-    includetext: true,
-    textxalign: "center",
-    backgroundcolor: "FFFFFF",
-    // No need for output: 'svg'
-  });
+  // const barcode = await bwipjs.toBuffer({
+  //   bcid: "code128",
+  //   text: `${sku}-${Date.now()}`.toLocaleUpperCase().slice(0, 13), // Unique identifier
+  //   scale: 3,
+  //   height: 10,
+  //   includetext: true,
+  //   textxalign: "center",
+  //   backgroundcolor: "FFFFFF",
+  //   // No need for output: 'svg'
+  // });
 
-  const base64Barcode = `data:image/png;base64,${barcode.toString("base64")}`;
-  // upload barcode to cloudinary
-  const { optimizeUrl: barcodeUrl } = await uploadBarcodeToCloudinary(
-    base64Barcode
-  );
+  // const base64Barcode = `data:image/png;base64,${barcode.toString("base64")}`;
+  // // upload barcode to cloudinary
+  // const { optimizeUrl: barcodeUrl } = await uploadBarcodeToCloudinary(
+  //   base64Barcode
+  // );
 
   // upload images to cloudinary
   const imageUploads = req.files.image
@@ -63,7 +63,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
   // Create product
   const product = new Product({
     name,
-    barCode: barcodeUrl || null,
+    barCode: `${sku}-${Date.now()}`.toLocaleUpperCase().slice(0, 13) || null,
     sku,
     description,
     category,
