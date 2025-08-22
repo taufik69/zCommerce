@@ -156,15 +156,13 @@ exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
 
 //@desc Delete Cart
 exports.deleteCart = asynchandeler(async (req, res) => {
-  const userId = req?.user?._id;
   const { cartId } = req.params;
-  const cart = await Cart.findOneAndDelete({
-    $or: [
-      { user: userId },
-      { user: "687f69506c48eb6386dc5f6d" },
-      { _id: cartId },
-    ],
-  });
+  if (!cartId) {
+    throw new customError("Cart ID is required", 400);
+  }
+
+  const cart = await Cart.findOneAndDelete({ _id: cartId });
+
   if (!cart) {
     throw new customError("Cart not found", 404);
   }
