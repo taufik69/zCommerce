@@ -15,7 +15,10 @@ const cartSchema = new mongoose.Schema({
       product: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Product",
-        required: true,
+      },
+      variant: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Variant",
       },
       quantity: {
         type: Number,
@@ -28,16 +31,12 @@ const cartSchema = new mongoose.Schema({
         required: true,
         default: 0,
       },
-      // price: {
-      //   type: Number,
-      //   required: true,
-      //   default: 0,
-      // },
-      reatailPrice: {
+      price: {
         type: Number,
         required: true,
         default: 0,
       },
+
       color: {
         type: String,
       },
@@ -46,24 +45,6 @@ const cartSchema = new mongoose.Schema({
       },
     },
   ],
-
-  coupon: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Coupon",
-  },
-  discountPrice: {
-    type: Number,
-    default: 0,
-  },
-  discountPercentance: {
-    type: Number,
-    default: 0,
-  },
-  totalAmountOfWholeProduct: {
-    type: Number,
-    required: true,
-    default: 0,
-  },
 });
 
 module.exports = mongoose.models.Cart || mongoose.model("Cart", cartSchema);

@@ -2,6 +2,7 @@ const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const Product = require("../models/product.model");
+const Variant = require("../models/variant.model");
 const Cart = require("../models/cart.model");
 
 //@desc add to cart
@@ -9,7 +10,7 @@ exports.addToCart = asynchandeler(async (req, res) => {
   const userId = req?.user?._id || req.body.user || null;
   const guestId = req?.body?.guestId || null;
 
-  const { productId, quantity, color, size } = req.body;
+  const { productId, variantId, quantity, color, size } = req.body;
 
   if (!quantity || quantity <= 0) {
     throw new customError(
@@ -17,113 +18,77 @@ exports.addToCart = asynchandeler(async (req, res) => {
       400
     );
   }
-
   if (!userId && !guestId) {
     throw new customError("User or guest ID is required", 400);
   }
 
-  const product = await Product.findById(productId)
-    .populate({
-      path: "category",
-      populate: { path: "discount" },
-    })
-    .populate({
-      path: "subcategory",
-      populate: { path: "discount" },
-    })
-    .populate("variant")
-    .populate("discount");
+  let product = null;
+  let variant = null;
+  let price = 0;
 
-  if (!product) {
-    throw new customError("Product not found", 404);
-  }
-  console.log(product);
-  return;
-
-  // calculate the price with discount
-  let priceWithDiscount = 0;
-  let discountRateInPercent = 0;
-  let discountPriceWithTk = 0;
-
-  if (product?.category?.discount?.discountType?.trim() === "percentance") {
-    discountRateInPercent =
-      product?.category?.discount?.discountValueByPercentance ||
-      product?.subcategory?.discount?.discountValueByPercentance ||
-      product?.discount?.discountValueByPercentance;
-
-    const afterDiscountPrice =
-      product.retailPrice - (product.retailPrice * discountRateInPercent) / 100;
-
-    priceWithDiscount = Math.round(afterDiscountPrice);
-  } else {
-    discountPriceWithTk =
-      product?.category?.discount?.discountValueByAmount ||
-      product?.subcategory?.discount?.discountValueByAmount ||
-      product?.discount?.discountValueByAmount;
-
-    const DiscountPrice = product.retailPrice - discountPriceWithTk;
-    priceWithDiscount = Math.round(DiscountPrice);
+  // Product fetch
+  if (productId) {
+    product = await Product.findById(productId);
+    if (!product) throw new customError("Product not found", 404);
+    price = product.retailPrice;
   }
 
-  if (priceWithDiscount < 0) {
-    priceWithDiscount = 0;
+  // Variant fetch
+  if (variantId) {
+    variant = await Variant.findById(variantId);
+    if (!variant) throw new customError("Variant not found", 404);
+    price = variant.retailPrice;
+    // যদি variant এর সাথে product reference থাকে, চাইলে এখানে product-ও populate করতে পারেন
+    if (!product && variant.product) {
+      product = await Product.findById(variant.product);
+    }
   }
 
-  const price = priceWithDiscount || product.retailPrice;
-
-  // ✅ Find cart using user or guestId
+  // Cart খুঁজুন
   const cartQuery = userId ? { user: userId } : { guestId };
   let cart = await Cart.findOne(cartQuery);
 
+  // Cart না থাকলে নতুন cart তৈরি করুন
   if (!cart) {
     cart = new Cart({
       user: userId || null,
       guestId: guestId || null,
-      items: [
-        {
-          product: product._id,
-          quantity: quantity,
-          price: price,
-          reatailPrice: product.retailPrice,
-          totalPrice: Math.round(price * quantity),
-          color,
-          size,
-        },
-      ],
-
-      totalAmountOfWholeProduct: 0,
+      items: [],
     });
   }
 
-  const itemIndex = cart.items.findIndex(
-    (item) => item.product.toString() === productId
-  );
+  // Cart item খুঁজুন (productId বা variantId দিয়ে)
+  let itemIndex = -1;
+  if (variantId) {
+    itemIndex = cart.items.findIndex(
+      (item) => item.variant && item.variant.toString() === variantId
+    );
+  } else if (productId) {
+    itemIndex = cart.items.findIndex(
+      (item) => item.product && item.product.toString() === productId
+    );
+  }
 
+  // Item থাকলে quantity বাড়ান, না থাকলে নতুন item push করুন
   if (itemIndex > -1) {
     cart.items[itemIndex].quantity += quantity;
     cart.items[itemIndex].price = price;
     cart.items[itemIndex].totalPrice = Math.round(
       cart.items[itemIndex].quantity * price
     );
+    if (color) cart.items[itemIndex].color = color;
+    if (size) cart.items[itemIndex].size = size;
   } else {
     cart.items.push({
-      product: product._id,
+      product: product ? product._id : null,
+      variant: variant ? variant._id : null,
       quantity: quantity,
       price: price,
-      reatailPrice: product.retailPrice,
       totalPrice: Math.round(price * quantity),
       color,
       size,
     });
   }
-
-  cart.totalAmountOfWholeProduct = cart.items.reduce(
-    (sum, item) => sum + item.totalPrice,
-    0
-  );
-
-  cart.discountPrice = discountPriceWithTk;
-  cart.discountPercentance = discountRateInPercent;
 
   await cart.save();
   apiResponse.sendSuccess(res, 201, "Product added to cart", cart);
@@ -131,50 +96,53 @@ exports.addToCart = asynchandeler(async (req, res) => {
 
 //@desc cart quantity
 exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
-  const userId = req?.user?._id || null;
+  const userId = req?.user?._id || req.body.user || null;
   const guestId = req?.body?.guestId || null;
   const { cartId } = req.params;
-  const { productId } = req.body;
+  const { productId, variantId } = req.body;
 
-  if (!productId) {
-    throw new customError("Product ID is required", 400);
+  if (!productId && !variantId) {
+    throw new customError("Product ID or Variant ID is required", 400);
   }
 
   // Find the cart using either user, guestId, or cartId
   const cart = await Cart.findOne({
-    $or: [{ user: userId }, { guestId: guestId }, { _id: cartId }],
+    user: userId,
+    guestId: guestId,
   });
 
   if (!cart) {
     throw new customError("Cart not found", 404);
   }
 
-  const itemIndex = cart.items.findIndex(
-    (item) => item.product.toString() === productId
-  );
+  // Cart item খুঁজুন (variantId থাকলে সেটি, না থাকলে productId)
+  let itemIndex = -1;
+  if (variantId) {
+    itemIndex = cart.items.findIndex(
+      (item) => item.variant && item.variant.toString() === variantId
+    );
+  } else if (productId) {
+    itemIndex = cart.items.findIndex(
+      (item) => item.product && item.product.toString() === productId
+    );
+  }
 
   if (itemIndex === -1) {
-    throw new customError("Product not found in cart", 404);
+    throw new customError("Product/Variant not found in cart", 404);
   }
 
   const item = cart.items[itemIndex];
-
-  // Handle discount or regular price
-  const unitPrice = item.price || item.reatailPrice || 0;
+  const unitPrice = item.price || item.retailPrice || 0;
 
   if (item.quantity > 1) {
     item.quantity -= 1;
     item.totalPrice = item.quantity * unitPrice;
   } else {
-    // Optional: remove item if quantity is 1
-    cart.items.splice(itemIndex, 1);
+    throw new customError(
+      "Minimum quantity is 1. Cannot decrement further.",
+      400
+    );
   }
-
-  // Recalculate total amount
-  cart.totalAmountOfWholeProduct = cart.items.reduce(
-    (sum, i) => sum + i.totalPrice,
-    0
-  );
 
   await cart.save();
 
