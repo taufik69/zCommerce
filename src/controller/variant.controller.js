@@ -26,22 +26,22 @@ exports.createVariant = asynchandeler(async (req, res, next) => {
   }
   // now make Qr code and barcode and update variant
   // Generate barcode using bwip-js
-  const barcode = await bwipjs.toBuffer({
-    bcid: "code128",
-    text: `${validatedData.sku}-${Date.now()}`.toLocaleUpperCase().slice(0, 13), // Unique identifier
-    scale: 3,
-    height: 10,
-    includetext: true,
-    textxalign: "center",
-    backgroundcolor: "FFFFFF",
-    // No need for output: 'svg'
-  });
+  // const barcode = await bwipjs.toBuffer({
+  //   bcid: "code128",
+  //   text: `${validatedData.sku}-${Date.now()}`.toLocaleUpperCase().slice(0, 13), // Unique identifier
+  //   scale: 3,
+  //   height: 10,
+  //   includetext: true,
+  //   textxalign: "center",
+  //   backgroundcolor: "FFFFFF",
+  //   // No need for output: 'svg'
+  // });
 
-  const base64Barcode = `data:image/png;base64,${barcode.toString("base64")}`;
-  // upload barcode to cloudinary
-  const { optimizeUrl: barcodeUrl } = await uploadBarcodeToCloudinary(
-    base64Barcode
-  );
+  // const base64Barcode = `data:image/png;base64,${barcode.toString("base64")}`;
+  // // upload barcode to cloudinary
+  // const { optimizeUrl: barcodeUrl } = await uploadBarcodeToCloudinary(
+  //   base64Barcode
+  // );
 
   // Generate QR code
 
@@ -64,7 +64,7 @@ exports.createVariant = asynchandeler(async (req, res, next) => {
   const { optimizeUrl: qrCodeUrl } = await uploadBarcodeToCloudinary(
     base64qrCode
   );
-  variantData.barCode = barcodeUrl;
+  variantData.barCode = `${Date.now()}`.toLocaleUpperCase().slice(0, 13);
   variantData.qrCode = qrCodeUrl;
   await variantData.save();
 
