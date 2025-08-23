@@ -16,19 +16,19 @@ const orderSchema = new mongoose.Schema(
 
     // ORDER ITEMS SNAPSHOT
     items: [
-      {
-        productId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Product",
-          required: true,
-        },
-        name: String,
-        quantity: Number,
-        totalPrice: Number,
-        retailPrice: Number,
-        size: String,
-        color: String,
-      },
+      // {
+      //   productId: {
+      //     type: mongoose.Schema.Types.ObjectId,
+      //     ref: "Product",
+      //     required: true,
+      //   },
+      //   name: String,
+      //   quantity: Number,
+      //   totalPrice: Number,
+      //   retailPrice: Number,
+      //   size: String,
+      //   color: String,
+      // },
     ],
 
     // SHIPPING INFO

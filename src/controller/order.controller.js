@@ -11,6 +11,7 @@ const { customError } = require("../lib/CustomError");
 const { v4: uuidv4 } = require("uuid");
 const SSLCommerzPayment = require("sslcommerz-lts");
 const cartModel = require("../models/cart.model");
+const Variant = require("../models/variant.model");
 const { sendEmail } = require("../helpers/nodemailer");
 const { orderTemplate } = require("../emailTemplate/orderTemplate");
 const e = require("express");
@@ -55,12 +56,13 @@ const applyCouponDiscount = async (code, subtotal) => {
 // Main controller
 exports.createOrder = asynchandeler(async (req, res) => {
   const userId = req.user?._id || req.body.user || null;
-  const { shippingInfo, paymentMethod, couponCode, deliveryCharge } = req.body;
+  const { guestId, shippingInfo, paymentMethod, couponCode, deliveryCharge } =
+    req.body;
 
   // Step 1: Load Cart
   const cart = await cartModel.findOne({
     user: userId || null,
-    guestId: req.body.guestId || null,
+    guestId: guestId || null,
   });
 
   if (!cart || !cart.items || cart.items.length === 0) {
@@ -70,26 +72,56 @@ exports.createOrder = asynchandeler(async (req, res) => {
   // Step 2: Calculate subtotal & Check stock
   let totalPriceofProducts = 0;
   let totalProductInfo = [];
+
   for (const item of cart.items) {
-    const product = await Product.findById(item.product);
-    totalProductInfo.push({
-      productId: product?._id,
-      name: product?.name,
-      quantity: item?.quantity,
-      totalPrice: item?.totalPrice,
-      reatailPrice: item?.reatailPrice,
-      size: item?.size,
-      color: item?.color,
-    });
-    if (!product) throw new customError(`Product not found`, 404);
-    if (product.stock < item.quantity) {
-      throw new customError(
-        `${product.productTitle} does not have enough stock`,
-        400
+    // যদি product থাকে
+    if (item.product) {
+      const product = await Product.findById(item.product).populate(
+        "category subcategory brand"
       );
+      if (!product) throw new customError(`Product not found`, 404);
+      if (product.stock < item.quantity) {
+        throw new customError(
+          `${product.name} does not have enough stock`,
+          400
+        );
+      }
+      totalProductInfo.push({
+        product: product,
+        quantity: item.quantity,
+        totalPrice: item.totalPrice,
+        retailPrice: product.retailPrice,
+        size: item.size,
+        color: item.color,
+        variant: item.variant || null,
+      });
+      totalPriceofProducts += item.totalPrice;
     }
 
-    totalPriceofProducts += item.totalPrice;
+    // যদি variant থাকে
+    if (item.variant) {
+      const variant = await Variant.findById(item.variant)
+        .populate("product")
+        .select("-variant");
+      if (!variant) throw new customError(`Variant not found`, 404);
+
+      if (variant.stockVariant < item.quantity) {
+        throw new customError(
+          `${variant.variantName} does not have enough stock`,
+          400
+        );
+      }
+      totalProductInfo.push({
+        variant: variant,
+        quantity: item.quantity,
+        totalPrice: item.totalPrice,
+        retailPrice: variant.retailPrice,
+        size: item.size,
+        color: item.color,
+        product: item.product || null,
+      });
+      totalPriceofProducts += item.totalPrice;
+    }
   }
 
   // Step 3: Apply Coupon
@@ -102,7 +134,9 @@ exports.createOrder = asynchandeler(async (req, res) => {
     throw new customError("Invalid delivery type", 400);
 
   // Step 5: Final Total
-  const finalAmount = discountedAmount + deliveryChargeAmount.deliveryCharge;
+  const finalAmount = couponCode
+    ? discountedAmount + deliveryChargeAmount.deliveryCharge
+    : totalPriceofProducts + deliveryChargeAmount.deliveryCharge;
 
   // Step 6: Create the Order
   const invoiceId = `INV-${uuidv4().slice(0, 8).toUpperCase()}`;
@@ -111,7 +145,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
   try {
     order = await Order.create({
       user: userId || null,
-      guestId: req.body.guestId || null,
+      guestId: guestId || null,
       items: totalProductInfo,
       shippingInfo,
       totalAmount: totalPriceofProducts,
@@ -126,16 +160,29 @@ exports.createOrder = asynchandeler(async (req, res) => {
     });
 
     // Step 7: Update stock and coupon usage after successful order creation
-    const productUpdatePromises = [];
+    // Step 7: Update stock and coupon usage after successful order creation
+    const stockUpdatePromises = [];
     for (const item of cart.items) {
-      productUpdatePromises.push(
-        Product.updateOne(
-          { _id: item.product },
-          { $inc: { stock: -item.quantity } }
-        )
-      );
+      // Product stock update
+      if (item.product) {
+        stockUpdatePromises.push(
+          Product.updateOne(
+            { _id: item.product },
+            { $inc: { stock: -item.quantity } }
+          )
+        );
+      }
+      // Variant stock update
+      if (item.variant) {
+        stockUpdatePromises.push(
+          Variant.updateOne(
+            { _id: item.variant },
+            { $inc: { stockVariant: -item.quantity } }
+          )
+        );
+      }
     }
-    await Promise.all(productUpdatePromises);
+    await Promise.all(stockUpdatePromises);
 
     if (coupon) {
       await Coupon.updateOne({ _id: coupon._id }, { $inc: { usedCount: 1 } });
@@ -280,7 +327,6 @@ exports.createOrder = asynchandeler(async (req, res) => {
 exports.getAllOrders = asynchandeler(async (req, res) => {
   const orders = await Order.find()
     .populate("user")
-    .populate("items.productId")
     .populate("deliveryCharge")
     .populate("coupon")
     .sort({ createdAt: -1 })
@@ -293,7 +339,6 @@ exports.getSingleOrder = asynchandeler(async (req, res) => {
   const { id } = req.params;
   const singleOrder = await Order.findOne({ _id: id })
     .populate("user")
-    .populate("items.productId")
     .populate("deliveryCharge")
     .populate("coupon")
     .sort({ createdAt: -1 })

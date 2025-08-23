@@ -78,4 +78,10 @@ _.route("/multiplevarinatproduct").get(
   Product.getAllMultipleVariantProducts
 );
 
+_.route("/newarrival").get(
+  // authGuard,
+  // authorize("product", "view"),
+  Product.getNewArrivalProducts
+);
+
 module.exports = _;

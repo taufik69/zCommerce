@@ -10,14 +10,25 @@ exports.orderTemplate = (order, shippingInfo, invoice, totalProductInfo) => {
   // This can be improved with a library like Handlebars for more complex templates
   let productRows = "";
   // Loop through order items to create the product table rows
+
   totalProductInfo.forEach((item) => {
-    productRows += `
+    if (item.variant) {
+      productRows += `
       <tr>
-        <td>${item.name}</td>
+        <td>${item.variant.variantName}</td>
         <td>${item.quantity}</td>
         <td style="text-align: right;">${item.totalPrice} টাকা</td>
       </tr>
     `;
+    } else if (item.product) {
+      productRows += `
+      <tr>
+        <td>${item.product.name}</td>
+        <td>${item.quantity}</td>
+        <td style="text-align: right;">${item.totalPrice} টাকা</td>
+      </tr>
+    `;
+    }
   });
 
   // The full HTML template as a string literal
