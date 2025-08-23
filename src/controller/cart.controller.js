@@ -39,9 +39,9 @@ exports.addToCart = asynchandeler(async (req, res) => {
     if (!variant) throw new customError("Variant not found", 404);
     price = variant.retailPrice;
     // যদি variant এর সাথে product reference থাকে, চাইলে এখানে product-ও populate করতে পারেন
-    if (!product && variant.product) {
-      product = await Product.findById(variant.product);
-    }
+    // if (!product && variant.product) {
+    //   product = await Product.findById(variant.product);
+    // }
   }
 
   // Cart খুঁজুন
@@ -89,6 +89,21 @@ exports.addToCart = asynchandeler(async (req, res) => {
       size,
     });
   }
+  const cartItem = cart.items.reduce(
+    (acc, item) => {
+      let itemPrice = item.totalPrice || item.price * item.quantity;
+      acc.totalPrice += itemPrice;
+      acc.quantity += item.quantity;
+      return acc;
+    },
+    {
+      totalPrice: 0,
+      quantity: 0,
+    }
+  );
+
+  cart.subTotal = cartItem.totalPrice;
+  cart.totalItem = cartItem.quantity;
 
   await cart.save();
   apiResponse.sendSuccess(res, 201, "Product added to cart", cart);
@@ -144,6 +159,22 @@ exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
     );
   }
 
+  const cartItem = cart.items.reduce(
+    (acc, item) => {
+      let itemPrice = item.totalPrice || item.price * item.quantity;
+      acc.totalPrice += itemPrice;
+      acc.quantity += item.quantity;
+      return acc;
+    },
+    {
+      totalPrice: 0,
+      quantity: 0,
+    }
+  );
+
+  cart.subTotal = cartItem.totalPrice;
+  cart.totalItem = cartItem.quantity;
+
   await cart.save();
 
   apiResponse.sendSuccess(
@@ -181,6 +212,25 @@ exports.getAllCart = asynchandeler(async (req, res) => {
   const guestId = req?.body?.guestId || null;
   const query = userId ? { user: userId } : { guestId };
   const cart = await Cart.findOne(query).populate("items.product").lean();
+  if (cart.items.length === 0) {
+    return apiResponse.sendSuccess(res, 200, "Cart is empty", cart);
+  }
+  const cartItem = cart.items.reduce(
+    (acc, item) => {
+      let itemPrice = item.totalPrice || item.price * item.quantity;
+      acc.totalPrice += itemPrice;
+      acc.quantity += item.quantity;
+      return acc;
+    },
+    {
+      totalPrice: 0,
+      quantity: 0,
+    }
+  );
+
+  cart.subTotal = cartItem.totalPrice;
+  cart.totalItem = cartItem.quantity;
+
   if (!cart) throw new customError("Cart not found", 404);
   apiResponse.sendSuccess(res, 200, "Cart fetched successfully", cart);
 });
