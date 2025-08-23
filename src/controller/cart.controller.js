@@ -7,6 +7,7 @@ const Cart = require("../models/cart.model");
 
 //@desc add to cart
 exports.addToCart = asynchandeler(async (req, res) => {
+
   const userId = req?.user?._id || req.body.user || null;
   const guestId = req?.body?.guestId || null;
 
@@ -175,6 +176,16 @@ exports.getAllCart = asynchandeler(async (req, res) => {
   const guestId = req?.body?.guestId || null;
   const query = userId ? { user: userId } : { guestId };
   const cart = await Cart.findOne(query).populate("items.product").lean();
+  if (!cart) throw new customError("Cart not found", 404);
+  apiResponse.sendSuccess(res, 200, "Cart fetched successfully", cart);
+});
+exports.getCartByUserId = asynchandeler(async (req, res) => {
+  const { id } = req.params;
+  // Try finding by user first, then guest
+  let cart = await Cart.findOne({ user: id }).populate("items.product");
+  if (!cart) {
+    cart = await Cart.findOne({ guestId: id }).populate("items.product");
+  }
   if (!cart) throw new customError("Cart not found", 404);
   apiResponse.sendSuccess(res, 200, "Cart fetched successfully", cart);
 });
