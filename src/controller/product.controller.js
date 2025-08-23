@@ -330,7 +330,7 @@ exports.removeProductReviewBySlug = asynchandeler(async (req, res) => {
   );
 });
 
-//@dese get all multiple variant products
+// @desc get all multiple variant products
 exports.getAllMultipleVariantProducts = asynchandeler(async (req, res) => {
   const products = await Product.find({ variantType: "multipleVariant" })
     .populate("category subcategory brand variant discount")
@@ -339,6 +339,20 @@ exports.getAllMultipleVariantProducts = asynchandeler(async (req, res) => {
     res,
     200,
     "Multiple variant products fetched successfully",
+    products
+  );
+});
+
+// @desc new arrival product
+exports.getNewArrivalProducts = asynchandeler(async (req, res) => {
+  const products = await Product.find({})
+    .sort({ createdAt: -1 })
+    .populate("category subcategory brand variant discount")
+    .limit(20);
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "New arrival products fetched successfully",
     products
   );
 });
