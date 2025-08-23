@@ -141,7 +141,7 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
     //   },
     //   select: "-subcategories -createdAt -updatedAt",
     // })
-    .populate("category brand variant discount")
+    .populate("category brand variant subcategory discount")
     .select("-updatedAt -createdAt");
   apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
 });
