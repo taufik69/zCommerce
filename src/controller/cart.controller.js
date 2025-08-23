@@ -7,7 +7,6 @@ const Cart = require("../models/cart.model");
 
 //@desc add to cart
 exports.addToCart = asynchandeler(async (req, res) => {
-
   const userId = req?.user?._id || req.body.user || null;
   const guestId = req?.body?.guestId || null;
 
@@ -158,11 +157,17 @@ exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
 //@desc Delete Cart
 exports.deleteCart = asynchandeler(async (req, res) => {
   const { cartId } = req.params;
-  if (!cartId) {
-    throw new customError("Cart ID is required", 400);
+  const { cartItemId } = req.body;
+  if (!cartId || !cartItemId) {
+    throw new customError("Cart ID or Cart Item ID is required", 400);
   }
 
-  const cart = await Cart.findOneAndDelete({ _id: cartId });
+  const cart = await Cart.findOne({ _id: cartId });
+  if (!cart) throw new customError("Cart not found with this ID", 404);
+  cart.items.map((item) =>
+    item._id == cartItemId ? cart.items.pull(item) : null
+  );
+  await cart.save();
 
   if (!cart) {
     throw new customError("Cart not found", 404);
