@@ -48,6 +48,11 @@ const variantSchema = new mongoose.Schema(
         default: "N/A",
       },
     ],
+    image: {
+      type: String,
+      trim: true,
+      default: "N/A",
+    },
 
     // Quantity / stock
     stockVariant: {

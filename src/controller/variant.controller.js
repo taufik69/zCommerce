@@ -8,17 +8,26 @@ const validateVariant = require("../validation/variant.validation");
 const bwipjs = require("bwip-js");
 const QRCode = require("qrcode");
 
-const { uploadBarcodeToCloudinary } = require("../helpers/cloudinary");
+const {
+  uploadBarcodeToCloudinary,
+  cloudinaryFileUpload,
+  deleteCloudinaryFile,
+} = require("../helpers/cloudinary");
 
 // @desc create  variant controller
 exports.createVariant = asynchandeler(async (req, res) => {
   // Validate the request body
   const validatedData = await validateVariant(req);
 
-  // after variant save
+  // Upload image to Cloudinary
+  const image = await cloudinaryFileUpload(req?.files[0].path);
 
   // Proceed with saving the variant
-  const variantData = new variant({ validatedData, ...req.body });
+  const variantData = new variant({
+    validatedData,
+    image: image.optimizeUrl,
+    ...req.body,
+  });
 
   await variantData.save();
 
@@ -117,15 +126,35 @@ exports.getSingleVariant = asynchandeler(async (req, res, next) => {
 // @desc update variant using req.params
 exports.updateVariant = asynchandeler(async (req, res) => {
   const { slug } = req.params;
-  // const validatedData = await validateVariant(req);
-  const updatedVariant = await variant.findOneAndUpdate(
-    { slug },
-    { ...req.body },
-    { new: true }
-  );
-  if (!updatedVariant) {
+
+  // Find the variant first
+  const existingVariant = await variant.findOne({ slug });
+  if (!existingVariant) {
     throw new customError("Variant not found", 404);
   }
+
+  // Handle image update if new image is provided
+  let updatedImageUrl = existingVariant.image;
+  if (req.files && req.files.length > 0) {
+    // Delete previous image from cloudinary if exists
+    if (existingVariant.image) {
+      // cloudinary public_id extract (assuming image url contains public_id)
+      const match = existingVariant.image.split("/");
+      const publicId = match[match.length - 1].split(".")[0];
+      await deleteCloudinaryFile(publicId);
+    }
+    // Upload new image
+    const imageUpload = await cloudinaryFileUpload(req.files[0].path);
+    updatedImageUrl = imageUpload.optimizeUrl;
+  }
+
+  // Update variant
+  const updatedVariant = await variant.findOneAndUpdate(
+    { slug },
+    { ...req.body, image: updatedImageUrl },
+    { new: true }
+  );
+
   apiResponse.sendSuccess(
     res,
     200,
@@ -182,6 +211,10 @@ exports.deleteVariant = asynchandeler(async (req, res) => {
   }
   productData.variant.pull(deletedVariant._id);
   await productData.save();
+
+  const match = deletedVariant.image.split("/");
+  const publicId = match[match.length - 1].split(".")[0];
+  await deleteCloudinaryFile(publicId);
   apiResponse.sendSuccess(
     res,
     200,

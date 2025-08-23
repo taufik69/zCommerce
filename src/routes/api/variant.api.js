@@ -1,14 +1,15 @@
 const express = require("express");
 const _ = express.Router();
 const variantController = require("../../controller/variant.controller");
+const { multipleFileUpload } = require("../../middleware/multer.middleware");
 
 _.route("/variant")
-  .post(variantController.createVariant)
+  .post(multipleFileUpload("image", 5), variantController.createVariant)
   .get(variantController.getAllVariants);
 
 _.route("/variant/:slug")
   .get(variantController.getSingleVariant)
-  .put(variantController.updateVariant)
+  .put(multipleFileUpload("image", 5), variantController.updateVariant)
   .delete(variantController.deleteVariant);
 
 _.route("/variant/deactive").post(variantController.deactivateVariant);
