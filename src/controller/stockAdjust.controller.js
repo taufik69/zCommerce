@@ -71,11 +71,21 @@ exports.getAllStockAdjusts = asynchandeler(async (req, res, next) => {
   const stockAdjusts = await StockAdjust.find()
     .populate({
       path: "productId",
-      populate: { path: "variant" },
+      populate: {
+        path: "variant",
+      },
+      select:
+        "-variant -description -category -subcategory -brand -warrantyInformation -shippingInformation -retailProfitMarginbyPercentance -retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt",
     })
     .populate({
       path: "variantId",
-      populate: { path: "product", select: "-variant" },
+      populate: {
+        path: "product",
+        select:
+          "-variant -description -category -subcategory -brand -warrantyInformation -shippingInformation -retailProfitMarginbyPercentance -retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt",
+      },
+      select:
+        "-retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt -retailProfitMarginbyPercentance",
     })
     .sort({ createdAt: -1 });
   apiResponse.sendSuccess(
