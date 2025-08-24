@@ -210,6 +210,12 @@ const productSchema = new mongoose.Schema(
     instock: {
       type: Boolean,
     },
+    stockAdjustment: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "StockAdjust",
+      },
+    ],
     isActive: {
       type: Boolean,
       default: true,

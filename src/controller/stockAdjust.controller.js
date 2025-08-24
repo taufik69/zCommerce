@@ -8,7 +8,7 @@ const StockAdjust = require("../models/stockadjust.model");
 //@desc create stock adjust
 //@route POST /api/stock-adjust
 //@access Private
-exports.createStockAdjust = asynchandeler(async (req, res, next) => {
+exports.createStockAdjust = asynchandeler(async (req, res) => {
   const {
     variantId,
     productId,
@@ -46,6 +46,7 @@ exports.createStockAdjust = asynchandeler(async (req, res, next) => {
       return next(new customError("Product not found", 404));
     }
     product.stock += increaseQuantity - decreaseQuantity;
+    product.stockAdjustment.push(stockAdjust._id);
     await product.save();
   }
   //    update variant stock
@@ -55,6 +56,7 @@ exports.createStockAdjust = asynchandeler(async (req, res, next) => {
       return next(new customError("Variant not found", 404));
     }
     variant.stockVariant += increaseQuantity - decreaseQuantity;
+    variant.stockVariantAdjust.push(stockAdjust._id);
     await variant.save();
   }
 
@@ -67,7 +69,7 @@ exports.createStockAdjust = asynchandeler(async (req, res, next) => {
 });
 
 // @des view all product latest stock
-exports.getAllStockAdjusts = asynchandeler(async (req, res, next) => {
+exports.getAllStockAdjusts = asynchandeler(async (req, res) => {
   const stockAdjusts = await StockAdjust.find()
     .populate({
       path: "productId",
@@ -75,7 +77,7 @@ exports.getAllStockAdjusts = asynchandeler(async (req, res, next) => {
         path: "variant",
       },
       select:
-        "-variant -description -category -subcategory -brand -warrantyInformation -shippingInformation -retailProfitMarginbyPercentance -retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt",
+        "-variant -description -category -subcategory -brand -warrantyInformation -shippingInformation -retailProfitMarginbyPercentance -retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt -stockAdjustment",
     })
     .populate({
       path: "variantId",
@@ -85,7 +87,7 @@ exports.getAllStockAdjusts = asynchandeler(async (req, res, next) => {
           "-variant -description -category -subcategory -brand -warrantyInformation -shippingInformation -retailProfitMarginbyPercentance -retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt",
       },
       select:
-        "-retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt -retailProfitMarginbyPercentance",
+        "-retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt -retailProfitMarginbyPercentance -stockAdjustment",
     })
     .sort({ createdAt: -1 });
   apiResponse.sendSuccess(
@@ -93,5 +95,34 @@ exports.getAllStockAdjusts = asynchandeler(async (req, res, next) => {
     200,
     "Stock adjustments retrieved successfully",
     stockAdjusts
+  );
+});
+
+// @desc get all product category wise
+
+exports.getAllProductCategoryWise = asynchandeler(async (req, res) => {
+  const { category } = req.params;
+  if (!category) throw new customError("Category is required", 400);
+  const products = await Product.find({ category }).populate(
+    "stockAdjustment category subcategory brand variant"
+  );
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Products retrieved successfully",
+    products
+  );
+});
+exports.getAllProductSSubcategoryWise = asynchandeler(async (req, res) => {
+  const { subcategory } = req.params;
+  if (!subcategory) throw new customError("Subcategory is required", 400);
+  const products = await Product.find({ subcategory }).populate(
+    "stockAdjustment category subcategory brand variant"
+  );
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Products retrieved successfully",
+    products
   );
 });

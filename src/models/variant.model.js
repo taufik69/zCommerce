@@ -60,6 +60,12 @@ const variantSchema = new mongoose.Schema(
       required: false,
       min: 0,
     },
+    stockVariantAdjust: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "StockAdjust",
+      },
+    ],
     alertVariantStock: {
       type: Number,
       min: 0,
