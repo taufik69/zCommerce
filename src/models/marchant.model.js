@@ -10,7 +10,16 @@ const merchantSchema = new mongoose.Schema({
   merchantName: { type: String, required: true },
   merchantEmail: { type: String, required: true },
   merchantPhone: { type: String, required: true },
+  merchantsecondary_contact: { type: String, required: true },
+  merchantAdress: String,
+  merchantcity_id: String,
+  merchantzone_id: String,
+  merchantarea_id: String,
+  password: { type: String, trim: true },
   slug: { type: String, unique: true },
+  access_token: { type: String, trim: true },
+  refresh_token: { type: String, trim: true },
+  token_expiry: { type: Date },
 });
 
 merchantSchema.pre("save", function (next) {

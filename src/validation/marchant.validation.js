@@ -46,8 +46,39 @@ const merchantSchema = joi.object(
         "string.pattern.base":
           "Merchant Phone must be a valid Bangladeshi phone number starting with 01.",
       }),
+    merchantsecondary_contact: joi
+      .string()
+      .trim()
+      .required()
+      .pattern(/^01[0-9]{9}$/)
+      .messages({
+        "string.empty": "Merchant Secondary Contact is required.",
+        "any.required": "Merchant Secondary Contact is required.",
+        "string.pattern.base":
+          "Merchant Secondary Contact must be a valid Bangladeshi phone number starting with 01.",
+      }),
+    merchantAdress: joi.string().trim().required().messages({
+      "string.empty": "Merchant Address is required.",
+      "any.required": "Merchant Address is required.",
+    }),
+    merchantcity_id: joi.string().trim().required().messages({
+      "string.empty": "Merchant City ID is required.",
+      "any.required": "Merchant City ID is required.",
+    }),
+    merchantzone_id: joi.string().trim().required().messages({
+      "string.empty": "Merchant Zone ID is required.",
+      "any.required": "Merchant Zone ID is required.",
+    }),
+    merchantarea_id: joi.string().trim().required().messages({
+      "string.empty": "Merchant Area ID is required.",
+      "any.required": "Merchant Area ID is required.",
+    }),
+    password: joi.string().trim().messages({
+      "string.empty": "Password is required.",
+      "any.required": "Password is required.",
+    }),
   },
-  { abortEarly: false, allowUnknown: true }
+  { abortEarly: true, allowUnknown: true }
 );
 
 exports.validateMerchant = async (req) => {
