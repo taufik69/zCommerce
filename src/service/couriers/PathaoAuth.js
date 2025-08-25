@@ -1,3 +1,4 @@
+require("dotenv").config();
 const axios = require("axios");
 const { customError } = require("../../lib/CustomError");
 const Merchant = require("../../models/marchant.model");
@@ -8,36 +9,32 @@ class PathaoAuth {
     this.baseURL = merchant.baseURL || "https://courier-api-sandbox.pathao.com";
     this.client_id = merchant.merchantID;
     this.client_secret = merchant.merchantSecret;
-    this.username = merchant.merchantName;
-    this.password = merchant.password;
-
-    // Store info
-    this.storeName = merchant.storeName || "Demo Store";
-    this.contact_name = merchant.merchantName;
-    this.contact_number = merchant.merchantPhone;
-    this.address = merchant.merchantAddress;
-    this.secondary_contact = merchant.merchantsecondary_contact;
-    this.city_id = merchant.merchantcity_id;
-    this.zone_id = merchant.merchantzone_id;
-    this.area_id = merchant.merchantarea_id;
   }
 
   /** STEP 1: New token issue */
   async issueToken() {
     try {
+      const payload =
+        process.env.NODE_ENV === "production"
+          ? {
+              client_id: this.client_id,
+              client_secret: this.client_secret,
+            }
+          : {
+              client_id: this.client_id,
+              client_secret: this.client_secret,
+              grant_type: "password",
+              username: "test@pathao.com",
+              password: "lovePathao",
+            };
+
       const response = await axios.post(
         `${this.baseURL}/aladdin/api/v1/issue-token`,
-        {
-          client_id: this.client_id,
-          client_secret: this.client_secret,
-          grant_type: "password",
-          username: this.username,
-          password: this.password,
-        }
+        payload
       );
 
       const { access_token, refresh_token, expires_in } = response.data;
-
+      this.refresh_token = refresh_token;
       // Save token in DB
       const merchant = await Merchant.findOneAndUpdate(
         { merchantID: this.client_id },
@@ -48,39 +45,8 @@ class PathaoAuth {
         },
         { new: true }
       );
-
-      if (!merchant) throw new customError("Merchant not found", 404);
-
-      // If no store, create one
-      if (!merchant.store_id) {
-        const store = await axios.post(
-          `${this.baseURL}/aladdin/api/v1/stores`,
-          {
-            name: this.storeName, // "My Demo Store"
-            contact_name: this.contact_name, // merchant.merchantName
-            contact_number: this.contact_number, // phone
-            address: this.address, // must add!
-            secondary_contact: this.secondary_contact,
-            city_id: Number(this.city_id), // ensure integer
-            zone_id: Number(this.zone_id), // ensure integer
-            area_id: Number(this.area_id), // ensure integer
-          },
-          {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${response.data.access_token}`,
-            },
-          }
-        );
-
-        const store_id = storeRes.data.data.id;
-        console.log("store_id", store_id);
-
-        await Merchant.findOneAndUpdate(
-          { merchantID: this.client_id },
-          { store_id },
-          { new: true }
-        );
+      if (!merchant) {
+        throw new customError("Merchant not found", 404);
       }
 
       return access_token;
@@ -108,6 +74,7 @@ class PathaoAuth {
       );
 
       const { access_token, refresh_token, expires_in } = response.data;
+      this.refresh_token = refresh_token;
 
       await Merchant.findOneAndUpdate(
         { merchantID: this.client_id },
@@ -133,9 +100,6 @@ class PathaoAuth {
     const merchant = await Merchant.findOne({ merchantID: this.client_id });
     if (!merchant) throw new customError("Merchant not found", 404);
 
-    await this.issueToken();
-    return;
-
     // CASE 1: First time → issue new token
     if (!merchant.access_token || !merchant.refresh_token) {
       return await this.issueToken();
@@ -148,6 +112,64 @@ class PathaoAuth {
 
     // CASE 3: Token still valid
     return merchant.access_token;
+  }
+
+  // get city id
+  async getCityId(cityName = "Dhaka") {
+    try {
+      const accessToken = await this.getValidToken();
+      if (!accessToken) throw new customError("Pathao token not found", 404);
+
+      const response = await axios.get(
+        `${this.baseURL}/aladdin/api/v1/city-list`,
+        // "https://courier-api-sandbox.pathao.com/aladdin/api/v1/city-list",
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json; charset=UTF-8",
+          },
+        }
+      );
+
+      const cityList = response?.data?.data?.data;
+      const city = cityList.find(
+        (c) => c.city_name.toLowerCase() === cityName.toLowerCase()
+      );
+      if (!city) throw new customError("City not found in Pathao", 404);
+      return city.city_id;
+    } catch (err) {
+      console.log(err);
+      throw new customError("Failed to get city ID: " + err.message, 500);
+    }
+  }
+
+  //get zone id
+  async getZoneId(cityId, zoneName) {
+    try {
+      const accessToken = await this.getValidToken();
+      if (!accessToken) throw new customError("Pathao token not found", 404);
+
+      const response = await axios.get(
+        `${this.baseURL}/aladdin/api/v1/cities/${cityId}/zone-list`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json; charset=UTF-8",
+          },
+        }
+      );
+
+      const zoneList = response?.data?.data?.data;
+      console.log(zoneList);
+      // const zone = zoneList.find(
+      //   (z) => z.zone_name.toLowerCase() === zoneName.toLowerCase()
+      // );
+      // if (!zone) throw new customError("Zone not found in Pathao", 404);
+      // return zone.zone_id;
+    } catch (err) {
+      console.log(err);
+      throw new customError("Failed to get zone ID: " + err.message, 500);
+    }
   }
 }
 

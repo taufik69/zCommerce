@@ -20,25 +20,27 @@ class PathaoCourier extends BaseCourier {
       const accessToken = await this.authService.getValidToken();
 
       if (!accessToken) throw new customError("Pathao token not found", 404);
-      console.log(accessToken);
+      if (!this.merchant.store_id)
+        throw new customError("Pathao store ID not found", 404);
+
+      const city_id = await this.authService.getCityId(order.shippingInfo.city);
+      const zone_id = await this.authService.getZoneId(
+        city_id,
+        "order.shippingInfo.zone"
+      );
+      console.log(zone_id);
 
       return;
-      // console.log(accessToken);
-
-      // if (!this.merchant.store_id)
-      //   throw new customError("Pathao store ID not found", 404);
 
       const response = await axios.post(
         `${this.baseURL}/aladdin/api/v1/orders`,
         {
-          store_id: "316784",
-          merchant_order_id: order._id,
+          store_id: this.merchant.store_id,
           recipient_name: order.shippingInfo.fullName,
           recipient_phone: order.shippingInfo.phone,
           recipient_address: order.shippingInfo.address,
-          recipient_city: order.shippingInfo.city_id,
+          recipient_city: city_id,
           recipient_zone: order.shippingInfo.zone_id,
-          recipient_area: order.shippingInfo.area_id,
           delivery_type: 48,
           item_type: 2,
           item_quantity: 1,
