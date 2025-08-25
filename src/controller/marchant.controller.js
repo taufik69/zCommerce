@@ -7,8 +7,6 @@ const { validateMerchant } = require("../validation/marchant.validation");
 // @desc create a new merchant
 exports.createMerchant = asynchandeler(async (req, res) => {
   const merchantData = await validateMerchant(req);
-  console.log("Merchant data validated:", merchantData);
-
   const newMerchant = new Merchant(merchantData);
   await newMerchant.save();
   if (!newMerchant) {

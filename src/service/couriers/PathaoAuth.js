@@ -4,16 +4,25 @@ const Merchant = require("../../models/marchant.model");
 
 class PathaoAuth {
   constructor(merchant) {
+    // API credentials
     this.baseURL = merchant.baseURL || "https://courier-api-sandbox.pathao.com";
     this.client_id = merchant.merchantID;
     this.client_secret = merchant.merchantSecret;
     this.username = merchant.merchantName;
-    this.userPhone = merchant.merchantPhone;
-    thus
     this.password = merchant.password;
-    this.refresh_token = merchant.refresh_token; // DB থেকে আসবে
+
+    // Store info
+    this.storeName = merchant.storeName || "Demo Store";
+    this.contact_name = merchant.merchantName;
+    this.contact_number = merchant.merchantPhone;
+    this.address = merchant.merchantAddress;
+    this.secondary_contact = merchant.merchantsecondary_contact;
+    this.city_id = merchant.merchantcity_id;
+    this.zone_id = merchant.merchantzone_id;
+    this.area_id = merchant.merchantarea_id;
   }
 
+  /** STEP 1: New token issue */
   async issueToken() {
     try {
       const response = await axios.post(
@@ -27,30 +36,57 @@ class PathaoAuth {
         }
       );
 
-      // make a new store
-      const store = await axios.post(`${this.baseURL}/aladdin/api/v1/stores`, {
-        name: "Demo Store",
-        contact_name: "Test Merchant",
-        contact_number: "017XXXXXXXX",
-        address: "House 123, Road 4, Sector 10, Uttara, Dhaka-1230, Bangladesh",
-        secondary_contact: "015XXXXXXXX",
-        city_id: "",
-        zone_id: "",
-        area_id: "",
-      });
+      const { access_token, refresh_token, expires_in } = response.data;
 
-      await Merchant.findOneAndUpdate(
+      // Save token in DB
+      const merchant = await Merchant.findOneAndUpdate(
         { merchantID: this.client_id },
         {
-          access_token: response.data.access_token,
-          refresh_token: response.data.refresh_token,
-          token_expiry: Date.now() + response.data.expires_in * 1000,
+          access_token,
+          refresh_token,
+          token_expiry: Date.now() + expires_in * 1000,
         },
         { new: true }
       );
 
-      return response.data.access_token;
+      if (!merchant) throw new customError("Merchant not found", 404);
+
+      // If no store, create one
+      if (!merchant.store_id) {
+        const store = await axios.post(
+          `${this.baseURL}/aladdin/api/v1/stores`,
+          {
+            name: this.storeName, // "My Demo Store"
+            contact_name: this.contact_name, // merchant.merchantName
+            contact_number: this.contact_number, // phone
+            address: this.address, // must add!
+            secondary_contact: this.secondary_contact,
+            city_id: Number(this.city_id), // ensure integer
+            zone_id: Number(this.zone_id), // ensure integer
+            area_id: Number(this.area_id), // ensure integer
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${response.data.access_token}`,
+            },
+          }
+        );
+
+        const store_id = storeRes.data.data.id;
+        console.log("store_id", store_id);
+
+        await Merchant.findOneAndUpdate(
+          { merchantID: this.client_id },
+          { store_id },
+          { new: true }
+        );
+      }
+
+      return access_token;
     } catch (err) {
+      console.log(err);
+
       throw new customError(
         "Failed to issue Pathao token: " + err.message,
         500
@@ -58,6 +94,7 @@ class PathaoAuth {
     }
   }
 
+  /** STEP 2: Refresh token */
   async refreshToken() {
     try {
       const response = await axios.post(
@@ -70,17 +107,19 @@ class PathaoAuth {
         }
       );
 
+      const { access_token, refresh_token, expires_in } = response.data;
+
       await Merchant.findOneAndUpdate(
-        { client_id: this.client_id },
+        { merchantID: this.client_id },
         {
-          access_token: response.data.access_token,
-          refresh_token: response.data.refresh_token,
-          token_expiry: Date.now() + response.data.expires_in * 1000,
+          access_token,
+          refresh_token,
+          token_expiry: Date.now() + expires_in * 1000,
         },
         { new: true }
       );
 
-      return response.data.access_token;
+      return access_token;
     } catch (err) {
       throw new customError(
         "Failed to refresh Pathao token: " + err.message,
@@ -89,22 +128,27 @@ class PathaoAuth {
     }
   }
 
+  /** STEP 3: Get valid token */
   async getValidToken() {
     const merchant = await Merchant.findOne({ merchantID: this.client_id });
     if (!merchant) throw new customError("Merchant not found", 404);
 
-    // CASE 1: একদম নতুন, DB তে token নাই → নতুন করে issueToken()
+    await this.issueToken();
+    return;
+
+    // CASE 1: First time → issue new token
     if (!merchant.access_token || !merchant.refresh_token) {
       return await this.issueToken();
     }
 
-    // CASE 2: access token expired → refresh
+    // CASE 2: Token expired → refresh
     if (Date.now() > merchant.token_expiry) {
-      return await this.refreshToken(merchant.refresh_token);
+      return await this.refreshToken();
     }
 
-    // CASE 3: এখনো valid
+    // CASE 3: Token still valid
     return merchant.access_token;
   }
 }
+
 module.exports = PathaoAuth;

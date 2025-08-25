@@ -20,12 +20,19 @@ class PathaoCourier extends BaseCourier {
       const accessToken = await this.authService.getValidToken();
 
       if (!accessToken) throw new customError("Pathao token not found", 404);
+      console.log(accessToken);
+
+      return;
+      // console.log(accessToken);
+
+      // if (!this.merchant.store_id)
+      //   throw new customError("Pathao store ID not found", 404);
 
       const response = await axios.post(
         `${this.baseURL}/aladdin/api/v1/orders`,
         {
-          store_id: this.merchant.store_id,
-          merchant_order_id: order.invoiceId,
+          store_id: "316784",
+          merchant_order_id: order._id,
           recipient_name: order.shippingInfo.fullName,
           recipient_phone: order.shippingInfo.phone,
           recipient_address: order.shippingInfo.address,
@@ -36,7 +43,6 @@ class PathaoCourier extends BaseCourier {
           item_type: 2,
           item_quantity: 1,
           item_weight: "0.5",
-          item_description: order.productDescription || "Product",
           amount_to_collect: order.finalAmount,
         },
         { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -54,6 +60,8 @@ class PathaoCourier extends BaseCourier {
       await order.save();
       return order;
     } catch (err) {
+      console.log(err);
+
       throw new customError(
         "Failed to create Pathao order: " + err.message,
         500

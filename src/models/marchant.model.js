@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const slugify = require("slugify");
 const { customError } = require("../lib/CustomError");
 
 const merchantSchema = new mongoose.Schema({
@@ -7,35 +6,18 @@ const merchantSchema = new mongoose.Schema({
   merchantSecret: { type: String, required: true },
   baseURL: { type: String, required: true },
   serviceProvider: { type: String, required: true },
-  merchantName: { type: String, required: true },
-  merchantEmail: { type: String, required: true },
-  merchantPhone: { type: String, required: true },
-  merchantsecondary_contact: { type: String, required: true },
-  merchantAdress: String,
-  merchantcity_id: String,
-  merchantzone_id: String,
-  merchantarea_id: String,
-  storeName: { type: String, required: true },
-  password: { type: String, trim: true },
+  store_id: { type: Number, default: null },
   slug: { type: String, unique: true },
   access_token: { type: String, trim: true },
   refresh_token: { type: String, trim: true },
   token_expiry: { type: Date },
+  isActive: { type: Boolean, default: true },
 });
 
-merchantSchema.pre("save", function (next) {
-  if (this.isNew || this.isModified("merchantName")) {
-    // Generate slug from merchantName
-    this.slug = slugify(this.merchantName, { lower: true, strict: true });
-  }
-
-  next();
-});
-
-// check if slug and marchantId already exist or not
+// Ensure uniqueness of slug and merchantID
 merchantSchema.pre("save", async function (next) {
   const existingMerchant = await this.constructor.findOne({
-    $or: [{ slug: this.slug }, { merchantID: this.merchantID }],
+    $or: [{ merchantID: this.merchantID }],
   });
 
   if (
@@ -47,5 +29,6 @@ merchantSchema.pre("save", async function (next) {
 
   next();
 });
+
 module.exports =
   mongoose.models.Merchant || mongoose.model("Merchant", merchantSchema);
