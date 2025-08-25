@@ -15,6 +15,7 @@ const merchantSchema = new mongoose.Schema({
   merchantcity_id: String,
   merchantzone_id: String,
   merchantarea_id: String,
+  storeName: { type: String, required: true },
   password: { type: String, trim: true },
   slug: { type: String, unique: true },
   access_token: { type: String, trim: true },

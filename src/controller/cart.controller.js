@@ -212,8 +212,8 @@ exports.getAllCart = asynchandeler(async (req, res) => {
   const guestId = req?.body?.guestId || null;
   const query = userId ? { user: userId } : { guestId };
   const cart = await Cart.findOne(query).populate("items.product").lean();
-  if (cart.items.length === 0) {
-    return apiResponse.sendSuccess(res, 200, "Cart is empty", cart);
+  if (!cart) {
+    apiResponse.sendSuccess(res, 200, "Cart is empty", cart);
   }
   const cartItem = cart.items.reduce(
     (acc, item) => {
@@ -231,7 +231,6 @@ exports.getAllCart = asynchandeler(async (req, res) => {
   cart.subTotal = cartItem.totalPrice;
   cart.totalItem = cartItem.quantity;
 
-  if (!cart) throw new customError("Cart not found", 404);
   apiResponse.sendSuccess(res, 200, "Cart fetched successfully", cart);
 });
 exports.getCartByUserId = asynchandeler(async (req, res) => {
@@ -241,6 +240,8 @@ exports.getCartByUserId = asynchandeler(async (req, res) => {
   if (!cart) {
     cart = await Cart.findOne({ guestId: id }).populate("items.product");
   }
-  if (!cart) throw new customError("Cart not found", 404);
+  if (!cart) {
+    apiResponse.sendSuccess(res, 200, "Cart is empty", cart);
+  }
   apiResponse.sendSuccess(res, 200, "Cart fetched successfully", cart);
 });

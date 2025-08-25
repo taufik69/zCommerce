@@ -61,6 +61,10 @@ const merchantSchema = joi.object(
       "string.empty": "Merchant Address is required.",
       "any.required": "Merchant Address is required.",
     }),
+    storeName: joi.string().trim().required().messages({
+      "string.empty": "Store Name is required.",
+      "any.required": "Store Name is required.",
+    }),
     merchantcity_id: joi.string().trim().required().messages({
       "string.empty": "Merchant City ID is required.",
       "any.required": "Merchant City ID is required.",

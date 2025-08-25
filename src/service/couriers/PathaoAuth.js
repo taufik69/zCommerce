@@ -8,6 +8,8 @@ class PathaoAuth {
     this.client_id = merchant.merchantID;
     this.client_secret = merchant.merchantSecret;
     this.username = merchant.merchantName;
+    this.userPhone = merchant.merchantPhone;
+    thus
     this.password = merchant.password;
     this.refresh_token = merchant.refresh_token; // DB থেকে আসবে
   }
@@ -25,7 +27,17 @@ class PathaoAuth {
         }
       );
 
-      // make a new store for issuing token
+      // make a new store
+      const store = await axios.post(`${this.baseURL}/aladdin/api/v1/stores`, {
+        name: "Demo Store",
+        contact_name: "Test Merchant",
+        contact_number: "017XXXXXXXX",
+        address: "House 123, Road 4, Sector 10, Uttara, Dhaka-1230, Bangladesh",
+        secondary_contact: "015XXXXXXXX",
+        city_id: "",
+        zone_id: "",
+        area_id: "",
+      });
 
       await Merchant.findOneAndUpdate(
         { merchantID: this.client_id },
