@@ -96,6 +96,25 @@ class CityZone {
       throw new customError("Failed to fetch zones", 500);
     }
   }
+
+  // areas can be fetched from zones api
+  async getAreas(zone_id) {
+    try {
+      await this.ensureToken();
+
+      const response = await axios.get(
+        `${this.baseURL}/zones/${zone_id}/area-list`,
+        {
+          headers: { Authorization: `Bearer ${this.access_token}` },
+        }
+      );
+
+      return response.data.data;
+    } catch (err) {
+      console.error(err.response?.data || err.message);
+      throw new customError("Failed to area zones", 500);
+    }
+  }
 }
 
 module.exports = CityZone;

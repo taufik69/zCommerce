@@ -24,9 +24,9 @@ const orderSchema = Joi.object({
       "any.required": "Address is required",
       "string.empty": "Address cannot be empty",
     }),
-    city: Joi.string().optional().allow(""),
-    postalCode: Joi.string().optional().allow(""),
-    country: Joi.string().default("Bangladesh"),
+    city: Joi.object().optional(),
+    area: Joi.object().optional(),
+    zone: Joi.object().optional(),
     deliveryZone: Joi.string()
       .valid("inside_dhaka", "outside_dhaka", "sub_area")
       .required()

@@ -50,3 +50,13 @@ exports.getPathaoZonesByCity = asynchandeler(async (req, res) => {
   const zones = await cityZone.getZones(cityId);
   apiResponse.sendSuccess(res, 200, "Zones fetched successfully", zones);
 });
+
+//@desc Get areas by zone ID
+//@route GET /api/v1/courier/pathao/zones/:zoneId/areas
+exports.getPathaoAreasByZone = asynchandeler(async (req, res) => {
+  const { zoneId } = req.params;
+  if (!zoneId) throw new customError("Zone ID is required", 400);
+  const cityZone = new cityZoneService();
+  const areas = await cityZone.getAreas(zoneId);
+  apiResponse.sendSuccess(res, 200, "Areas fetched successfully", areas);
+});

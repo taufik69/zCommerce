@@ -14,7 +14,7 @@ const cartModel = require("../models/cart.model");
 const Variant = require("../models/variant.model");
 const { sendEmail } = require("../helpers/nodemailer");
 const { orderTemplate } = require("../emailTemplate/orderTemplate");
-const e = require("express");
+
 const { sendSMS } = require("../helpers/sms");
 
 // applyDeliveryCharge

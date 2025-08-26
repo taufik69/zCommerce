@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Product = require("./product.model");
+const { required } = require("joi");
 
 const orderSchema = new mongoose.Schema(
   {
@@ -37,9 +38,19 @@ const orderSchema = new mongoose.Schema(
       phone: { type: String },
       address: { type: String, required: true },
       email: { type: String },
-      state: { type: String },
-      city: { type: String },
-      postalCode: { type: String },
+      city: {
+        city_id: Number,
+        city_name: String,
+      },
+      zone: {
+        zone_id: Number,
+        zone_name: String,
+      },
+      area: {
+        area_id: Number,
+        area_name: String,
+      },
+
       country: {
         type: String,
         default: "Bangladesh",
@@ -51,6 +62,7 @@ const orderSchema = new mongoose.Schema(
       },
     },
 
+    productWeight: { type: Number, default: 0 }, // in grams
     // DELIVERY CHARGE
     deliveryCharge: {
       type: mongoose.Types.ObjectId,
