@@ -144,7 +144,7 @@ class PathaoAuth {
   }
 
   //get zone id
-  async getZoneId(cityId, zoneName) {
+  async getZoneId(cityId = 1, zoneName = "Gulshan") {
     try {
       const accessToken = await this.getValidToken();
       if (!accessToken) throw new customError("Pathao token not found", 404);

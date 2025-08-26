@@ -3,6 +3,7 @@ const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { customError } = require("../lib/CustomError");
 const PathaoCourier = require("../service/couriers/PathaoCourier");
+const cityZoneService = require("../service/couriers/courierCityZone");
 
 // Create single order
 exports.createPathaoOrder = asynchandeler(async (req, res) => {
@@ -29,3 +30,23 @@ exports.createPathaoOrder = asynchandeler(async (req, res) => {
 
 //   apiResponse.sendSuccess(res, 201, "Pathao bulk orders created", orders);
 // });
+
+//@desc Get available cities
+//@route GET /api/v1/courier/pathao/cities
+
+exports.getPathaoCities = asynchandeler(async (req, res) => {
+  const cityZone = new cityZoneService();
+  const cities = await cityZone.getCities();
+  apiResponse.sendSuccess(res, 200, "Cities fetched successfully", cities);
+});
+
+//@desc Get zones by city ID
+//@route GET /api/v1/courier/pathao/cities/:cityId/zones
+exports.getPathaoZonesByCity = asynchandeler(async (req, res) => {
+  const { cityId } = req.params;
+  if (!cityId) throw new customError("City ID is required", 400);
+
+  const cityZone = new cityZoneService();
+  const zones = await cityZone.getZones(cityId);
+  apiResponse.sendSuccess(res, 200, "Zones fetched successfully", zones);
+});

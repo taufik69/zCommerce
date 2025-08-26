@@ -157,8 +157,9 @@ exports.getProductBySlug = asynchandeler(async (req, res) => {
       },
       select: "-subcategories -createdAt -updatedAt",
     })
-    .populate("brand variant discount")
+    .populate("brand variant discount subcategory")
     .select("-updatedAt -createdAt");
+
   if (!product) {
     throw new customError(404, "Product not found");
   }
