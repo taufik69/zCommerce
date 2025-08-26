@@ -39,16 +39,16 @@ const orderSchema = new mongoose.Schema(
       address: { type: String, required: true },
       email: { type: String },
       city: {
-        city_id: Number,
-        city_name: String,
+        city_id: { type: Number },
+        city_name: { type: String },
       },
       zone: {
-        zone_id: Number,
-        zone_name: String,
+        zone_id: { type: Number },
+        zone_name: { type: String },
       },
       area: {
-        area_id: Number,
-        area_name: String,
+        area_id: { type: Number },
+        area_name: { type: String },
       },
 
       country: {

@@ -192,13 +192,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
     const invoice = await Invoice.create({
       order: order._id,
       invoiceId: order.invoiceId,
-      customerDetails: {
-        fullName: shippingInfo.fullName,
-        email: shippingInfo.email,
-        phone: shippingInfo.phone,
-        address: shippingInfo.address,
-        city: shippingInfo.city,
-      },
+      customerDetails: shippingInfo,
       totalAmount: totalPriceofProducts,
       discountAmount,
       deliveryChargeAmount: deliveryChargeAmount.deliveryCharge,

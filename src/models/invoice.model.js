@@ -18,13 +18,7 @@ const invoiceSchema = new Schema(
       unique: true,
     },
     // Invoice details
-    customerDetails: {
-      fullName: String,
-      email: String,
-      phone: String,
-      address: String,
-      city: String,
-    },
+    customerDetails: {},
     // The total amount of all products before discounts and delivery charges
     totalAmount: {
       type: Number,
