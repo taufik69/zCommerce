@@ -223,8 +223,8 @@ const productSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    // toJSON: { virtuals: true },
-    // toObject: { virtuals: true },
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
@@ -260,5 +260,15 @@ productSchema.pre("save", async function (next) {
   next();
 });
 
+// virtual populate for variants
+productSchema.virtual("allSize").get(function () {
+  const standardSizes = ["S", "M", "L", "XL", "XXL", "XXXL"];
+
+  return standardSizes;
+});
+
+productSchema.virtual("allNummerixSize").get(function () {
+  return [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 38, 40, 42, 44, 46];
+});
 const Product = mongoose.model("Product", productSchema);
 module.exports = Product;
