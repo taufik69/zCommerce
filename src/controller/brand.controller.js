@@ -8,26 +8,37 @@ const {
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
 // @desc    Create a new brand
-exports.createBrand = asynchandeler(async (req, res, next) => {
-  const { name } = await validateBrand(req);
-  //   upload image on cloudinary using promise.all beacuse brannd have multiple image
-  const images = await Promise.all(
-    req.files.map(async (file) => {
-      const result = await cloudinaryFileUpload(file.path);
-      if (!result) {
-        throw new customError("Image upload failed", 500);
-      }
-      return result.optimizeUrl;
-    })
-  );
-  console.log("images", images);
+exports.createBrand = asynchandeler(async (req, res) => {
+  const { name } = req.body; // array of brand names
+  const files = req.files; // array of images
 
-  const brand = await Brand.create({
-    name,
-    image: images,
-  });
+  if (!Array.isArray(name) || name.length === 0) {
+    throw new customError("At least one brand name is required", 400);
+  }
 
-  return apiResponse.sendSuccess(res, 201, "Brand created successfully", brand);
+  if (!files || files.length === 0) {
+    throw new customError("At least one brand image is required", 400);
+  }
+
+  if (name.length !== files.length) {
+    throw new customError("Each brand must have an image", 400);
+  }
+
+  let savedBrands = [];
+
+  for (let i = 0; i < name.length; i++) {
+    const imageUpload = await cloudinaryFileUpload(files[i].path);
+
+    const brand = new Brand({
+      name: name[i],
+      image: imageUpload.optimizeUrl,
+    });
+
+    await brand.save();
+    savedBrands.push(brand);
+  }
+
+  apiResponse.sendSuccess(res, 201, "Brands created successfully", savedBrands);
 });
 
 // get all brands
