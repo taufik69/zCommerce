@@ -12,7 +12,7 @@ class PathaoCourier extends BaseCourier {
     this.authService = new PathaoAuth(merchant);
   }
 
-  async   createOrder(orderId) {
+  async createOrder(orderId) {
     try {
       const order = await Order.findById(orderId);
       if (!order) throw new customError("Order not found", 404);
@@ -23,12 +23,6 @@ class PathaoCourier extends BaseCourier {
       if (!this.merchant.store_id)
         throw new customError("Pathao store ID not found", 404);
 
-      const city_id = await this.authService.getCityId(order.shippingInfo.city);
-      const zone_id = await this.authService.getZoneId(city_id, "Gulshan");
-      console.log(zone_id);
-
-      return;
-
       const response = await axios.post(
         `${this.baseURL}/aladdin/api/v1/orders`,
         {
@@ -36,7 +30,7 @@ class PathaoCourier extends BaseCourier {
           recipient_name: order.shippingInfo.fullName,
           recipient_phone: order.shippingInfo.phone,
           recipient_address: order.shippingInfo.address,
-          recipient_city: city_id,
+          recipient_city: order.shippingInfo.city_id,
           recipient_zone: order.shippingInfo.zone_id,
           delivery_type: 48,
           item_type: 2,
@@ -50,7 +44,7 @@ class PathaoCourier extends BaseCourier {
       const trackingId = response.data.data.consignment_id;
 
       order.courier = {
-        name: "Pathao",
+        name: "pathao",
         trackingId,
         status: response.data.data.order_status,
         lastUpdated: new Date(),

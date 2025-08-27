@@ -14,6 +14,7 @@ exports.createPathaoOrder = asynchandeler(async (req, res) => {
 
   const courier = new PathaoCourier(merchant);
   const order = await courier.createOrder(orderId);
+  if (!order) throw new customError("Failed to create Pathao order", 500);
 
   apiResponse.sendSuccess(res, 201, "Pathao order created", order);
 });
