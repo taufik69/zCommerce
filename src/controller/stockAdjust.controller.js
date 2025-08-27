@@ -19,13 +19,11 @@ exports.createStockAdjust = asynchandeler(async (req, res) => {
   } = req.body;
 
   if (!variantId && !productId) {
-    return next(
-      new customError("Please provide either productId or variantId", 400)
-    );
+    return new customError("Please provide either productId or variantId", 400);
   }
 
   if (!adjustReason) {
-    return next(new customError("Please provide all required fields", 400));
+    return new customError("Please provide all required fields", 400);
   }
 
   const stockAdjust = await StockAdjust.create({
@@ -37,13 +35,13 @@ exports.createStockAdjust = asynchandeler(async (req, res) => {
     date,
   });
   if (!stockAdjust) {
-    return next(new customError("Failed to create stock adjustment", 500));
+    return new customError("Failed to create stock adjustment", 500);
   }
   //   update product stock
   if (productId) {
     const product = await Product.findById(productId);
     if (!product) {
-      return next(new customError("Product not found", 404));
+      return new customError("Product not found", 404);
     }
     product.stock += increaseQuantity - decreaseQuantity;
     product.stockAdjustment.push(stockAdjust._id);
@@ -53,7 +51,7 @@ exports.createStockAdjust = asynchandeler(async (req, res) => {
   if (variantId) {
     const variant = await Variant.findById(variantId);
     if (!variant) {
-      return next(new customError("Variant not found", 404));
+      return new customError("Variant not found", 404);
     }
     variant.stockVariant += increaseQuantity - decreaseQuantity;
     variant.stockVariantAdjust.push(stockAdjust._id);
