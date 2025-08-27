@@ -8,29 +8,52 @@ const {
 } = require("../validation/subCatgegory.validation");
 
 // @desc    Create a new subcategory
-exports.createSubCategory = asynchandeler(async (req, res) => {
-  // Validate the request body
-  const { category, name } = await validateSubCategory(req);
-  const subCategory = await Subcategory.create({
-    name,
-    category,
-  });
-  if (!subCategory) {
-    throw new customError("Subcategory not created", 400);
+exports.createSubCategories = asynchandeler(async (req, res) => {
+  const subcategoriesData = req.body; // Expecting an array of { name, category }
+
+  if (!Array.isArray(subcategoriesData) || subcategoriesData.length === 0) {
+    throw new customError("At least one subcategory is required", 400);
   }
 
-  // Add the subcategory to the category's subcategories array
+  let savedSubcategories = [];
 
-  const categoryToUpdate = await Category.findOne({ _id: category });
+  for (let i = 0; i < subcategoriesData.length; i++) {
+    const { name, category } = subcategoriesData[i];
 
-  if (!categoryToUpdate) {
-    throw new customError("Category not found", 404);
+    if (!name || !category) {
+      throw new customError(
+        `Subcategory name and category are required at index ${i}`,
+        400
+      );
+    }
+
+    // Validate category exists
+    const parentCategory = await Category.findById(category);
+    if (!parentCategory) {
+      throw new customError(`Category not found for index ${i}`, 404);
+    }
+
+    // Create subcategory
+    const subcategory = new Subcategory({
+      name,
+      category,
+    });
+
+    await subcategory.save();
+
+    // Add subcategory to parent category
+    parentCategory.subcategories.push(subcategory._id);
+    await parentCategory.save();
+
+    savedSubcategories.push(subcategory);
   }
-  categoryToUpdate.subcategories.push(subCategory._id);
-  await categoryToUpdate.save();
 
-  // Return the created subcategory in the response
-  apiResponse.sendSuccess(res, 201, "Subcategory created", subCategory);
+  apiResponse.sendSuccess(
+    res,
+    201,
+    "Subcategories created successfully",
+    savedSubcategories
+  );
 });
 
 // @desc    Get all subcategories

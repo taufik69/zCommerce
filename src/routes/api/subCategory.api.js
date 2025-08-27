@@ -2,7 +2,7 @@ const express = require("express");
 const _ = express.Router();
 const subCategory = require("../../controller/subCategory.controller");
 _.route("/subcategories")
-  .post(subCategory.createSubCategory)
+  .post(subCategory.createSubCategories)
   .get(subCategory.getAllSubCategory);
 
 _.route("/subcategories/:slug")
