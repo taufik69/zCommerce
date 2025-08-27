@@ -9,7 +9,7 @@ const { authorize } = require("../../middleware/checkPermission.middleware");
 _.route("/categories").post(
   // authGuard,
   // authorize("category", "add"),
-  multipleFileUpload("image", 1),
+  multipleFileUpload("image", 10),
   Category.createCategory
 );
 // @desc   get all categories

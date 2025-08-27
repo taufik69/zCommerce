@@ -11,18 +11,41 @@ const {
 // @desc    Create a new category
 
 exports.createCategory = asynchandeler(async (req, res) => {
-  const value = await validateCategory(req);
-  const { name } = value;
-  // upload the image into cloudinary
-  const { optimizeUrl } = await cloudinaryFileUpload(req.files[0].path);
-  // now save the category to the database
-  const category = new Category({
-    name: name,
-    image: optimizeUrl,
-  });
-  await category.save();
-  // send success response
-  apiResponse.sendSuccess(res, 201, "Category created successfully", category);
+  const { name } = req.body; // array of names
+  const files = req.files; // array of images
+
+  if (!Array.isArray(name) || name.length === 0) {
+    throw new customError("At least one category name is required", 400);
+  }
+
+  if (!files || files.length === 0) {
+    throw new customError("At least one category image is required", 400);
+  }
+
+  if (name.length !== files.length) {
+    throw new customError("Each category must have an image", 400);
+  }
+
+  let savedCategories = [];
+
+  for (let i = 0; i < name.length; i++) {
+    const imageUpload = await cloudinaryFileUpload(files[i].path);
+
+    const category = new Category({
+      name: name[i],
+      image: imageUpload.optimizeUrl,
+    });
+
+    await category.save();
+    savedCategories.push(category);
+  }
+
+  apiResponse.sendSuccess(
+    res,
+    201,
+    "Categories created successfully",
+    savedCategories
+  );
 });
 
 // @desc    Get all categories
