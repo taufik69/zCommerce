@@ -24,7 +24,7 @@ exports.createVariant = asynchandeler(async (req, res) => {
   let savedVariants = [];
 
   for (let v of variants) {
-    const validatedData = await validateVariant({ body : v });
+    const validatedData = await validateVariant({ body: v });
 
     // Upload image (if exist in request, you can map files by index)
     let imageUrl = null;
@@ -41,34 +41,6 @@ exports.createVariant = asynchandeler(async (req, res) => {
       ...validatedData,
       image: imageUrl || "N/A",
     });
-
-    // QR code
-    const qrCode = await QRCode.toBuffer(
-      JSON.stringify(
-        `${
-          process.env.PRODUCT_QR_URL ||
-          "https://www.facebook.com/zahirulislamdev"
-        }/${variantData._id}`
-      ),
-      {
-        errorCorrectionLevel: "H",
-        margin: 2,
-        width: 200,
-        height: 200,
-        type: "png",
-      }
-    );
-    const base64qrCode = `data:image/png;base64,${qrCode.toString("base64")}`;
-    const { optimizeUrl: qrCodeUrl } = await uploadBarcodeToCloudinary(
-      base64qrCode
-    );
-
-    variantData.barCode =
-      validatedData.barCode ||
-      `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    variantData.qrCode = qrCodeUrl;
-
-    await variantData.save();
 
     // Push into product
     await product.findByIdAndUpdate(variantData.product, {
