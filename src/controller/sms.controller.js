@@ -2,6 +2,8 @@ const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { sendSMS } = require("../helpers/sms");
+const User = require("../models/user.model");
+const Order = require("../models/order.model");
 const { default: axios } = require("axios");
 
 exports.sendSMS = asynchandeler(async (req, res) => {
@@ -35,4 +37,24 @@ exports.smsBlance = asynchandeler(async (req, res) => {
   }
 
   return apiResponse.sendSuccess(res, 202, "SMS balace", response.data);
+});
+
+// @desc get all user phone number
+exports.getAllUserPhoneNumber = asynchandeler(async (req, res) => {
+  const users = await User.find().select("phone");
+  return apiResponse.sendSuccess(res, 200, "User fetched successfully", users);
+});
+
+//@desc get all order phone number
+exports.getAllOrderPhoneNumber = asynchandeler(async (req, res) => {
+  const orders = await Order.find().select("shippingInfo.phone");
+  const phoneNumbers = orders.map((order) => {
+    return { _id: order._id, phone: order.shippingInfo.phone };
+  });
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Order fetched successfully",
+    phoneNumbers
+  );
 });
