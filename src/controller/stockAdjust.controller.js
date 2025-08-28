@@ -124,3 +124,27 @@ exports.getAllProductSSubcategoryWise = asynchandeler(async (req, res) => {
     products
   );
 });
+
+// @desc get all variant
+exports.getAllVariants = asynchandeler(async (req, res, next) => {
+  const variants = await Variant.find()
+    .populate("product")
+    .select("-updatedAt")
+    .sort({ createdAt: -1 });
+  apiResponse.sendSuccess(res, 200, "Variants fetched successfully", variants);
+});
+
+//@desc  get all single varinat product
+exports.getSingleVariant = asynchandeler(async (req, res) => {
+  const singleVariant = await Product.findOne({ variantType: "singleVariant" });
+
+  if (!singleVariant) {
+    throw new customError("Variant not found", 404);
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Variant fetched successfully",
+    singleVariant
+  );
+});
