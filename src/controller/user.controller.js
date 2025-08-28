@@ -370,3 +370,20 @@ exports.removePermissionFromUser = asynchandeler(async (req, res) => {
     permission,
   });
 });
+
+// is SuperAdmin
+exports.isSuperAdmin = asynchandeler(async (req, res) => {
+  const { email, password, phone } = req.body;
+  if (!email && !phone) {
+    throw new customError("Email or phone is required", 400);
+  }
+  const user = await User.findOne({ $or: [{ email }, { phone }] });
+  if (!user) {
+    throw new customError("User not found", 404);
+  }
+
+  const isSuperAdmin = user?.roles?.some((role) => role.slug === "superadmin");
+  return apiResponse.sendSuccess(res, 200, "User fetched successfully", {
+    isSuperAdmin,
+  });
+});
