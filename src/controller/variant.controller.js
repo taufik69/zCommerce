@@ -29,8 +29,6 @@ exports.createVariant = asynchandeler(async (req, res) => {
     // Upload image (if exist in request, you can map files by index)
     let imageUrl = null;
     if (req.files && req.files.length > 0) {
-      // Example: match by sku or index
-      const file = req.files.find((f) => f.originalname.includes(v.sku));
       if (file) {
         const image = await cloudinaryFileUpload(file.path);
         imageUrl = image.optimizeUrl;
@@ -41,6 +39,8 @@ exports.createVariant = asynchandeler(async (req, res) => {
       ...validatedData,
       image: imageUrl || "N/A",
     });
+
+    await variantData.save();
 
     // Push into product
     await product.findByIdAndUpdate(variantData.product, {
