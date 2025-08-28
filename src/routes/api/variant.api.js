@@ -4,7 +4,7 @@ const variantController = require("../../controller/variant.controller");
 const { multipleFileUpload } = require("../../middleware/multer.middleware");
 
 _.route("/variant")
-  .post(multipleFileUpload("image", 5), variantController.createVariant)
+  .post(multipleFileUpload("image", 15), variantController.createVariant)
   .get(variantController.getAllVariants);
 
 _.route("/variant/:slug")
