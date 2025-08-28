@@ -5,8 +5,6 @@ const product = require("../models/product.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const validateVariant = require("../validation/variant.validation");
-const bwipjs = require("bwip-js");
-const QRCode = require("qrcode");
 
 const {
   uploadBarcodeToCloudinary,
@@ -16,33 +14,41 @@ const {
 
 // @desc create  variant controller
 exports.createVariant = asynchandeler(async (req, res) => {
-  const { variants } = req.body;
-  if (!Array.isArray(variants) || variants.length === 0) {
+  const { variants } = req.body; // এখানে variants আসবে array of objects হিসেবে
+  const files = req.files;
+
+  if (!variants || !Array.isArray(variants) || variants.length === 0) {
     throw new customError("At least one variant is required", 400);
+  }
+
+  if (!files || files.length === 0) {
+    throw new customError("At least one variant image is required", 400);
+  }
+
+  if (variants.length !== files.length) {
+    throw new customError("Each variant must have a corresponding image", 400);
   }
 
   let savedVariants = [];
 
-  for (let v of variants) {
-    const validatedData = await validateVariant({ body: v });
+  for (let i = 0; i < variants.length; i++) {
+    const v = variants[i];
 
-    // Upload image (if exist in request, you can map files by index)
-    let imageUrl = null;
-    if (req.files && req.files.length > 0) {
-      if (file) {
-        const image = await cloudinaryFileUpload(file.path);
-        imageUrl = image.optimizeUrl;
-      }
-    }
+    // validate variant data with Joi
+    const validatedData = await validateVariant(v);
 
+    // upload corresponding image
+    const imageUpload = await cloudinaryFileUpload(files[i].path);
+
+    // create variant document
     const variantData = new variant({
       ...validatedData,
-      image: imageUrl || "N/A",
+      image: imageUpload?.optimizeUrl || "N/A",
     });
 
     await variantData.save();
 
-    // Push into product
+    // attach variant to product
     await product.findByIdAndUpdate(variantData.product, {
       $push: { variant: variantData._id },
     });
