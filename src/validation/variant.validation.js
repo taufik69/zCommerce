@@ -16,7 +16,7 @@ const VariantSchema = Joi.object({
   color: Joi.array().items(Joi.string()).messages({
     "array.base": "Color must be an array of strings",
   }),
-  stockVariant: Joi.number().min(0).required().messages({
+  stockVariant: Joi.number().optional().min(0).messages({
     "number.base": "Stock variant must be a number",
     "number.min": "Stock variant cannot be less than 0",
     "any.required": "Stock variant is required",
