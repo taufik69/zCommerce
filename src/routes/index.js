@@ -20,6 +20,7 @@ const smsRoutes = require("./api/sms.api");
 const merchantRoutes = require("./api/merchant.api");
 const courierRoutes = require("./api/courier.api");
 const stockAdjustRoutes = require("./api/stockAdjust.api");
+const purchaseRoutes = require("./api/purchase.api");
 
 _.use("/auth", userRoutes);
 _.use(categoryRoutes);
@@ -40,6 +41,7 @@ _.use("/sms", smsRoutes);
 _.use("/merchant", merchantRoutes);
 _.use("/courier", courierRoutes);
 _.use("/stock", stockAdjustRoutes);
+_.use("/purchase", purchaseRoutes);
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });
