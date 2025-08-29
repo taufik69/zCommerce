@@ -25,6 +25,7 @@ const permission = [
   { permissionName: "Settings", actions: ["view"] },
   { permissionName: "Notification", actions: ["view"] },
   { permissionName: "Report", actions: ["view"] },
+  { permissionName: "Purchase", actions: ["view"] },
 ];
 
 /**
