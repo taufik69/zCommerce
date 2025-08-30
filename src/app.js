@@ -1,9 +1,15 @@
 const express = require("express");
 const { globalErrorHandeler } = require("./lib/GlobalErrorHandeler");
 const cors = require("cors");
+const morgan = require("morgan");
+const helmet = require("helmet");
 const cookieparser = require("cookie-parser");
+const rateLimit = require("express-rate-limit");
 const app = express();
 
+// ====== Security Middlewares ======
+
+app.use(helmet());
 /**
  * todo : All middleware
  * *motive: Middleware are used to configuration
@@ -19,12 +25,33 @@ app.use(
       "http://localhost:5174",
       "https://smartsoftnextjs-ecommerce-git-main-wasim-mahamods-projects.vercel.app",
       "https://smartsoftnextjs-ecommerce.vercel.app",
-      "https://z-ecommerce-seven.vercel.app"
+      "https://z-ecommerce-seven.vercel.app",
     ],
     credentials: true,
   })
 );
+
+/**
+ * rate limiter
+ * this middleware are used to limit request
+ */
 app.use(cookieparser());
+
+// 4. Morgan -> Request logging
+if (process.env.NODE_ENV === "development") {
+  app.use(morgan("dev"));
+} else {
+  app.use(morgan("combined"));
+}
+// 5. Rate Limiter -> Prevent brute-force / abuse
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 100, // Max 100 requests per 15 minutes per IP
+  standardHeaders: true, // Return rate limit info in headers
+  legacyHeaders: false,
+  message: "Too many requests from this IP, please try again later.",
+});
+app.use(limiter);
 
 /**
  * Todo : This middleware express.json are used to parse from data
