@@ -236,7 +236,9 @@ exports.getCartByUserId = asynchandeler(async (req, res) => {
     "items.product items.variant"
   );
   if (!cart) {
-    cart = await Cart.findOne({ guestId: id }).populate("items.product");
+    cart = await Cart.findOne({ guestId: id }).populate(
+      "items.product items.variant"
+    );
   }
   if (!cart) {
     apiResponse.sendSuccess(res, 200, "Cart is empty", cart);
