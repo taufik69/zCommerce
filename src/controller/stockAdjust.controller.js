@@ -72,20 +72,21 @@ exports.getAllStockAdjusts = asynchandeler(async (req, res) => {
     .populate({
       path: "productId",
       populate: {
-        path: "variant",
+        path: "variant category subcategory",
       },
       select:
-        "-variant -description -category -subcategory -brand -warrantyInformation -shippingInformation -retailProfitMarginbyPercentance -retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt -stockAdjustment",
+        "-description -brand -warrantyInformation -shippingInformation -retailProfitMarginbyPercentance -retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt ",
     })
     .populate({
       path: "variantId",
       populate: {
         path: "product",
+        populate: "category subcategory",
         select:
-          "-variant -description -category -subcategory -brand -warrantyInformation -shippingInformation -retailProfitMarginbyPercentance -retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt",
+          "-description -brand -warrantyInformation -shippingInformation -retailProfitMarginbyPercentance -retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt",
       },
       select:
-        "-retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt -retailProfitMarginbyPercentance -stockAdjustment",
+        "-retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt -retailProfitMarginbyPercentance ",
     })
     .sort({ createdAt: -1 });
   apiResponse.sendSuccess(
