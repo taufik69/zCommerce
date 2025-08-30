@@ -80,7 +80,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
         "category subcategory brand"
       );
       if (!product) throw new customError(`Product not found`, 404);
-      if (product.stock < item.quantity) {
+      if (product?.stock < item?.quantity) {
         throw new customError(
           `${product.name} does not have enough stock`,
           400
@@ -100,14 +100,13 @@ exports.createOrder = asynchandeler(async (req, res) => {
 
     // যদি variant থাকে
     if (item.variant) {
-      const variant = await Variant.findById(item.variant)
-        .populate("product")
-        .select("-variant");
+      const variant = await Variant.findById(item.variant).populate("product");
+
       if (!variant) throw new customError(`Variant not found`, 404);
 
       if (variant.stockVariant < item.quantity) {
         throw new customError(
-          `${variant.variantName} does not have enough stock`,
+          `${variant.variantName} does not have enough stock from variant`,
           400
         );
       }
