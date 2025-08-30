@@ -38,10 +38,6 @@ exports.addToCart = asynchandeler(async (req, res) => {
     variant = await Variant.findById(variantId);
     if (!variant) throw new customError("Variant not found", 404);
     price = variant.retailPrice;
-    // যদি variant এর সাথে product reference থাকে, চাইলে এখানে product-ও populate করতে পারেন
-    // if (!product && variant.product) {
-    //   product = await Product.findById(variant.product);
-    // }
   }
 
   // Cart খুঁজুন
@@ -236,7 +232,9 @@ exports.getAllCart = asynchandeler(async (req, res) => {
 exports.getCartByUserId = asynchandeler(async (req, res) => {
   const { id } = req.params;
   // Try finding by user first, then guest
-  let cart = await Cart.findOne({ user: id }).populate("items.product");
+  let cart = await Cart.findOne({ user: id }).populate(
+    "items.product items.variant"
+  );
   if (!cart) {
     cart = await Cart.findOne({ guestId: id }).populate("items.product");
   }
