@@ -108,4 +108,10 @@ _.route("/best-selling-products").get(
   Product.getBestSellingProducts
 );
 
+_.route("/search-product").get(
+  // authGuard,
+  // authorize("product", "view"),
+  Product.getNameWiseSearch
+);
+
 module.exports = _;

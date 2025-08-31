@@ -464,3 +464,35 @@ exports.getBestSellingProducts = asynchandeler(async (req, res) => {
     products
   );
 });
+
+//@desc name wise  search
+exports.getNameWiseSearch = asynchandeler(async (req, res) => {
+  const { name } = req.body;
+  const products = await Product.aggregate([
+    {
+      $lookup: {
+        from: "variants",
+        localField: "variant",
+        foreignField: "_id",
+        as: "variant",
+      },
+    },
+    {
+      $lookup: {
+        from: "discounts",
+        localField: "discount",
+        foreignField: "_id",
+        as: "discount",
+      },
+    },
+    {
+      $match: {
+        $or: [
+          { name: { $regex: name, $options: "i" } },
+          { "variant.variantName": { $regex: name, $options: "i" } },
+        ],
+      },
+    },
+  ]);
+  apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
+});
