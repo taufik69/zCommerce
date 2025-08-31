@@ -84,4 +84,28 @@ _.route("/newarrival").get(
   Product.getNewArrivalProducts
 );
 
+_.route("/price-range").get(
+  // authGuard,
+  // authorize("product", "view"),
+  Product.getProductsByPriceRange
+);
+
+_.route("/related-products").get(
+  // authGuard,
+  // authorize("product", "view"),
+  Product.getRelatedProducts
+);
+
+_.route("/discount-products").get(
+  // authGuard,
+  // authorize("product", "view"),
+  Product.getDiscountProducts
+);
+
+_.route("/best-selling-products").get(
+  // authGuard,
+  // authorize("product", "view"),
+  Product.getBestSellingProducts
+);
+
 module.exports = _;

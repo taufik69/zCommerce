@@ -357,3 +357,110 @@ exports.getNewArrivalProducts = asynchandeler(async (req, res) => {
     products
   );
 });
+
+//@desc product price range filter
+exports.getProductsByPriceRange = asynchandeler(async (req, res) => {
+  let { minPrice, maxPrice } = req.query;
+  minPrice = Number(minPrice);
+  maxPrice = Number(maxPrice);
+
+  if (isNaN(minPrice) || isNaN(maxPrice)) {
+    throw new customError("Invalid price range", 400);
+  }
+
+  const products = await Product.aggregate([
+    {
+      $lookup: {
+        from: "variants", // Variant collection
+        localField: "variant", // Product এর variant field (ObjectId[])
+        foreignField: "_id", // Variant collection এর _id
+        as: "variantdocs", // lookup result
+      },
+    },
+    {
+      $lookup: {
+        from: "discounts", // Discount collection
+        localField: "discount", // Product এর discount field (ObjectId)
+        foreignField: "_id", // Discount collection এর _id
+        as: "discountdocs", // lookup result
+      },
+    },
+    {
+      $match: {
+        $or: [
+          // 1. Product নিজেই price range এর মধ্যে
+          { retailPrice: { $gte: minPrice, $lte: maxPrice } },
+
+          // 2. Variant এর মধ্যে অন্তত ১টা price range এর মধ্যে
+          {
+            variantdocs: {
+              $elemMatch: {
+                retailPrice: { $gte: minPrice, $lte: maxPrice },
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
+});
+
+//@desc  get related product
+exports.getRelatedProducts = asynchandeler(async (req, res) => {
+  const { category, subcategory, brand } = req.body;
+  const products = await Product.find({
+    category,
+    subcategory,
+    brand,
+  })
+    .populate("category subcategory brand variant discount")
+    .sort({ createdAt: -1 });
+  apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
+});
+
+//@desc   discount product
+exports.getDiscountProducts = asynchandeler(async (req, res) => {
+  const products = await Product.find({ discount: { $ne: null } })
+    .populate("category subcategory brand variant discount")
+    .sort({ createdAt: -1 });
+  apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
+});
+
+//@desc get bestSellig product
+exports.getBestSellingProducts = asynchandeler(async (req, res) => {
+  const products = await Product.aggregate([
+    {
+      $match: {
+        stock: { $lte: 20 },
+      },
+    },
+    {
+      $lookup: {
+        from: "variants",
+        localField: "variant",
+        foreignField: "_id",
+        as: "variant",
+      },
+    },
+    {
+      $match: {
+        "variant.stockVariant": { $lte: 40 },
+      },
+    },
+    {
+      $sort: {
+        "variant.stockVariant": -1,
+        createdAt: -1,
+      },
+    },
+  ]);
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Best selling products fetched successfully",
+    products
+  );
+});
