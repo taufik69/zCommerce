@@ -149,3 +149,43 @@ exports.getSingleVariant = asynchandeler(async (req, res) => {
     singleVariant
   );
 });
+
+//@desc delete stockadust by id  en delete en product stock decrease
+exports.deleteStockAdjustById = asynchandeler(async (req, res) => {
+  const { id } = req.params;
+  if (!id) throw new customError("Stock adjustment ID is required", 400);
+
+  const stockAdjust = await StockAdjust.findById(id);
+  if (!stockAdjust) throw new customError("Stock adjustment not found", 404);
+
+  // Decrease product stock
+  const { productId, variantId, decreaseQuantity, increaseQuantity } =
+    stockAdjust;
+  if (productId) {
+    const product = await Product.findById(productId);
+    if (!product) {
+      return new customError("Product not found", 404);
+    }
+
+    product.stock -= decreaseQuantity || increaseQuantity;
+    product.stockAdjustment.pull(stockAdjust._id);
+    await product.save();
+  }
+  //    update variant stock
+  if (variantId) {
+    const variant = await Variant.findById(variantId);
+    if (!variant) {
+      return new customError("Variant not found", 404);
+    }
+    variant.stockVariant -= decreaseQuantity || increaseQuantity;
+    variant.stockVariantAdjust.pull(stockAdjust._id);
+    await variant.save();
+  }
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Stock adjustment deleted successfully",
+    stockAdjust
+  );
+});

@@ -122,7 +122,6 @@ const productSchema = new mongoose.Schema(
     // group unit
     groupUnit: {
       type: String,
-      enum: ["Box", "Packet", "Dozen", "Custom"],
     },
     groupUnitQuantity: {
       type: Number,

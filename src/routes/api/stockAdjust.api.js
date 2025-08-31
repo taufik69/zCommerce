@@ -15,5 +15,8 @@ _.route("/stock-adjust/subcategory/:subcategory").get(
 );
 _.route("/getallmultiplevariant").get(stockAdjustController.getAllVariants);
 _.route("/getsinglevariant").get(stockAdjustController.getSingleVariant);
+_.route("/deletestockadjust/:id").delete(
+  stockAdjustController.deleteStockAdjustById
+);
 
 module.exports = _;
