@@ -33,4 +33,10 @@ _.route("/update-sizechart/:slug").put(
   sizeChartController.updateSizeChart
 );
 
+_.route("/delete-sizechart/:slug").delete(
+  // authGuard,
+  // authorize("sizechart", "delete"),
+  sizeChartController.deleteSizeChartBySlug
+);
+
 module.exports = _;
