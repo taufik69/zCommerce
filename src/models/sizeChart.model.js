@@ -8,9 +8,7 @@ const sizeChartSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    image: {
-      type: String,
-    },
+    image: {},
     slug: {
       type: String,
       unique: true,

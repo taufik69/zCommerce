@@ -27,7 +27,14 @@ const cloudinaryFileUpload = async (localFilePath) => {
     // Optimize delivery by resizing and applying auto-format and auto-quality
     const optimizeUrl = cloudinary.url(result.public_id, {
       fetch_format: "auto",
+      resource_type: "image",
       quality: "auto",
+      // ✅ Optimization Tricks
+      transformation: [
+        { width: 1024, crop: "limit" }, // limit max width
+        { quality: "auto:low" }, // compress aggressively
+        { fetch_format: "auto" }, // auto WebP/AVIF
+      ],
     });
 
     // Delete local file after upload
@@ -75,6 +82,12 @@ const uploadBarcodeToCloudinary = async (barcodeBase64) => {
     const result = await cloudinary.uploader.upload(barcodeBase64, {
       resource_type: "image",
       format: "png",
+      // ✅ Compression
+      transformation: [
+        { width: 512, crop: "limit" }, // barcode ছোট হওয়া যথেষ্ট
+        { quality: "auto:low" },
+        { fetch_format: "auto" },
+      ],
     });
 
     // Optimize delivery by resizing and applying auto-format and auto-quality
