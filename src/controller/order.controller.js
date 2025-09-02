@@ -345,12 +345,13 @@ exports.getSingleOrder = asynchandeler(async (req, res) => {
 //@desc find oder by id and update orderStatus
 exports.updateOrder = asynchandeler(async (req, res) => {
   const { id } = req.params;
-  const { orderStatus } = req.body;
+  const { orderStatus, shippingInfo } = req.body;
   const singleOrder = await Order.findOne({ _id: id });
   if (!singleOrder) {
     throw new customError("Order not found", 404);
   }
   singleOrder.orderStatus = orderStatus;
+  singleOrder.shippingInfo = shippingInfo;
   await singleOrder.save();
   apiResponse.sendSuccess(res, 200, "Order updated successfully", singleOrder);
 });

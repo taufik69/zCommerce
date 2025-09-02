@@ -90,7 +90,7 @@ _.route("/price-range").get(
   Product.getProductsByPriceRange
 );
 
-_.route("/related-products").get(
+_.route("/related-products").post(
   // authGuard,
   // authorize("product", "view"),
   Product.getRelatedProducts

@@ -409,11 +409,9 @@ exports.getProductsByPriceRange = asynchandeler(async (req, res) => {
 
 //@desc  get related product
 exports.getRelatedProducts = asynchandeler(async (req, res) => {
-  const { category, subcategory, brand } = req.body;
+  const { category } = req.body;
   const products = await Product.find({
     category,
-    subcategory,
-    brand,
   })
     .populate("category subcategory brand variant discount")
     .sort({ createdAt: -1 });
