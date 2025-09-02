@@ -219,6 +219,10 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    totalSales: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
@@ -269,5 +273,64 @@ productSchema.virtual("allSize").get(function () {
 productSchema.virtual("allNummerixSize").get(function () {
   return [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 38, 40, 42, 44, 46];
 });
+
+productSchema.virtual("allOpeningStock").get(function () {
+  return this.variant.reduce((total, variant) => {
+    total += variant.stockVariant;
+    return total;
+  }, 0);
+});
+
+// adjustment plus
+productSchema.virtual("adjustmentVariantplus").get(function () {
+  const mal = this.variant.map((variant) => {
+    return variant.stockVariantAdjust;
+  });
+  const variantPlus = mal.flat();
+  const totalAdjustStockofVariant = variantPlus.reduce((total, variant) => {
+    total += variant.increaseQuantity;
+    return total;
+  }, 0);
+  return totalAdjustStockofVariant;
+});
+
+// adjustment minus
+productSchema.virtual("adjustmentVariantminus").get(function () {
+  const mal = this.variant.map((variant) => {
+    return variant.stockVariantAdjust;
+  });
+  const variantPlus = mal.flat();
+  const totalAdjustStockofVariant = variantPlus.reduce((total, variant) => {
+    total += variant.decreaseQuantity;
+    return total;
+  }, 0);
+  return totalAdjustStockofVariant;
+});
+
+productSchema.virtual("sizeWiseStock").get(function () {
+  const result = {};
+
+  // CASE 1: multipleVariant -> use variants
+  if (this.variant && this.variant.length > 0) {
+    this.variant.forEach((v) => {
+      if (v.size) {
+        result[v.size] = (result[v.size] || 0) + (v.stockVariant || 0);
+      }
+    });
+    return result;
+  }
+
+  // CASE 2: singleVariant -> use product's own size + stock
+  if (this.variantType === "singleVariant" && this.size && this.size.length) {
+    this.size.forEach((s) => {
+      result[s] = (result[s] || 0) + (this.stock || 0);
+    });
+    return result;
+  }
+
+  // CASE 3: no variants and not singleVariant
+  return result;
+});
+
 const Product = mongoose.model("Product", productSchema);
 module.exports = Product;

@@ -141,9 +141,16 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
     //   },
     //   select: "-subcategories -createdAt -updatedAt",
     // })
-    .populate("category brand variant subcategory discount")
+    .populate({
+      path: "variant",
+      populate: "stockVariantAdjust",
+    })
+    .populate("category brand  subcategory discount  stockAdjustment")
     .select("-updatedAt -createdAt");
-  apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
+
+  apiResponse.sendSuccess(res, 200, "Products fetched successfully", {
+    products,
+  });
 });
 
 //@desc Get product by slug
@@ -157,7 +164,11 @@ exports.getProductBySlug = asynchandeler(async (req, res) => {
       },
       select: "-subcategories -createdAt -updatedAt",
     })
-    .populate("brand variant discount subcategory")
+    .populate({
+      path: "variant",
+      populate: "stockVariantAdjust",
+    })
+    .populate("brand discount subcategory stockAdjustment")
     .select("-updatedAt -createdAt");
 
   if (!product) {
