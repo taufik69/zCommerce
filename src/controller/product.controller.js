@@ -5,6 +5,8 @@ const Product = require("../models/product.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { apiResponse } = require("../utils/apiResponse");
+const NodeCache = require("node-cache");
+const myCache = new NodeCache();
 
 const {
   cloudinaryFileUpload,
@@ -120,35 +122,48 @@ exports.createProduct = asynchandeler(async (req, res) => {
 //@desc Get all porducts using pipeline aggregation
 exports.getAllProducts = asynchandeler(async (req, res) => {
   const { category, subcategory, brand, minPrice, maxPrice } = req.query;
-
-  console.log(req.query);
-  const query = {};
-  if (category) query.category = category;
-  if (subcategory) query.subcategory = subcategory;
-  if (brand) query.brand = brand;
   // please do not delete this code
   // if (minPrice) query.retailPrice = { $gte: minPrice };
   // if (maxPrice) query.retailPrice = { $lte: maxPrice };
   // if (minPrice && maxPrice) {
   //   query.retailPrice = { $gte: minPrice, $lte: maxPrice };
   // }
+  const cachedData = myCache.get("category");
+  const query = {};
+  if (category) query.category = category;
+  if (subcategory) query.subcategory = subcategory;
+  if (brand) query.brand = brand;
+  if (cachedData == undefined) {
+    const products = await Product.find(query)
+      // .populate({
+      //   path: "category",
+      //   populate: {
+      //     path: "discount",
+      //   },
+      //   select: "-subcategories -createdAt -updatedAt",
+      // })
+      .populate({
+        path: "variant",
+        populate: "stockVariantAdjust",
+      })
+      .populate("category brand  subcategory discount  stockAdjustment")
+      .select("-updatedAt -createdAt");
 
-  const products = await Product.find(query)
-    // .populate({
-    //   path: "category",
-    //   populate: {
-    //     path: "discount",
-    //   },
-    //   select: "-subcategories -createdAt -updatedAt",
-    // })
-    .populate({
-      path: "variant",
-      populate: "stockVariantAdjust",
-    })
-    .populate("category brand  subcategory discount  stockAdjustment")
-    .select("-updatedAt -createdAt");
+    myCache.set("category", JSON.stringify(products));
+    apiResponse.sendSuccess(
+      res,
+      200,
+      "Products fetched  successfully",
+      products
+    );
+  }
 
-  apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Products fetched from cahcheds successfully",
+    JSON.parse(cachedData)
+  );
 });
 
 //@desc Get product by slug

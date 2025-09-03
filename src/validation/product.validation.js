@@ -76,6 +76,9 @@ const validateProduct = async (req) => {
     if (req.files.image.length > 10) {
       throw new customError("You can upload a maximum of 10 images", 400);
     }
+    if (req.files.image[0].size > 1 * 1024 * 1024) {
+      throw new customError("Image size should be less than 15MB", 400);
+    }
 
     return value;
   } catch (error) {

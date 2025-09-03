@@ -24,7 +24,7 @@ const validateCategory = async (req) => {
         400
       );
     }
-    if (req.files[0].size > 15 * 1024 * 1024) {
+    if (req.files[0].size > 1 * 1024 * 1024) {
       throw new customError("Image size should be less than 15MB", 400);
     }
 
