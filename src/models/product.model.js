@@ -282,7 +282,7 @@ productSchema.virtual("allNummerixSize").get(function () {
 
 productSchema.virtual("allOpeningStock").get(function () {
   return this.variant.reduce((total, variant) => {
-    total += variant.stockVariant;
+    total += variant?.stockVariant;
     return total;
   }, 0);
 });
@@ -290,11 +290,11 @@ productSchema.virtual("allOpeningStock").get(function () {
 // adjustment plus
 productSchema.virtual("adjustmentVariantplus").get(function () {
   const mal = this.variant.map((variant) => {
-    return variant.stockVariantAdjust;
+    return variant?.stockVariantAdjust;
   });
   const variantPlus = mal.flat();
   const totalAdjustStockofVariant = variantPlus.reduce((total, variant) => {
-    total += variant.increaseQuantity;
+    total += variant?.increaseQuantity;
     return total;
   }, 0);
   return totalAdjustStockofVariant;
@@ -307,7 +307,7 @@ productSchema.virtual("adjustmentVariantminus").get(function () {
   });
   const variantPlus = mal.flat();
   const totalAdjustStockofVariant = variantPlus.reduce((total, variant) => {
-    total += variant.decreaseQuantity;
+    total += variant?.decreaseQuantity;
     return total;
   }, 0);
   return totalAdjustStockofVariant;
@@ -317,8 +317,8 @@ productSchema.virtual("sizeWiseStock").get(function () {
   const result = {};
 
   // CASE 1: multipleVariant -> use variants
-  if (this.variant && this.variant.length > 0) {
-    this.variant.forEach((v) => {
+  if (this.variant && this.variant?.length > 0) {
+    this.variant?.forEach((v) => {
       if (v.size) {
         result[v.size] = (result[v.size] || 0) + (v.stockVariant || 0);
       }
