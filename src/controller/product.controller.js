@@ -148,9 +148,7 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
     .populate("category brand  subcategory discount  stockAdjustment")
     .select("-updatedAt -createdAt");
 
-  apiResponse.sendSuccess(res, 200, "Products fetched successfully", {
-    products,
-  });
+  apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
 });
 
 //@desc Get product by slug
