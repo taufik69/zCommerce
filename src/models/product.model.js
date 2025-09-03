@@ -223,6 +223,12 @@ const productSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    salesReturn: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "SalesReturn",
+      },
+    ],
   },
   {
     timestamps: true,

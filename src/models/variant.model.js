@@ -124,6 +124,12 @@ const variantSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    salesReturn: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "SalesReturn",
+      },
+    ],
   },
   {
     timestamps: true,

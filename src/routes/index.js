@@ -44,6 +44,7 @@ _.use("/courier", courierRoutes);
 _.use("/stock", stockAdjustRoutes);
 _.use("/purchase", purchaseRoutes);
 _.use("/sizechart", sizeChartRoutes);
+_.use("/sales-return", require("./api/salesReturn.api"));
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });
