@@ -1,7 +1,7 @@
 let io = null;
 const { Server } = require("socket.io");
 const { customError } = require("../lib/CustomError");
-
+const userSockets = new Map();
 module.exports = {
   initSocket: (server) => {
     io = new Server(server, {
@@ -24,10 +24,17 @@ module.exports = {
 
     // ====== Socket.IO Setup ======
     io.on("connection", (socket) => {
-      console.log("A user connected:", socket.id);
+      // Suppose the frontend sends userId in the query when connecting
+      const userId = socket.handshake.query.userId;
+
+      console.log("User connected:", userId);
+
+      if (userId) {
+        userSockets.set(userId, socket.id);
+      }
 
       socket.on("disconnect", () => {
-        console.log("User disconnected:", socket.id);
+        if (userId) userSockets.delete(userId);
       });
     });
 

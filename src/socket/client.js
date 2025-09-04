@@ -4,6 +4,7 @@ const { io } = require("socket.io-client");
 // তোমার socket server এর URL
 const socket = io("http://localhost:3000", {
   transports: ["websocket"],
+  query: { userId: "1234" },
 });
 
 // connection successful হলে

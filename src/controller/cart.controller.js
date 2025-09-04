@@ -10,7 +10,16 @@ const { getIO } = require("../socket/socket");
 exports.addToCart = asynchandeler(async (req, res) => {
   const userId = req?.user?._id || req.body.user || null;
   const guestId = req?.body?.guestId || null;
+  // Emit cartUpdated event
+  const socketId = userSockets.get(userId || guestId);
+  if (socketId) {
+    io.to(socketId).emit("cartUpdated", {
+      message: "🛒 Product added to cart",
+      cart: cart,
+    });
+  }
 
+  return;
   const { productId, variantId, quantity, color, size } = req.body;
 
   if (!quantity || quantity <= 0) {
@@ -104,12 +113,15 @@ exports.addToCart = asynchandeler(async (req, res) => {
 
   await cart.save();
 
-  // emit socket event
-  getIO().emit("cartUpdated", {
-    message: "🛒 Product added to cart",
-    cart: cart,
-    user: userId || guestId,
-  });
+  // Emit cartUpdated event
+  // const socketId = userSockets.get(userId || guestId);
+  // if (socketId) {
+  //   io.to(socketId).emit("cartUpdated", {
+  //     message: "🛒 Product added to cart",
+  //     cart: cart,
+  //   });
+  // }
+
   apiResponse.sendSuccess(res, 201, "Product added to cart", cart);
 });
 
