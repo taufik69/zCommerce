@@ -128,42 +128,28 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
   // if (minPrice && maxPrice) {
   //   query.retailPrice = { $gte: minPrice, $lte: maxPrice };
   // }
-  const cachedData = myCache.get("category");
+
   const query = {};
   if (category) query.category = category;
   if (subcategory) query.subcategory = subcategory;
   if (brand) query.brand = brand;
-  if (cachedData == undefined) {
-    const products = await Product.find(query)
-      // .populate({
-      //   path: "category",
-      //   populate: {
-      //     path: "discount",
-      //   },
-      //   select: "-subcategories -createdAt -updatedAt",
-      // })
-      .populate({
-        path: "variant",
-        populate: "stockVariantAdjust",
-      })
-      .populate("category brand  subcategory discount  stockAdjustment")
-      .select("-updatedAt -createdAt");
 
-    myCache.set("category", JSON.stringify(products));
-    apiResponse.sendSuccess(
-      res,
-      200,
-      "Products fetched  successfully",
-      products
-    );
-  }
+  const products = await Product.find(query)
+    // .populate({
+    //   path: "category",
+    //   populate: {
+    //     path: "discount",
+    //   },
+    //   select: "-subcategories -createdAt -updatedAt",
+    // })
+    .populate({
+      path: "variant",
+      populate: "stockVariantAdjust",
+    })
+    .populate("category brand  subcategory discount  stockAdjustment")
+    .select("-updatedAt -createdAt");
 
-  apiResponse.sendSuccess(
-    res,
-    200,
-    "Products fetched from cahcheds successfully",
-    JSON.parse(cachedData)
-  );
+  apiResponse.sendSuccess(res, 200, "Products fetched  successfully", products);
 });
 
 //@desc Get product by slug
