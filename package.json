@@ -9,7 +9,8 @@
     "build": "pm2 start index.js --name jahirCommerce --watch --ignore-watch=\"node_modules\" --env production",
     "seed:permissions": "node src/seeder/permissionSeeder.js",
     "seed:delivery": "node src/seeder/deliverySeeder.js",
-    "seed:roles": "node src/seeder/roleSeeder.js"
+    "seed:roles": "node src/seeder/roleSeeder.js",
+    "socket": "node src/socket/client.js"
   },
   "keywords": [],
   "author": "",
@@ -38,6 +39,7 @@
     "qrcode": "^1.5.4",
     "slugify": "^1.6.6",
     "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "sslcommerz-lts": "^1.1.0",
     "uuid": "^11.1.0"
   }

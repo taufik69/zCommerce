@@ -1,3 +1,4 @@
+const { initSocket } = require("./socket/socket");
 const express = require("express");
 const { globalErrorHandeler } = require("./lib/GlobalErrorHandeler");
 const cors = require("cors");
@@ -5,16 +6,13 @@ const morgan = require("morgan");
 const helmet = require("helmet");
 const cookieparser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
+const http = require("http");
 
 const app = express();
+const server = http.createServer(app); // 🔑 Express app দিয়ে HTTP server তৈরি
 
 // ====== Security Middlewares ======
-
 app.use(helmet());
-/**
- * todo : All middleware
- * *motive: Middleware are used to configuration
- */
 app.use(
   cors({
     origin: [
@@ -32,10 +30,6 @@ app.use(
   })
 );
 
-/**
- * rate limiter
- * this middleware are used to limit request
- */
 app.use(cookieparser());
 
 // 4. Morgan -> Request logging
@@ -44,30 +38,29 @@ if (process.env.NODE_ENV === "development") {
 } else {
   app.use(morgan("combined"));
 }
+
 // 5. Rate Limiter -> Prevent brute-force / abuse
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 100, // Max 100 requests per 15 minutes per IP
-  standardHeaders: true, // Return rate limit info in headers
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  standardHeaders: true,
   legacyHeaders: false,
   message: "Too many requests from this IP, please try again later.",
 });
 app.use(limiter);
 
-/**
- * Todo : This middleware express.json are used to parse from data
- */
 app.use(express.json());
-/**
- * Todo : This middleware are parse search string and like extract data from url
- */
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
 // routes
 app.use(process.env.BASE_URL || "/api/v1", require("../src/routes/index"));
 
-// this is global Error handaler method // this middleware always niche thakbe
+// initialize socket
+const io = initSocket(server);
+
+// global error handler
 app.use(globalErrorHandeler);
 
-module.exports = { app };
+// export both app & server for usage
+module.exports = { server, io };
