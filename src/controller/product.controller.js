@@ -144,7 +144,7 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
     // })
     .populate({
       path: "variant",
-      populate: "stockVariantAdjust",
+      populate: "stockVariantAdjust product",
     })
     .populate("category brand  subcategory discount  stockAdjustment")
     .select("-updatedAt -createdAt");
