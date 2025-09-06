@@ -1,122 +1,154 @@
-const { customError } = require("../lib/CustomError");
-const { asynchandeler } = require("../lib/asyncHandeler");
+const Purchase = require("../models/purchase.model");
 const Product = require("../models/product.model");
 const Variant = require("../models/variant.model");
+const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
-const Purchase = require("../models/purchase.model");
-
-//@desc Create a new purchase
-//@route POST /api/purchase
+const { asynchandeler } = require("../lib/asyncHandeler");
 
 exports.createPurchase = asynchandeler(async (req, res) => {
   const {
-    product,
-    variant,
-    price,
-    stock,
-    wholesalePrice,
-    retailPrice,
-    size,
-    color,
+    invoiceNumber,
+    supplierName,
+    cashType,
+    allproduct, // [{ product, variant, price, wholesalePrice, retailPrice, quantity, size, color }]
+    commission = 0,
+    shipping = 0,
+    paid = 0,
   } = req.body;
 
-  //   validate req.body data
-  if (!product && !variant) {
-    throw new customError("Product or Variant is required", 400);
+  // Validate request
+  if (!allproduct || !Array.isArray(allproduct) || allproduct.length === 0) {
+    throw new customError("At least one product or variant is required", 400);
   }
+
+  // Calculate totals
+  let subTotal = 0;
+  const purchaseProducts = [];
+
+  for (const item of allproduct) {
+    const {
+      product,
+      variant,
+      purchasePrice,
+      retailPrice,
+      quantity,
+      size,
+      color,
+    } = item;
+
+    if (!purchasePrice || !retailPrice || !quantity) continue; // skip invalid entries
+
+    const subTotalItem = purchasePrice * quantity;
+    subTotal += subTotalItem;
+
+    // Prepare purchase product entry
+    purchaseProducts.push({
+      product: product || null,
+      variant: variant || null,
+      purchasePrice,
+      retailPrice,
+      subTotal: subTotalItem,
+      quantity,
+      size: size || null,
+      color: color || null,
+    });
+
+    /** ------------------------------
+     * 🔹 Update Product or Variant Stock & Info
+     * ------------------------------ */
+    if (product) {
+      const productInfo = await Product.findById(product);
+      if (productInfo) {
+        productInfo.stock = (productInfo.stock || 0) + quantity;
+
+        productInfo.purchasePrice = purchasePrice;
+        productInfo.retailPrice = retailPrice;
+        if (size)
+          productInfo.size = Array.from(
+            new Set([...(productInfo.size || []), size])
+          );
+        if (color)
+          productInfo.color = Array.from(
+            new Set([...(productInfo.color || []), color])
+          );
+        await productInfo.save();
+      }
+    }
+
+    if (variant) {
+      const variantInfo = await Variant.findById(variant);
+      if (variantInfo) {
+        variantInfo.stockVariant = (variantInfo.stockVariant || 0) + quantity;
+
+        variantInfo.purchasePrice = purchasePrice;
+        variantInfo.retailPrice = retailPrice;
+        if (size)
+          variantInfo.size = Array.from(
+            new Set([...(variantInfo.size || []), size])
+          );
+        if (color)
+          variantInfo.color = Array.from(
+            new Set([...(variantInfo.color || []), color])
+          );
+        await variantInfo.save();
+      }
+    }
+  }
+
+  const payable = subTotal + shipping + commission;
+  const dueamount = payable - paid;
+
+  // Create Purchase document
   const purchase = await Purchase.create({
-    product: product || null,
-    variant: variant || null,
-    price,
-    stock,
-    wholesalePrice,
-    retailPrice,
-    size,
-    color,
+    invoiceNumber,
+    supplierName,
+    cashType,
+    allproduct: purchaseProducts,
+    subTotal,
+    commission,
+    shipping,
+    payable,
+    paid,
+    dueamount,
   });
 
-  if (!purchase) {
-    throw new customError("Failed to create purchase", 500);
-  }
-
-  //   if product id ave en update e product info
-  if (product) {
-    const productinfo = await Product.findById(product);
-    productinfo.stock = stock;
-    productinfo.wholesalePrice = wholesalePrice;
-    productinfo.retailPrice = retailPrice;
-    productinfo.price = price;
-    productinfo.size = Array.from(new Set([...productinfo.size, size]));
-    productinfo.color = Array.from(new Set([...productinfo.color, color]));
-    await productinfo.save();
-  }
-
-  if (variant) {
-    const variantinfo = await Variant.findById(variant);
-    if (!variantinfo) throw new customError("Failed to update variant", 404);
-    variantinfo.stockVariant = stock;
-    variantinfo.wholesalePrice = wholesalePrice;
-    variantinfo.retailPrice = retailPrice;
-    variantinfo.price = price;
-    variantinfo.size = Array.from(new Set([...variantinfo.size, size]));
-    variantinfo.color = Array.from(new Set([...variantinfo.color, color]));
-    await variantinfo.save();
-  }
+  if (!purchase) throw new customError("Failed to create purchase", 500);
 
   apiResponse.sendSuccess(res, 201, "Purchase created successfully", purchase);
 });
 
-// @desc get all purchases
-// @route GET /api/purchase
-// @access Private
+// get all purchases
 exports.getAllPurchases = asynchandeler(async (req, res) => {
   const purchases = await Purchase.find()
-    .populate("product")
-    .populate("variant");
-  if (!purchases || purchases.length === 0) {
-    throw new customError("No purchases found", 404);
-  }
+    .populate({
+      path: "allproduct.product",
+    })
+    .populate({
+      path: "allproduct.variant",
+    })
+    .sort({ createdAt: -1 });
   apiResponse.sendSuccess(
     res,
     200,
-    "Purchases retrieved successfully",
+    "Purchases fetched successfully",
     purchases
   );
 });
-
-/// @desc get single purchase using slug
-// @route GET /api/purchase/:slug
-// @access Private
+// get single product using slug
 exports.getSinglePurchase = asynchandeler(async (req, res) => {
   const { id } = req.params;
   if (!id) {
     throw new customError("ID is required", 400);
   }
   const purchase = await Purchase.findById(id)
-    .populate("product")
-    .populate("variant");
+    .populate({
+      path: "allproduct.product",
+    })
+    .populate({
+      path: "allproduct.variant",
+    });
   if (!purchase) {
     throw new customError("Purchase not found", 404);
   }
-  apiResponse.sendSuccess(
-    res,
-    200,
-    "Purchase retrieved successfully",
-    purchase
-  );
-});
-
-//@desc Delete a purchase
-//@route DELETE /api/purchase/:id
-//@access Private
-exports.deletePurchase = asynchandeler(async (req, res) => {
-  const { id } = req.params;
-  if (!id) {
-    throw new customError("ID is required", 400);
-  }
-  const purchase = await Purchase.findByIdAndDelete(id);
-  if (!purchase) {
-    throw new customError("Purchase not found", 404);
-  }
-  apiResponse.sendSuccess(res, 200, "Purchase deleted successfully", purchase);
+  apiResponse.sendSuccess(res, 200, "Purchase fetched successfully", purchase);
 });
