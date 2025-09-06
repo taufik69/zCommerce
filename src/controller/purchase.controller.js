@@ -155,3 +155,195 @@ exports.getSinglePurchase = asynchandeler(async (req, res) => {
   }
   apiResponse.sendSuccess(res, 200, "Purchase fetched successfully", purchase);
 });
+
+// update purchase
+exports.updatePurchase = asynchandeler(async (req, res) => {
+  const { id } = req.params; // purchase ID
+  const {
+    invoiceNumber,
+    supplierName,
+    cashType,
+    allproduct, // [{ product, variant, purchasePrice, retailPrice, wholesalePrice, quantity, size, color }]
+    commission = 0,
+    shipping = 0,
+    paid = 0,
+  } = req.body;
+
+  // Find existing purchase
+  const existingPurchase = await Purchase.findById(id);
+  if (!existingPurchase) {
+    throw new customError("Purchase not found", 404);
+  }
+
+  /** -----------------------------------
+   * 🔹 Revert Old Stock
+   * ----------------------------------- */
+  for (const item of existingPurchase.allproduct) {
+    const { product, variant, quantity } = item;
+
+    if (product) {
+      const productInfo = await Product.findById(product);
+      if (productInfo) {
+        productInfo.stock = (productInfo.stock || 0) - quantity;
+        await productInfo.save();
+      }
+    }
+
+    if (variant) {
+      const variantInfo = await Variant.findById(variant);
+      if (variantInfo) {
+        variantInfo.stockVariant = (variantInfo.stockVariant || 0) - quantity;
+        await variantInfo.save();
+      }
+    }
+  }
+
+  /** -----------------------------------
+   * 🔹 Apply New Products
+   * ----------------------------------- */
+  let subTotal = 0;
+  const updatedProducts = [];
+
+  for (const item of allproduct) {
+    const {
+      product,
+      variant,
+      purchasePrice,
+      retailPrice,
+      wholesalePrice,
+      quantity,
+      size,
+      color,
+    } = item;
+
+    if (!purchasePrice || !retailPrice || !quantity) continue;
+
+    const subTotalItem = purchasePrice * quantity;
+    subTotal += subTotalItem;
+
+    updatedProducts.push({
+      product: product || null,
+      variant: variant || null,
+      purchasePrice,
+      retailPrice,
+      wholesalePrice,
+      subTotal: subTotalItem,
+      quantity,
+      size: size || null,
+      color: color || null,
+    });
+
+    // Update Product
+    if (product) {
+      const productInfo = await Product.findById(product);
+      if (productInfo) {
+        productInfo.stock = (productInfo.stock || 0) + quantity;
+        productInfo.wholesalePrice = wholesalePrice;
+        productInfo.purchasePrice = purchasePrice;
+        productInfo.retailPrice = retailPrice;
+        if (size)
+          productInfo.size = Array.from(
+            new Set([...(productInfo.size || []), size])
+          );
+        if (color)
+          productInfo.color = Array.from(
+            new Set([...(productInfo.color || []), color])
+          );
+        await productInfo.save();
+      }
+    }
+
+    // Update Variant
+    if (variant) {
+      const variantInfo = await Variant.findById(variant);
+      if (variantInfo) {
+        variantInfo.stockVariant = (variantInfo.stockVariant || 0) + quantity;
+        variantInfo.wholesalePrice = wholesalePrice;
+        variantInfo.purchasePrice = purchasePrice;
+        variantInfo.retailPrice = retailPrice;
+        if (size)
+          variantInfo.size = Array.from(
+            new Set([...(variantInfo.size || []), size])
+          );
+        if (color)
+          variantInfo.color = Array.from(
+            new Set([...(variantInfo.color || []), color])
+          );
+        await variantInfo.save();
+      }
+    }
+  }
+
+  const payable = subTotal + shipping + commission;
+  const dueamount = payable - paid;
+
+  /** -----------------------------------
+   * 🔹 Update Purchase Document
+   * ----------------------------------- */
+  existingPurchase.invoiceNumber =
+    invoiceNumber || existingPurchase.invoiceNumber;
+  existingPurchase.supplierName = supplierName || existingPurchase.supplierName;
+  existingPurchase.cashType = cashType || existingPurchase.cashType;
+  existingPurchase.allproduct = updatedProducts;
+  existingPurchase.subTotal = subTotal;
+  existingPurchase.commission = commission;
+  existingPurchase.shipping = shipping;
+  existingPurchase.payable = payable;
+  existingPurchase.paid = paid;
+  existingPurchase.dueamount = dueamount;
+
+  await existingPurchase.save();
+
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Purchase updated successfully",
+    existingPurchase
+  );
+});
+
+// delete purchase
+exports.deletePurchase = asynchandeler(async (req, res) => {
+  const { id } = req.params;
+
+  // Find purchase
+  const purchase = await Purchase.findById(id);
+  if (!purchase) {
+    throw new customError("Purchase not found", 404);
+  }
+
+  /** -----------------------------------
+   * 🔹 Rollback Stock Before Deleting
+   * ----------------------------------- */
+  for (const item of purchase.allproduct) {
+    const { product, variant, quantity } = item;
+
+    if (product) {
+      const productInfo = await Product.findById(product);
+      if (productInfo) {
+        productInfo.stock = (productInfo.stock || 0) - quantity;
+        if (productInfo.stock < 0) productInfo.stock = 0; // prevent negative
+        await productInfo.save();
+      }
+    }
+
+    if (variant) {
+      const variantInfo = await Variant.findById(variant);
+      if (variantInfo) {
+        variantInfo.stockVariant = (variantInfo.stockVariant || 0) - quantity;
+        if (variantInfo.stockVariant < 0) variantInfo.stockVariant = 0; // prevent negative
+        await variantInfo.save();
+      }
+    }
+  }
+
+  // Delete purchase
+  await Purchase.findByIdAndDelete(id);
+
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Purchase deleted successfully",
+    null
+  );
+});
