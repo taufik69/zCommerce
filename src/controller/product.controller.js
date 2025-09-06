@@ -475,7 +475,25 @@ exports.getBestSellingProducts = asynchandeler(async (req, res) => {
 
 //@desc name wise  search
 exports.getNameWiseSearch = asynchandeler(async (req, res) => {
-  const { name } = req.body;
+  const { name = "", barCode = "" } = req.query;
+  console.log("Search Query:", { name, barCode });
+
+  // Build match conditions dynamically
+  const matchConditions = [];
+
+  if (name) {
+    matchConditions.push(
+      { name: { $regex: name, $options: "i" } },
+      { "variant.variantName": { $regex: name, $options: "i" } }
+    );
+  }
+
+  if (barCode) {
+    matchConditions.push({
+      barCode: { $regex: barCode, $options: "i" },
+    });
+  }
+
   const products = await Product.aggregate([
     {
       $lookup: {
@@ -495,12 +513,14 @@ exports.getNameWiseSearch = asynchandeler(async (req, res) => {
     },
     {
       $match: {
-        $or: [
-          { name: { $regex: name, $options: "i" } },
-          { "variant.variantName": { $regex: name, $options: "i" } },
-        ],
+        $or: matchConditions.length > 0 ? matchConditions : [{}], // prevents empty $or error
       },
     },
   ]);
+
+  if (products.length === 0) {
+    throw new customError("Product not found", 404);
+  }
+
   apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
 });

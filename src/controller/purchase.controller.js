@@ -31,6 +31,7 @@ exports.createPurchase = asynchandeler(async (req, res) => {
       variant,
       purchasePrice,
       retailPrice,
+      wholesalePrice,
       quantity,
       size,
       color,
@@ -47,6 +48,7 @@ exports.createPurchase = asynchandeler(async (req, res) => {
       variant: variant || null,
       purchasePrice,
       retailPrice,
+      wholesalePrice,
       subTotal: subTotalItem,
       quantity,
       size: size || null,
@@ -60,7 +62,7 @@ exports.createPurchase = asynchandeler(async (req, res) => {
       const productInfo = await Product.findById(product);
       if (productInfo) {
         productInfo.stock = (productInfo.stock || 0) + quantity;
-
+        productInfo.wholesalePrice = wholesalePrice;
         productInfo.purchasePrice = purchasePrice;
         productInfo.retailPrice = retailPrice;
         if (size)
@@ -79,7 +81,7 @@ exports.createPurchase = asynchandeler(async (req, res) => {
       const variantInfo = await Variant.findById(variant);
       if (variantInfo) {
         variantInfo.stockVariant = (variantInfo.stockVariant || 0) + quantity;
-
+        variantInfo.wholesalePrice = wholesalePrice;
         variantInfo.purchasePrice = purchasePrice;
         variantInfo.retailPrice = retailPrice;
         if (size)
@@ -110,6 +112,7 @@ exports.createPurchase = asynchandeler(async (req, res) => {
     payable,
     paid,
     dueamount,
+    ...req.body,
   });
 
   if (!purchase) throw new customError("Failed to create purchase", 500);
