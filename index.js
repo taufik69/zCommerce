@@ -1,15 +1,20 @@
-const { app } = require("./src/app");
+const { server } = require("./src/app");
 require("dotenv").config();
 const { dbConnect } = require("./src/database/db");
 const { customError } = require("./src/lib/CustomError");
+
 dbConnect()
   .then(() => {
-    app.listen(process.env.PORT || 3000, () => {
-      console.log(
-        "Server is running on port http://localhost:" + process.env.PORT
-      );
+    const PORT = process.env.PORT || 3000;
+
+    // শুধু server.listen() চালাবে
+    server.listen(PORT, () => {
+      console.log(`🚀 Server is running on http://localhost:${PORT}`);
     });
   })
   .catch((err) => {
-    throw new customError("Database connection error from index.js" + err, 500);
+    throw new customError(
+      "Database connection error from index.js " + err,
+      500
+    );
   });

@@ -4,12 +4,22 @@ const { asynchandeler } = require("../lib/asyncHandeler");
 const Product = require("../models/product.model");
 const Variant = require("../models/variant.model");
 const Cart = require("../models/cart.model");
+const { getIO } = require("../socket/socket");
 
 //@desc add to cart
 exports.addToCart = asynchandeler(async (req, res) => {
   const userId = req?.user?._id || req.body.user || null;
   const guestId = req?.body?.guestId || null;
+  // Emit cartUpdated event
+  const socketId = userSockets.get(userId || guestId);
+  if (socketId) {
+    io.to(socketId).emit("cartUpdated", {
+      message: "🛒 Product added to cart",
+      cart: cart,
+    });
+  }
 
+  return;
   const { productId, variantId, quantity, color, size } = req.body;
 
   if (!quantity || quantity <= 0) {
@@ -102,6 +112,16 @@ exports.addToCart = asynchandeler(async (req, res) => {
   cart.totalItem = cartItem.quantity;
 
   await cart.save();
+
+  // Emit cartUpdated event
+  // const socketId = userSockets.get(userId || guestId);
+  // if (socketId) {
+  //   io.to(socketId).emit("cartUpdated", {
+  //     message: "🛒 Product added to cart",
+  //     cart: cart,
+  //   });
+  // }
+
   apiResponse.sendSuccess(res, 201, "Product added to cart", cart);
 });
 
@@ -109,7 +129,6 @@ exports.addToCart = asynchandeler(async (req, res) => {
 exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
   const userId = req?.user?._id || req.body.user || null;
   const guestId = req?.body?.guestId || null;
-  const { cartId } = req.params;
   const { productId, variantId } = req.body;
 
   if (!productId && !variantId) {
@@ -172,6 +191,13 @@ exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
   cart.totalItem = cartItem.quantity;
 
   await cart.save();
+
+  // emit socket event
+  getIO().emit("cartUpdated", {
+    message: "🛒 Product decrease to cart",
+    cart: cart,
+    user: userId || guestId,
+  });
 
   apiResponse.sendSuccess(
     res,
