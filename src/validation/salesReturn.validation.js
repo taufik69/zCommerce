@@ -21,7 +21,6 @@ const byReturnSchema = joi
         .messages({
           "string.empty": "Variant is required.",
           "string.pattern.base": "Variant must be a valid ObjectId.",
-          "any.required": "Variant is required.",
         }),
 
       productBarCode: joi.string().trim().min(3).max(50).messages({
