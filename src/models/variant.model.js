@@ -130,6 +130,12 @@ const variantSchema = new mongoose.Schema(
         ref: "SalesReturn",
       },
     ],
+    byReturn: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ByReturn",
+      },
+    ],
   },
   {
     timestamps: true,

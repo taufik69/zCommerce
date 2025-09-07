@@ -1,7 +1,7 @@
 require("dotenv").config();
 const bwipjs = require("bwip-js");
 const QRCode = require("qrcode");
-const Product = require("../mode--+ls/product.model");
+const Product = require("../models/product.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { apiResponse } = require("../utils/apiResponse");
