@@ -1,11 +1,10 @@
 let io = null;
 const { Server } = require("socket.io");
 const { customError } = require("../lib/CustomError");
-const userSockets = new Map();
+
 module.exports = {
   initSocket: (server) => {
     io = new Server(server, {
-      // ✅ assign to outer variable
       cors: {
         origin: [
           process.env.FRONTEND_URL,
@@ -24,17 +23,16 @@ module.exports = {
 
     // ====== Socket.IO Setup ======
     io.on("connection", (socket) => {
-      // Suppose the frontend sends userId in the query when connecting
       const userId = socket.handshake.query.userId;
-
-      console.log("User connected:", userId);
+      console.log("User connected socket.handshake.query.userId:", userId);
 
       if (userId) {
-        userSockets.set(userId, socket.id);
+        // ✅ User নিজের userId নামে room এ join করবে
+        socket.join(userId);
       }
 
       socket.on("disconnect", () => {
-        if (userId) userSockets.delete(userId);
+        console.log("User disconnected:", userId);
       });
     });
 

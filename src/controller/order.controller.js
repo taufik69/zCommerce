@@ -16,6 +16,7 @@ const { sendEmail } = require("../helpers/nodemailer");
 const { orderTemplate } = require("../emailTemplate/orderTemplate");
 
 const { sendSMS } = require("../helpers/sms");
+const { getIO } = require("../socket/socket");
 
 // applyDeliveryCharge
 const applyDeliveryCharge = async (deliveryChargeID) => {
@@ -273,6 +274,13 @@ exports.createOrder = asynchandeler(async (req, res) => {
       // Redirect the user to payment gateway
 
       console.log("Redirecting to: ", response.GatewayPageURL);
+
+      // Emit order event
+      const io = getIO();
+      io.emit("orderPlaced", {
+        message: "🛒 Product added to your cart successfully",
+        order: order,
+      });
       // return res.status(301).redirect(response.GatewayPageURL);
       apiResponse.sendSuccess(res, 201, "Order placed successfully", {
         url: response.GatewayPageURL,
