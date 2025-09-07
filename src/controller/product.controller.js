@@ -1,7 +1,7 @@
 require("dotenv").config();
 const bwipjs = require("bwip-js");
 const QRCode = require("qrcode");
-const Product = require("../models/product.model");
+const Product = require("../mode--+ls/product.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { apiResponse } = require("../utils/apiResponse");
@@ -35,6 +35,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
     size,
     color,
     barCode,
+    variantType,
   } = value;
 
   // Generate barcode using bwip-js
@@ -81,6 +82,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
     manufactureCountry,
     stock,
     image: imageUrls,
+    variantType,
     ...req.body,
   });
 
@@ -108,11 +110,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
     base64qrCode
   );
   product.qrCode = qrCodeUrl || null;
-  if (stock && size && color) {
-    product.variantType = "singleVariant";
-  } else {
-    product.variantType = "multipleVariant";
-  }
+
   await product.save();
   // Send success response
 
@@ -398,10 +396,8 @@ exports.getProductsByPriceRange = asynchandeler(async (req, res) => {
     {
       $match: {
         $or: [
-          // 1. Product নিজেই price range এর মধ্যে
           { retailPrice: { $gte: minPrice, $lte: maxPrice } },
 
-          // 2. Variant এর মধ্যে অন্তত ১টা price range এর মধ্যে
           {
             variantdocs: {
               $elemMatch: {

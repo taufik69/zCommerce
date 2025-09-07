@@ -56,6 +56,14 @@ const productSchema = joi
       "number.min": "Wholesale price cannot be negative.",
       "any.required": "Wholesale price is required.",
     }),
+    variantType: joi
+      .string()
+      .required()
+      .valid("singleVariant", "multipleVariant")
+      .messages({
+        "string.empty": "Variant type is required.",
+        "any.required": "Variant type is required.",
+      }),
   })
   .options({ abortEarly: false, allowUnknown: true }); // Allow extra fields, only validate required
 
