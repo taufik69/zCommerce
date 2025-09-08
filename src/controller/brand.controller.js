@@ -8,6 +8,7 @@ const {
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
 // @desc    Create a new brand
+// @route   POST /api/v1/brand
 exports.createBrand = asynchandeler(async (req, res) => {
   const { name } = req.body; // array of brand names
   const files = req.files; // array of images
