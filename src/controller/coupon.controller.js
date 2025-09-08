@@ -2,6 +2,15 @@ const { customError } = require("../lib/CustomError");
 const Coupon = require("../models/coupon.model");
 const { apiResponse } = require("../utils/apiResponse");
 const { validateCoupon } = require("../validation/coupon.validation");
+/**
+ * Handles the creation of a new coupon by validating the request data,
+ * saving the coupon to the database, and sending a success response.
+ *
+ * @param {Object} req - The request object containing coupon data.
+ * @param {Object} res - The response object used to send the response.
+ * @returns {Promise<void>} - A promise that resolves when the response is sent.
+ * @throws {Error} - Throws an error if coupon validation fails or saving to the database fails.
+ */
 exports.createCoupon = async (req, res) => {
   try {
     const value = await validateCoupon(req);
