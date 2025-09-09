@@ -184,7 +184,7 @@ exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
 
   // emit socket event
   const io = getIO();
-  io.to(userId || guestId).emit("cartUpdated", {
+  io.to(cart.user || cart.guestId).emit("cartUpdated", {
     message: "🛒 Product added to your cart successfully",
     cart: cart,
   });
@@ -216,7 +216,7 @@ exports.deleteCart = asynchandeler(async (req, res) => {
     throw new customError("Cart not found", 404);
   }
   const io = getIO();
-  io.to(userId || guestId).emit("cartUpdated", {
+  io.to(cart.user || cart.guestId).emit("cartUpdated", {
     message: "🛒 Product added to your cart successfully",
     cart: cart,
   });
@@ -253,7 +253,7 @@ exports.getAllCart = asynchandeler(async (req, res) => {
   cart.totalItem = cartItem.quantity;
   //socket io
   const io = getIO();
-  io.to(userId || guestId).emit("cartUpdated", {
+  io.to(cart.user || cart.guestId).emit("cartUpdated", {
     message: "🛒 Product added to your cart successfully",
     cart: cart,
   });
@@ -266,6 +266,7 @@ exports.getCartByUserId = asynchandeler(async (req, res) => {
   let cart = await Cart.findOne({ user: id })
     .populate("items.product")
     .populate("items.variant");
+
   if (!cart) {
     cart = await Cart.findOne({ guestId: id }).populate(
       "items.product items.variant"
@@ -275,7 +276,7 @@ exports.getCartByUserId = asynchandeler(async (req, res) => {
     apiResponse.sendSuccess(res, 200, "Cart is empty", cart);
   }
   const io = getIO();
-  io.to(userId || guestId).emit("cartUpdated", {
+  io.to(cart.user || cart.guestId).emit("cartUpdated", {
     message: "🛒 Product get  cart successfully",
     cart: cart,
   });
