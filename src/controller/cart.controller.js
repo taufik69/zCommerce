@@ -229,7 +229,10 @@ exports.getAllCart = asynchandeler(async (req, res) => {
   const userId = req?.user?._id || null;
   const guestId = req?.body?.guestId || null;
   const query = userId ? { user: userId } : { guestId };
-  const cart = await Cart.findOne(query).populate("items.product").lean();
+  const cart = await Cart.findOne(query)
+    .populate("items.product")
+    .populate("items.variant")
+    .lean();
   if (!cart) {
     apiResponse.sendSuccess(res, 200, "Cart is empty", cart);
   }
@@ -260,9 +263,9 @@ exports.getAllCart = asynchandeler(async (req, res) => {
 exports.getCartByUserId = asynchandeler(async (req, res) => {
   const { id } = req.params;
   // Try finding by user first, then guest
-  let cart = await Cart.findOne({ user: id }).populate(
-    "items.product items.variant"
-  );
+  let cart = await Cart.findOne({ user: id })
+    .populate("items.product")
+    .populate("items.variant");
   if (!cart) {
     cart = await Cart.findOne({ guestId: id }).populate(
       "items.product items.variant"
@@ -273,7 +276,7 @@ exports.getCartByUserId = asynchandeler(async (req, res) => {
   }
   const io = getIO();
   io.to(userId || guestId).emit("cartUpdated", {
-    message: "🛒 Product added to your cart successfully",
+    message: "🛒 Product get  cart successfully",
     cart: cart,
   });
 
