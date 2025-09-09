@@ -267,7 +267,8 @@ exports.getCartByUserId = asynchandeler(async (req, res) => {
   // Try finding by user first, then guest
   let cart = await Cart.findOne({ user: id })
     .populate("items.product")
-    .populate("items.variant");
+    .populate("items.variant")
+    .lean();
 
   if (!cart) {
     cart = await Cart.findOne({ guestId: id }).populate(
@@ -279,7 +280,7 @@ exports.getCartByUserId = asynchandeler(async (req, res) => {
   }
   const io = getIO();
   io.to(cart.user || cart.guestId).emit("cartUpdated", {
-    message: "🛒 Product get  cart successfully",
+    message: "🛒 Product getCartByUserId  cart successfully",
     cart: cart,
   });
 
