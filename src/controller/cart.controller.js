@@ -43,7 +43,9 @@ exports.addToCart = asynchandeler(async (req, res) => {
 
   // Cart খুঁজুন
   const cartQuery = userId ? { user: userId } : { guestId };
-  let cart = await Cart.findOne(cartQuery);
+  let cart = await Cart.findOne(cartQuery)
+    .populate("items.product")
+    .populate("items.variant");
 
   // Cart না থাকলে নতুন cart তৈরি করুন
   if (!cart) {
