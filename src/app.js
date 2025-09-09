@@ -42,7 +42,7 @@ if (process.env.NODE_ENV === "development") {
 // 5. Rate Limiter -> Prevent brute-force / abuse
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 100,
+  limit: 1000000000,
   standardHeaders: true,
   legacyHeaders: false,
   message: "Too many requests from this IP, please try again later.",
