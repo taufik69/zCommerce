@@ -183,10 +183,10 @@ exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
   await cart.save();
 
   // emit socket event
-  getIO().emit("cartUpdated", {
-    message: "🛒 Product decrease to cart",
+  const io = getIO();
+  io.to(userId || guestId).emit("cartUpdated", {
+    message: "🛒 Product added to your cart successfully",
     cart: cart,
-    user: userId || guestId,
   });
 
   apiResponse.sendSuccess(
@@ -215,6 +215,12 @@ exports.deleteCart = asynchandeler(async (req, res) => {
   if (!cart) {
     throw new customError("Cart not found", 404);
   }
+  const io = getIO();
+  io.to(userId || guestId).emit("cartUpdated", {
+    message: "🛒 Product added to your cart successfully",
+    cart: cart,
+  });
+
   apiResponse.sendSuccess(res, 200, "Cart deleted successfully", cart);
 });
 
@@ -242,6 +248,12 @@ exports.getAllCart = asynchandeler(async (req, res) => {
 
   cart.subTotal = cartItem.totalPrice;
   cart.totalItem = cartItem.quantity;
+  //socket io
+  const io = getIO();
+  io.to(userId || guestId).emit("cartUpdated", {
+    message: "🛒 Product added to your cart successfully",
+    cart: cart,
+  });
 
   apiResponse.sendSuccess(res, 200, "Cart fetched successfully", cart);
 });
@@ -259,5 +271,11 @@ exports.getCartByUserId = asynchandeler(async (req, res) => {
   if (!cart) {
     apiResponse.sendSuccess(res, 200, "Cart is empty", cart);
   }
+  const io = getIO();
+  io.to(userId || guestId).emit("cartUpdated", {
+    message: "🛒 Product added to your cart successfully",
+    cart: cart,
+  });
+
   apiResponse.sendSuccess(res, 200, "Cart fetched successfully", cart);
 });
