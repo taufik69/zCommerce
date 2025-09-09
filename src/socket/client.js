@@ -4,7 +4,7 @@ const { io } = require("socket.io-client");
 // তোমার socket server এর URL
 const socket = io("http://localhost:3000", {
   transports: ["websocket"],
-  query: { userId: "1234" },
+  query: { userId: "427e8e5359725e2befde69e1" },
 });
 
 // connection successful হলে
@@ -17,6 +17,9 @@ socket.on("cartUpdated", (data) => {
   console.log("📩 cartUpdated:", data);
 });
 
+socket.on("orderPlaced", (data) => {
+  console.log("📩 orderPlaced:", data);
+});
 // disconnect হলে
 socket.on("disconnect", () => {
   console.log("❌ Disconnected from server");

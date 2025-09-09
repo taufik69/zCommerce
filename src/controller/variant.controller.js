@@ -68,7 +68,10 @@ exports.createVariant = asynchandeler(async (req, res) => {
 exports.getAllVariants = asynchandeler(async (req, res, next) => {
   const variants = await variant
     .find()
-    .populate("product")
+    .populate({
+      path: "product",
+      populate: [{ path: "subcategory", select: "name" }],
+    })
     .select("-updatedAt")
     .sort({ createdAt: -1 });
   apiResponse.sendSuccess(res, 200, "Variants fetched successfully", variants);

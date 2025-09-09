@@ -7,12 +7,10 @@ const byReturnSchema = new mongoose.Schema(
     product: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
-      required: true,
     },
     variant: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Variant",
-      required: true,
     },
     productBarCode: {
       type: String,

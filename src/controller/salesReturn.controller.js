@@ -43,7 +43,8 @@ exports.createSalesReturn = asynchandeler(async (req, res) => {
 exports.getAllSalesReturn = asynchandeler(async (req, res) => {
   const salesReturn = await SalesReturn.find()
     .populate("product")
-    .populate("variant");
+    .populate("variant")
+    .sort({ createdAt: -1 });
   if (!salesReturn || salesReturn.length === 0) {
     throw new customError("No sales return found", 404);
   }
@@ -57,11 +58,11 @@ exports.getAllSalesReturn = asynchandeler(async (req, res) => {
 
 //@desc get single sales return using slug
 exports.getSingleSalesReturn = asynchandeler(async (req, res) => {
-  const { id } = req.params;
-  if (!id) {
+  const { slug } = req.params;
+  if (!slug) {
     throw new customError("ID is required", 400);
   }
-  const salesReturn = await SalesReturn.findById(id)
+  const salesReturn = await SalesReturn.findOne({ slug })
     .populate("product")
     .populate("variant");
   if (!salesReturn) {
@@ -102,5 +103,113 @@ exports.deleteSalesReturnBySlug = asynchandeler(async (req, res) => {
     await variant.save();
   }
   await SalesReturn.findByIdAndDelete(salesReturn._id);
+  apiResponse.sendSuccess(res, 200, "Sales Return deleted successfully");
+});
+
+//update salesReturn
+exports.updateSalesReturn = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const data = await validateByReturn(req);
+
+  // Find existing sales return
+  const salesReturn = await SalesReturn.findOne({ slug });
+  if (!salesReturn) {
+    throw new customError("Sales Return not found", 404);
+  }
+
+  /** -----------------------------------
+   * 🔹 Handle Product Change
+   * ----------------------------------- */
+  if (
+    data.product &&
+    data.product.toString() !== (salesReturn.product?.toString() || "")
+  ) {
+    // Remove from old product
+    if (salesReturn.product) {
+      await Product.findByIdAndUpdate(salesReturn.product, {
+        $pull: { salesReturn: salesReturn._id },
+      });
+    }
+    // Add to new product
+    await Product.findByIdAndUpdate(data.product, {
+      $addToSet: { salesReturn: salesReturn._id },
+    });
+    salesReturn.product = data.product;
+  }
+
+  /** -----------------------------------
+   * 🔹 Handle Variant Change
+   * ----------------------------------- */
+  if (
+    data.variant &&
+    data.variant.toString() !== (salesReturn.variant?.toString() || "")
+  ) {
+    // Remove from old variant
+    if (salesReturn.variant) {
+      await Variant.findByIdAndUpdate(salesReturn.variant, {
+        $pull: { salesReturn: salesReturn._id },
+      });
+    }
+    // Add to new variant
+    await Variant.findByIdAndUpdate(data.variant, {
+      $addToSet: { salesReturn: salesReturn._id },
+    });
+    salesReturn.variant = data.variant;
+  }
+
+  /** -----------------------------------
+   * 🔹 Update Other Fields
+   * ----------------------------------- */
+  salesReturn.productBarCode =
+    data.productBarCode || salesReturn.productBarCode;
+  salesReturn.quantity = data.quantity || salesReturn.quantity;
+  salesReturn.date = data.date || salesReturn.date;
+  salesReturn.remarks = data.remarks || salesReturn.remarks;
+
+  await salesReturn.save();
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Sales Return updated successfully",
+    salesReturn
+  );
+});
+
+//delete salesReturn
+exports.deleteSalesReturn = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+
+  // Find the sales return
+  const salesReturn = await SalesReturn.findOne({ slug });
+  if (!salesReturn) {
+    throw new customError("Sales Return not found", 404);
+  }
+
+  /** ------------------------------
+   * 🔹 Remove reference from Product
+   * ------------------------------ */
+  if (salesReturn.product) {
+    await Product.findByIdAndUpdate(
+      salesReturn.product,
+      { $pull: { salesReturn: salesReturn._id } },
+      { new: true }
+    );
+  }
+
+  /** ------------------------------
+   * 🔹 Remove reference from Variant
+   * ------------------------------ */
+  if (salesReturn.variant) {
+    await Variant.findByIdAndUpdate(
+      salesReturn.variant,
+      { $pull: { salesReturn: salesReturn._id } },
+      { new: true }
+    );
+  }
+
+  // Delete sales return
+  await SalesReturn.findOneAndDelete({ slug });
+
   apiResponse.sendSuccess(res, 200, "Sales Return deleted successfully");
 });
