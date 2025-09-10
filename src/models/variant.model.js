@@ -124,6 +124,10 @@ const variantSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    totalSales: {
+      type: Number,
+      default: 0,
+    },
     salesReturn: [
       {
         type: mongoose.Schema.Types.ObjectId,

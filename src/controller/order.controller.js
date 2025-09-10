@@ -97,6 +97,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
         variant: item.variant || null,
       });
       totalPriceofProducts += item.totalPrice;
+      product.totalSales += item.quantity;
     }
 
     // যদি variant থাকে
@@ -120,7 +121,6 @@ exports.createOrder = asynchandeler(async (req, res) => {
         color: item.color,
         product: item.product || null,
       });
-      totalPriceofProducts += item.totalPrice;
     }
   }
 
@@ -168,7 +168,10 @@ exports.createOrder = asynchandeler(async (req, res) => {
         stockUpdatePromises.push(
           Product.updateOne(
             { _id: item.product },
-            { $inc: { stock: -item.quantity } }
+            {
+              $inc: { stock: -item.quantity },
+              $inc: { totalSales: item.quantity },
+            }
           )
         );
       }
@@ -177,7 +180,10 @@ exports.createOrder = asynchandeler(async (req, res) => {
         stockUpdatePromises.push(
           Variant.updateOne(
             { _id: item.variant },
-            { $inc: { stockVariant: -item.quantity } }
+            {
+              $inc: { stockVariant: -item.quantity },
+              $inc: { totalSales: item.quantity },
+            }
           )
         );
       }
@@ -230,11 +236,11 @@ exports.createOrder = asynchandeler(async (req, res) => {
       }
     }
 
-    // Step 10: Clear cart
-    await cartModel.deleteOne({
-      user: userId || null,
-      guestId: req.body.guestId || null,
-    });
+    // // Step 10: Clear cart
+    // await cartModel.deleteOne({
+    //   user: userId || null,
+    //   guestId: req.body.guestId || null,
+    // });
 
     // Step 11: SSLCommerz or COD Success
     if (paymentMethod === "sslcommerz") {
@@ -299,7 +305,10 @@ exports.createOrder = asynchandeler(async (req, res) => {
         productUpdatePromises.push(
           Product.updateOne(
             { _id: item.product },
-            { $inc: { stock: item.quantity } }
+            {
+              $inc: { stock: item.quantity },
+              $inc: { totalSales: -item.quantity },
+            }
           )
         );
       }

@@ -99,8 +99,8 @@ const orderSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ["pending", "paid", "failed", "unpaid"],
-      default: "unpaid",
+      enum: ["pending", "success", "failed", "cancelled"],
+      default: "pending",
     },
 
     // SSLCommerz Payment Gateway Specific
