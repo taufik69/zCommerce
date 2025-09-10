@@ -19,8 +19,8 @@ const purchaseSchema = new mongoose.Schema(
     },
     cashType: {
       type: String,
-      enum: ["cash", "bank", "mobile_banking"],
-      required: true,
+      // enum: ["cash", "bank", "mobile_banking"],
+      // required: true,
     },
 
     // inline product schema
