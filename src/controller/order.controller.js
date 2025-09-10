@@ -237,10 +237,10 @@ exports.createOrder = asynchandeler(async (req, res) => {
     }
 
     // // Step 10: Clear cart
-    // await cartModel.deleteOne({
-    //   user: userId || null,
-    //   guestId: req.body.guestId || null,
-    // });
+    await cartModel.deleteOne({
+      user: userId || null,
+      guestId: req.body.guestId || null,
+    });
 
     // Step 11: SSLCommerz or COD Success
     if (paymentMethod === "sslcommerz") {
