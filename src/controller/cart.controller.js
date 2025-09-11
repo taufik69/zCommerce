@@ -211,7 +211,7 @@ exports.deleteCart = asynchandeler(async (req, res) => {
     throw new customError("Cart ID or Cart Item ID is required", 400);
   }
 
-  const cart = await Cart.findOne({ _id: cartId });
+  const cart = await Cart.findOne({ _id: cartId }).populate("items.product").populate("items.variant");
   if (!cart) throw new customError("Cart not found with this ID", 404);
   cart.items.map((item) =>
     item._id == cartItemId ? cart.items.pull(item) : null
