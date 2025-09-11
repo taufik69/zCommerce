@@ -108,10 +108,14 @@ exports.addToCart = asynchandeler(async (req, res) => {
 
   // Emit cartUpdated event
   // ✅ emit to that specific user (room based)
+
+  let getcart = await Cart.findOne({
+  _id: cart._id
+  }).populate("items.product").populate("items.variant");
   const io = getIO();
   io.to(userId || guestId).emit("cartUpdated", {
     message: "🛒 Product added to your cart successfully",
-    cart: cart,
+    cart: getcart,
   });
 
   apiResponse.sendSuccess(res, 201, "Product added to cart", cart);
