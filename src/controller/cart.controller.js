@@ -110,7 +110,7 @@ exports.addToCart = asynchandeler(async (req, res) => {
   // ✅ emit to that specific user (room based)
 
   let getcart = await Cart.findOne({
-  _id: cart._id
+    _id: cart._id
   }).populate("items.product").populate("items.variant");
   const io = getIO();
   io.to(userId || guestId).emit("cartUpdated", {

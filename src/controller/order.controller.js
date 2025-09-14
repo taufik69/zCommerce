@@ -238,11 +238,16 @@ exports.createOrder = asynchandeler(async (req, res) => {
     }
 
     // // Step 10: Clear cart
-    await cartModel.deleteOne({
+   let deleteCart = await cartModel.deleteOne({
       user: userId || null,
       guestId: req.body.guestId || null,
     });
 
+      const io = getIO();
+  io.to(userId || guestId).emit("cartUpdated", {
+    message: "🛒 Product added to your cart successfully",
+    cart: deleteCart,
+  });
     // Step 11: SSLCommerz or COD Success
     if (paymentMethod === "sslcommerz") {
       const data = {
