@@ -154,7 +154,8 @@ exports.createOrder = asynchandeler(async (req, res) => {
       deliveryCharge: deliveryChargeAmount._id,
       paymentMethod,
       invoiceId,
-      paymentStatus: paymentMethod === "cod" ? "unpaid" : "pending",
+      paymentStatus: paymentMethod === "cod" ? "pending" : "pending",
+      // paymentStatus: paymentMethod === "cod" ? "unpaid" : "pending",
       orderStatus: "pending",
       coupon: coupon ? coupon._id : undefined,
     });
@@ -297,6 +298,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
       apiResponse.sendSuccess(res, 201, "Order placed successfully", order);
     }
   } catch (error) {
+    console.log(error);
     // If order creation or any subsequent step fails, we must rollback stock and coupon usage
     if (order && order._id) {
       // Rollback stock
