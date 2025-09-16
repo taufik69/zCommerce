@@ -7,5 +7,6 @@ _.route("/allorders").get(orderController.getAllOrders);
 _.route("/single-order/:id").get(orderController.getSingleOrder);
 _.route("/order-update/:id").put(orderController.updateOrder);
 _.route("/order-delete/:id").delete(orderController.deleteOrder);
+_.route("/filterorderbydate").get(orderController.filterOrderdatewise);
 
 module.exports = _;

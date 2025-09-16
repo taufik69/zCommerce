@@ -389,3 +389,34 @@ exports.deleteOrder = asynchandeler(async (req, res) => {
   await Order.deleteOne({ _id: id });
   apiResponse.sendSuccess(res, 200, "Order deleted successfully", singleOrder);
 });
+
+// fiter order using datewise like today and yesterday last 7 days last month
+exports.filterOrderdatewise = asynchandeler(async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // convert to Date objects
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+
+    const filter = {};
+    if (start && end) {
+      filter.createdAt = { $gte: start, $lt: end };
+    } else if (start) {
+      filter.createdAt = { $gte: start };
+    } else if (end) {
+      filter.createdAt = { $lt: end };
+    }
+
+    const orders = await Order.find(filter)
+      .populate("user")
+      .populate("deliveryCharge")
+      .populate("coupon")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
+  } catch (err) {
+    apiResponse.sendError(res, 500, "Error fetching orders", err.message);
+  }
+});
