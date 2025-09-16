@@ -95,6 +95,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
         size: item.size,
         color: item.color,
         variant: item.variant || null,
+        orderType: "singlevariant",
       });
       totalPriceofProducts += item.totalPrice;
       product.totalSales += item.quantity;
@@ -120,7 +121,10 @@ exports.createOrder = asynchandeler(async (req, res) => {
         size: item.size,
         color: item.color,
         product: item.product || null,
+        orderType: "multivariant",
       });
+      totalPriceofProducts += item.totalPrice;
+      variant.totalSales += item.quantity;
     }
   }
 
@@ -242,7 +246,6 @@ exports.createOrder = asynchandeler(async (req, res) => {
       user: userId || null,
       guestId: req.body.guestId || null,
     });
-    
 
     // Step 11: SSLCommerz or COD Success
     if (paymentMethod === "sslcommerz") {
