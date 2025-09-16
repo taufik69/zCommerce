@@ -174,8 +174,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
           Product.updateOne(
             { _id: item.product },
             {
-              $inc: { stock: -item.quantity },
-              $inc: { totalSales: item.quantity },
+              $inc: { stock: -item.quantity, totalSales: item.quantity },
             }
           )
         );
@@ -186,8 +185,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
           Variant.updateOne(
             { _id: item.variant },
             {
-              $inc: { stockVariant: -item.quantity },
-              $inc: { totalSales: item.quantity },
+              $inc: { stockVariant: -item.quantity, totalSales: item.quantity },
             }
           )
         );
@@ -306,19 +304,35 @@ exports.createOrder = asynchandeler(async (req, res) => {
     // If order creation or any subsequent step fails, we must rollback stock and coupon usage
     if (order && order._id) {
       // Rollback stock
-      const productUpdatePromises = [];
+      const stockUpdatePromises = [];
       for (const item of cart.items) {
-        productUpdatePromises.push(
-          Product.updateOne(
-            { _id: item.product },
-            {
-              $inc: { stock: item.quantity },
-              $inc: { totalSales: -item.quantity },
-            }
-          )
-        );
+        // Product stock update
+        if (item.product) {
+          stockUpdatePromises.push(
+            Product.updateOne(
+              { _id: item.product },
+              {
+                $inc: { stock: -item.quantity, totalSales: item.quantity },
+              }
+            )
+          );
+        }
+        // Variant stock update
+        if (item.variant) {
+          stockUpdatePromises.push(
+            Variant.updateOne(
+              { _id: item.variant },
+              {
+                $inc: {
+                  stockVariant: -item.quantity,
+                  totalSales: item.quantity,
+                },
+              }
+            )
+          );
+        }
       }
-      await Promise.all(productUpdatePromises);
+      await Promise.all(stockUpdatePromises);
       console.log("Stock rolled back due to error.");
 
       // Rollback coupon usage
@@ -334,7 +348,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
       await Order.deleteOne({ _id: order._id });
       console.log("Incomplete order deleted.");
     }
-    throw error; // Re-throw the error for the async handler to catch
+    throw new customError(error.message, 500);
   }
 });
 
@@ -369,13 +383,51 @@ exports.getSingleOrder = asynchandeler(async (req, res) => {
 exports.updateOrder = asynchandeler(async (req, res) => {
   const { id } = req.params;
   const { orderStatus, shippingInfo } = req.body;
+
   const singleOrder = await Order.findOne({ _id: id });
   if (!singleOrder) {
     throw new customError("Order not found", 404);
   }
+
+  // if orderStatus is Cancelled then rollback stock
+  if (orderStatus === "Cancelled") {
+    const stockUpdatePromises = [];
+
+    for (const item of singleOrder.items) {
+      // Product stock update
+      if (item.product) {
+        stockUpdatePromises.push(
+          Product.updateOne(
+            { _id: item.product._id },
+            { $inc: { stock: item.quantity, totalSales: -item.quantity } },
+            { new: true }
+          )
+        );
+      }
+
+      // Variant stock update
+      if (item.variant) {
+        stockUpdatePromises.push(
+          Variant.updateOne(
+            { _id: item.variant._id },
+            {
+              $inc: { stockVariant: item.quantity, totalSales: -item.quantity },
+            },
+            { new: true }
+          )
+        );
+      }
+    }
+
+    // Run all updates together
+    await Promise.all(stockUpdatePromises);
+  }
+
+  // Update order fields
   singleOrder.orderStatus = orderStatus;
   singleOrder.shippingInfo = shippingInfo;
   await singleOrder.save();
+
   apiResponse.sendSuccess(res, 200, "Order updated successfully", singleOrder);
 });
 
