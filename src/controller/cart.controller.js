@@ -110,8 +110,10 @@ exports.addToCart = asynchandeler(async (req, res) => {
   // ✅ emit to that specific user (room based)
 
   let getcart = await Cart.findOne({
-    _id: cart._id
-  }).populate("items.product").populate("items.variant");
+    _id: cart._id,
+  })
+    .populate("items.product")
+    .populate("items.variant");
   const io = getIO();
   io.to(userId || guestId).emit("cartUpdated", {
     message: "🛒 Product added to your cart successfully",
@@ -211,19 +213,25 @@ exports.deleteCart = asynchandeler(async (req, res) => {
     throw new customError("Cart ID or Cart Item ID is required", 400);
   }
 
-  const cart = await Cart.findOne({ _id: cartId }).populate("items.product").populate("items.variant");
+  const cart = await Cart.findOne({ _id: cartId })
+    .populate("items.product")
+    .populate("items.variant");
   if (!cart) throw new customError("Cart not found with this ID", 404);
   cart.items.map((item) =>
     item._id == cartItemId ? cart.items.pull(item) : null
   );
   await cart.save();
+  // check if cart is empty
+  if (cart.items.length == 0) {
+    await Cart.deleteOne({ _id: cartId });
+  }
 
   if (!cart) {
     throw new customError("Cart not found", 404);
   }
   const io = getIO();
   io.to(cart.user || cart.guestId).emit("cartUpdated", {
-    message: "🛒 Product added to your cart successfully",
+    message: "🛒 Product deleted to your cart successfully",
     cart: cart,
   });
 
