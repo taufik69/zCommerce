@@ -287,7 +287,7 @@ productSchema.virtual("allNummerixSize").get(function () {
 });
 
 productSchema.virtual("allOpeningStock").get(function () {
-  return this.variant.reduce((total, variant) => {
+  return this.variant?.reduce((total, variant) => {
     total += variant?.stockVariant;
     return total;
   }, 0);
@@ -295,11 +295,11 @@ productSchema.virtual("allOpeningStock").get(function () {
 
 // adjustment plus
 productSchema.virtual("adjustmentVariantplus").get(function () {
-  const mal = this.variant.map((variant) => {
+  const mal = this.variant?.map((variant) => {
     return variant?.stockVariantAdjust;
   });
-  const variantPlus = mal.flat();
-  const totalAdjustStockofVariant = variantPlus.reduce((total, variant) => {
+  const variantPlus = mal?.flat();
+  const totalAdjustStockofVariant = variantPlus?.reduce((total, variant) => {
     total += variant?.increaseQuantity;
     return total;
   }, 0);
@@ -308,11 +308,11 @@ productSchema.virtual("adjustmentVariantplus").get(function () {
 
 // adjustment minus
 productSchema.virtual("adjustmentVariantminus").get(function () {
-  const mal = this.variant.map((variant) => {
-    return variant.stockVariantAdjust;
+  const mal = this.variant?.map((variant) => {
+    return variant?.stockVariantAdjust;
   });
-  const variantPlus = mal.flat();
-  const totalAdjustStockofVariant = variantPlus.reduce((total, variant) => {
+  const variantPlus = mal?.flat();
+  const totalAdjustStockofVariant = variantPlus?.reduce((total, variant) => {
     total += variant?.decreaseQuantity;
     return total;
   }, 0);
