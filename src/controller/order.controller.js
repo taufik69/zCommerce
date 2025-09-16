@@ -390,7 +390,7 @@ exports.updateOrder = asynchandeler(async (req, res) => {
   }
 
   // if orderStatus is Cancelled then rollback stock
-  if (orderStatus === "Cancelled") {
+  if (orderStatus === "Cancelled" || orderStatus === "Delivered") {
     const stockUpdatePromises = [];
 
     for (const item of singleOrder.items) {
