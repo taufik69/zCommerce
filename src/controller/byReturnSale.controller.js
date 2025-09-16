@@ -8,14 +8,7 @@ const { asynchandeler } = require("../lib/asyncHandeler");
 
 // ✅ Validation function
 const validateByReturn = (req) => {
-  const {
-    product,
-    variant,
-    productBarCode,
-    supplierName,
-    quantity,
-    cashReturnMode,
-  } = req.body;
+  const { product, variant, productBarCode, supplierName, quantity } = req.body;
 
   if (!product && !variant)
     throw new customError("Product  or variant is required", 400);
@@ -25,13 +18,6 @@ const validateByReturn = (req) => {
   if (!supplierName) throw new customError("Supplier name is required", 400);
   if (!quantity || quantity <= 0)
     throw new customError("Quantity must be greater than 0", 400);
-
-  if (
-    cashReturnMode &&
-    !["cash", "bank", "mobile_banking"].includes(cashReturnMode)
-  ) {
-    throw new customError("Invalid cashReturnMode", 400);
-  }
 
   return req.body;
 };
@@ -48,7 +34,6 @@ exports.createByReturn = asynchandeler(async (req, res) => {
     quantity: data.quantity,
     date: data.date,
     remarks: data.remarks,
-    cashReturnMode: data.cashReturnMode,
   });
 
   // ✅ push this byReturn id into product.salesReturn
@@ -161,7 +146,6 @@ exports.updateByReturn = asynchandeler(async (req, res) => {
   byReturn.quantity = data.quantity || byReturn.quantity;
   byReturn.date = data.date || byReturn.date;
   byReturn.remarks = data.remarks || byReturn.remarks;
-  byReturn.cashReturnMode = data.cashReturnMode || byReturn.cashReturnMode;
 
   await byReturn.save();
 

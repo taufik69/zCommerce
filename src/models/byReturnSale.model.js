@@ -35,10 +35,7 @@ const byReturnSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    cashReturnMode: {
-      type: String,
-      enum: ["cash", "bank", "mobile_banking"],
-    },
+
     slug: {
       type: String,
       unique: true,
