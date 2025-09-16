@@ -63,8 +63,17 @@ const orderSchema = Joi.object({
     .default("pending"),
 
   orderStatus: Joi.string()
-    .valid("pending", "processing", "shipped", "delivered", "cancelled")
-    .default("pending"),
+    .valid(
+      "Pending",
+      "Hold",
+      "Confirmed",
+      "Packaging",
+      "Courier",
+      "Shipped",
+      "Delivered",
+      "Cancelled"
+    )
+    .default("Pending"),
 
   invoiceId: Joi.string().optional().allow(null),
 }).options({ abortEarly: false, allowUnknown: true }); // all validation errors at once

@@ -158,9 +158,9 @@ exports.createOrder = asynchandeler(async (req, res) => {
       deliveryCharge: deliveryChargeAmount._id,
       paymentMethod,
       invoiceId,
-      paymentStatus: paymentMethod === "cod" ? "pending" : "pending",
+      paymentStatus: paymentMethod === "cod" ? "Pending" : "Pending",
       // paymentStatus: paymentMethod === "cod" ? "unpaid" : "pending",
-      orderStatus: "pending",
+      orderStatus: "Pending",
       coupon: coupon ? coupon._id : undefined,
     });
 

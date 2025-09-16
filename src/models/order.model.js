@@ -125,16 +125,16 @@ const orderSchema = new mongoose.Schema(
     orderStatus: {
       type: String,
       enum: [
-        "pending",
-        "hold",
-        "confrimed",
-        "shipped",
-        "cancelled",
-        "delivered",
-        "returned",
-        "failed",
+        "Pending",
+        "Hold",
+        "Confirmed",
+        "Packaging",
+        "Courier",
+        "Shipped",
+        "Delivered",
+        "Cancelled",
       ],
-      default: "pending",
+      default: "Pending",
     },
 
     // INVOICE ID (Optional)
