@@ -5,14 +5,14 @@ const orderSchema = Joi.object({
   user: Joi.string().optional().allow(null),
   guestId: Joi.string().optional().allow(null),
 
-  items: Joi.array().items(Joi.string().required()).required().messages({
+  items: Joi.array().items(Joi.string()).messages({
     "array.base": "Items must be an array",
     "array.min": "At least one item is required",
     "any.required": "Items are required",
   }),
 
   shippingInfo: Joi.object({
-    fullName: Joi.string().trim().required().messages({
+    fullName: Joi.string().trim().messages({
       "any.required": "Full name is required",
       "string.empty": "Full name cannot be empty",
     }),
@@ -20,7 +20,7 @@ const orderSchema = Joi.object({
       "any.required": "Phone number is required",
       "string.empty": "Phone number cannot be empty",
     }),
-    address: Joi.string().trim().required().messages({
+    address: Joi.string().trim().messages({
       "any.required": "Address is required",
       "string.empty": "Address cannot be empty",
     }),
@@ -35,7 +35,7 @@ const orderSchema = Joi.object({
       }),
   }).required(),
 
-  deliveryCharge: Joi.string().required().messages({
+  deliveryCharge: Joi.string().messages({
     "any.required": "Delivery charge is required",
     "number.base": "Delivery charge must be a number",
   }),
@@ -43,17 +43,17 @@ const orderSchema = Joi.object({
   coupon: Joi.string().optional().allow(null),
   discountAmount: Joi.number().min(0).default(0),
 
-  subtotal: Joi.number().required().messages({
+  subtotal: Joi.number().messages({
     "any.required": "Subtotal is required",
     "number.base": "Subtotal must be a number",
   }),
 
-  totalAmount: Joi.number().required().messages({
+  totalAmount: Joi.number().messages({
     "any.required": "Total amount is required",
     "number.base": "Total amount must be a number",
   }),
 
-  paymentMethod: Joi.string().valid("cod", "sslcommerz").required().messages({
+  paymentMethod: Joi.string().valid("cod", "sslcommerz").messages({
     "any.only": "Payment method must be 'cod' or 'sslcommerz'",
     "any.required": "Payment method is required",
   }),

@@ -34,9 +34,9 @@ const orderSchema = new mongoose.Schema(
 
     // SHIPPING INFO
     shippingInfo: {
-      fullName: { type: String, required: true },
+      fullName: { type: String, required: false },
       phone: { type: String },
-      address: { type: String, required: true },
+      address: { type: String, required: false },
       email: { type: String },
       city: {
         city_id: { type: Number },
