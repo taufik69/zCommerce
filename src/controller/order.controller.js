@@ -287,7 +287,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
       // Emit order event
       const io = getIO();
       io.emit("orderPlaced", {
-        message: "🛒 Product added to your cart successfully",
+        message: "🛒New Order added",
         order: order,
       });
       // return res.status(301).redirect(response.GatewayPageURL);
