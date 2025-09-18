@@ -56,9 +56,15 @@ exports.createByReturn = asynchandeler(async (req, res) => {
 
 // @desc get all byReturns
 exports.getAllByReturns = asynchandeler(async (req, res) => {
-  const byReturns = await ByReturn.find().populate("product variant").sort({
-    createdAt: -1,
-  });
+  const byReturns = await ByReturn.find()
+    .populate("product")
+    .populate({
+      path: "variant",
+      populate: "product",
+    })
+    .sort({
+      createdAt: -1,
+    });
   apiResponse.sendSuccess(res, 200, "ByReturns found", byReturns);
 });
 
@@ -70,7 +76,10 @@ exports.getSingleByReturn = asynchandeler(async (req, res) => {
   }
   const byReturn = await ByReturn.findOne({ slug })
     .populate("product")
-    .populate("variant");
+    .populate({
+      path: "variant",
+      populate: "product",
+    });
   if (!byReturn) {
     throw new customError("ByReturn not found", 404);
   }
