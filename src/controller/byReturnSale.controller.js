@@ -10,11 +10,6 @@ const { asynchandeler } = require("../lib/asyncHandeler");
 const validateByReturn = (req) => {
   const { product, variant, productBarCode, supplierName, quantity } = req.body;
 
-  if (!product && !variant)
-    throw new customError("Product  or variant is required", 400);
-
-  if (!productBarCode)
-    throw new customError("Product barcode is required", 400);
   if (!supplierName) throw new customError("Supplier name is required", 400);
   if (!quantity || quantity <= 0)
     throw new customError("Quantity must be greater than 0", 400);
