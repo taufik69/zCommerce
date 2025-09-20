@@ -42,8 +42,10 @@ const applyCouponDiscount = async (code, subtotal) => {
 
   let discountAmount = 0;
   if (coupon.discountType === "percentage") {
+    coupon.usedCount += 1;
     discountAmount = Math.round((subtotal * coupon.discountValue) / 100);
   } else if (coupon.discountType === "fixed") {
+    coupon.usedCount += 1;
     discountAmount = Math.round(coupon.discountValue);
   }
 

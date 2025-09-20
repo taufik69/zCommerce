@@ -5,10 +5,10 @@ const { asynchandeler } = require("../lib/asyncHandeler");
 
 //@desc add to wishlist
 exports.addToWishlist = asynchandeler(async (req, res) => {
-  const { productId } = req.body;
+  const { productId, variantId } = req.body;
 
-  if (!productId) {
-    throw new customError("Product ID is required", 400);
+  if (!productId && !variantId) {
+    throw new customError("Product ID or Variant ID is required", 400);
   }
 
   const userId = req?.user?._id || null;
@@ -18,35 +18,46 @@ exports.addToWishlist = asynchandeler(async (req, res) => {
     throw new customError("User or Guest ID is required", 400);
   }
 
-  // Find wishlist based on user or guest
+  // Find wishlist
   const query = userId ? { user: userId } : { guestId };
   let wishlist = await WishList.findOne(query);
 
-  // Create new wishlist if not exists
+  // Define item object based on input
+  let newItem = {};
+  if (variantId) newItem.variant = variantId;
+  if (productId) newItem.product = productId;
+
+  // Create new wishlist if none exists
   if (!wishlist) {
     wishlist = await WishList.create({
       user: userId,
       guestId,
-      items: [{ product: productId }],
+      items: [newItem],
     });
     return apiResponse.sendSuccess(res, 201, "Wishlist created", wishlist);
   }
 
-  // Check if product already exists
-  const alreadyExists = wishlist.items.some(
-    (item) => item.product.toString() === productId
-  );
+  // Check if the item (product or variant) already exists
+  const alreadyExists = wishlist.items.some((item) => {
+    if (variantId) {
+      return item.variant?.toString() === variantId;
+    } else if (productId) {
+      return item.product?.toString() === productId;
+    }
+    return false;
+  });
 
   if (alreadyExists) {
-    throw new customError("Product already in wishlist", 400);
+    throw new customError("Item already in wishlist", 400);
   }
 
-  // Add product to existing wishlist
-  wishlist.items.push({ product: productId });
+  // Add new item to wishlist
+  wishlist.items.push(newItem);
   await wishlist.save();
 
-  apiResponse.sendSuccess(res, 200, "Product added to wishlist", wishlist);
+  apiResponse.sendSuccess(res, 200, "Item added to wishlist", wishlist);
 });
+
 
 // @desc get all useList using guestid or userid and populate product
 exports.getAllWishList = asynchandeler(async (req, res) => {
