@@ -306,6 +306,22 @@ productSchema.virtual("adjustmentSingleVariantMinus").get(function () {
   }, 0);
 });
 
+// get all byReturn quantity data
+productSchema.virtual("totalByReturnQuantity").get(function () {
+  return this.byReturn?.reduce((total, item) => {
+    total += item?.quantity;
+    return total;
+  }, 0);
+});
+
+// get all salesReturn quantity data
+productSchema.virtual("totalSalesReturnQuantity").get(function () {
+  return this.salesReturn?.reduce((total, item) => {
+    total += item?.quantity;
+    return total;
+  }, 0);
+});
+
 // size wise stock
 productSchema.virtual("sizeWiseStock").get(function () {
   const result = {};
