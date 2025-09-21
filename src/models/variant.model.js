@@ -148,6 +148,22 @@ const variantSchema = new mongoose.Schema(
   }
 );
 
+// calculate stock adjustment // adjustment plus
+variantSchema.virtual("adjustmentVariantplus").get(function () {
+  return this.stockVariantAdjust?.reduce((total, variant) => {
+    total += variant?.increaseQuantity;
+    return total;
+  }, 0);
+});
+
+//calculate stock adjustment // adjustment minus
+variantSchema.virtual("adjustmentVariantminus").get(function () {
+  return this.stockVariantAdjust?.reduce((total, variant) => {
+    total += variant?.decreaseQuantity;
+    return total;
+  }, 0);
+});
+
 // slugify
 variantSchema.pre("save", function (next) {
   if (this.isModified("variantName")) {

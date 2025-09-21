@@ -72,6 +72,7 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
       path: "product",
       populate: [{ path: "subcategory", select: "name" }],
     })
+    .populate("stockVariantAdjust")
     .select("-updatedAt")
     .sort({ createdAt: -1 });
   apiResponse.sendSuccess(res, 200, "Variants fetched successfully", variants);

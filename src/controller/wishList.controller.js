@@ -61,7 +61,7 @@ exports.addToWishlist = asynchandeler(async (req, res) => {
 // @desc get all useList using guestid or userid and populate product
 // @desc Get all wishlist items for a user or guest
 exports.getAllUserWishlist = asynchandeler(async (req, res) => {
-  const userId = req?.user?._id || null;
+  const userId = req?.query?.userId || null;
   const guestId = req?.query?.guestId || null;
 
   if (!userId && !guestId) {

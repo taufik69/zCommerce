@@ -12,7 +12,7 @@ _.route("/add-wishtlist").post(
 _.route("/get-wishtlist").get(
   //   authGuard,
   //   authorize("wishlist", "view"),
-  wishListController.getAllWishList
+  wishListController.getAllUserWishlist
 );
 
 _.route("/delete-wishtlist").delete(
