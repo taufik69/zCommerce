@@ -286,39 +286,27 @@ productSchema.virtual("allNummerixSize").get(function () {
   return [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 38, 40, 42, 44, 46];
 });
 
-productSchema.virtual("allOpeningStock").get(function () {
-  return this.variant?.reduce((total, variant) => {
-    total += variant?.stockVariant;
-    return total;
-  }, 0);
+productSchema.virtual("singleVariantOpeningStock").get(function () {
+  return this.stock;
 });
 
 // adjustment plus
-productSchema.virtual("adjustmentVariantplus").get(function () {
-  const mal = this.variant?.map((variant) => {
-    return variant?.stockVariantAdjust;
-  });
-  const variantPlus = mal?.flat();
-  const totalAdjustStockofVariant = variantPlus?.reduce((total, variant) => {
+productSchema.virtual("adjustmentSingleVariantPlus").get(function () {
+  return this.stockAdjustment?.reduce((total, variant) => {
     total += variant?.increaseQuantity;
     return total;
   }, 0);
-  return totalAdjustStockofVariant;
 });
 
 // adjustment minus
-productSchema.virtual("adjustmentVariantminus").get(function () {
-  const mal = this.variant?.map((variant) => {
-    return variant?.stockVariantAdjust;
-  });
-  const variantPlus = mal?.flat();
-  const totalAdjustStockofVariant = variantPlus?.reduce((total, variant) => {
+productSchema.virtual("adjustmentSingleVariantMinus").get(function () {
+  return this.stockAdjustment?.reduce((total, variant) => {
     total += variant?.decreaseQuantity;
     return total;
   }, 0);
-  return totalAdjustStockofVariant;
 });
 
+// size wise stock
 productSchema.virtual("sizeWiseStock").get(function () {
   const result = {};
 

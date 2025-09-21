@@ -149,7 +149,7 @@ const variantSchema = new mongoose.Schema(
 );
 
 // calculate stock adjustment // adjustment plus
-variantSchema.virtual("adjustmentVariantplus").get(function () {
+variantSchema.virtual("adjustmentMultipleVariantPlus").get(function () {
   return this.stockVariantAdjust?.reduce((total, variant) => {
     total += variant?.increaseQuantity;
     return total;
@@ -157,11 +157,25 @@ variantSchema.virtual("adjustmentVariantplus").get(function () {
 });
 
 //calculate stock adjustment // adjustment minus
-variantSchema.virtual("adjustmentVariantminus").get(function () {
+variantSchema.virtual("adjustmentMultipleVariantMinus").get(function () {
   return this.stockVariantAdjust?.reduce((total, variant) => {
     total += variant?.decreaseQuantity;
     return total;
   }, 0);
+});
+
+// get opening stock
+variantSchema.virtual("openingStock").get(function () {
+  return (
+    this.stockVariant +
+    (this.adjustmentMultipleVariantMinus || 0) -
+    (this.adjustmentMultipleVariantPlus || 0)
+  );
+});
+
+// get multiVariantOpening stock
+variantSchema.virtual("multiVariantOpeningStock").get(function () {
+  return this.stockVariant;
 });
 
 // slugify
