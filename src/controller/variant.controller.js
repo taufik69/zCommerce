@@ -72,7 +72,7 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
       path: "product",
       populate: [{ path: "subcategory", select: "name" }],
     })
-    .populate("stockVariantAdjust")
+    .populate("stockVariantAdjust byReturn salesReturn")
     .select("-updatedAt")
     .sort({ createdAt: -1 });
   apiResponse.sendSuccess(res, 200, "Variants fetched successfully", variants);
@@ -83,8 +83,11 @@ exports.getSingleVariant = asynchandeler(async (req, res, next) => {
   const slug = req.params.slug;
   const singleVariant = await variant
     .findOne({ slug })
-    .populate("product")
-    .select("-updatedAt");
+    .populate({
+      path: "product",
+      populate: [{ path: "subcategory", select: "name" }],
+    })
+    .populate("stockVariantAdjust byReturn salesReturn");
   if (!singleVariant) {
     throw new customError("Variant not found", 404);
   }

@@ -2,7 +2,7 @@ const { customError } = require("../lib/CustomError");
 const WishList = require("../models/wishList.model");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
-
+const { getIO } = require("../socket/socket");
 //@desc add to wishlist
 exports.addToWishlist = asynchandeler(async (req, res) => {
   const { productId, variantId } = req.body;
@@ -34,7 +34,13 @@ exports.addToWishlist = asynchandeler(async (req, res) => {
       guestId,
       items: [newItem],
     });
-    return apiResponse.sendSuccess(res, 201, "Wishlist created", wishlist);
+
+    const io = getIO();
+    io.to(userId || guestId).emit("addwishlist", {
+      message: "🛒 Product added to your wishlist successfully",
+      wishlist: wishlist,
+    });
+    apiResponse.sendSuccess(res, 201, "Wishlist created", wishlist);
   }
 
   // Check if the item (product or variant) already exists
@@ -90,11 +96,51 @@ exports.getAllUserWishlist = asynchandeler(async (req, res) => {
 });
 
 //@desc delete wishlist  by guest id or  userId
-exports.deleteWishlist = asynchandeler(async (req, res) => {
-  const userId = req?.user?._id || null;
+// @desc Delete a single item from wishlist
+exports.deleteWishlistItem = asynchandeler(async (req, res) => {
+  const { productId, variantId } = req.body;
+
+  if (!productId && !variantId) {
+    throw new customError("Product ID or Variant ID is required", 400);
+  }
+
+  const userId = req?.user?._id || req?.body?.userId || null;
   const guestId = req?.body?.guestId || null;
+
+  if (!userId && !guestId) {
+    throw new customError("User or Guest ID is required", 400);
+  }
+
   const query = userId ? { user: userId } : { guestId };
-  const wishlist = await WishList.findOneAndDelete(query);
-  if (!wishlist) throw new customError("Wishlist not found", 404);
-  apiResponse.sendSuccess(res, 200, "Wishlist deleted successfully", wishlist);
+
+  const wishlist = await WishList.findOne(query);
+  if (!wishlist) {
+    throw new customError("Wishlist not found", 404);
+  }
+
+  // Filter out the matching item
+  wishlist.items = wishlist.items.filter((item) => {
+    if (variantId) {
+      return item.variant?.toString() !== variantId;
+    } else if (productId) {
+      return item.product?.toString() !== productId;
+    }
+    return true;
+  });
+
+  await wishlist.save();
+
+  // Emit socket event (optional)
+  const io = getIO();
+  io.to(userId || guestId).emit("deletewishlist", {
+    message: "❌ Item removed from wishlist",
+    wishlist: wishlist,
+  });
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Wishlist item deleted successfully",
+    wishlist
+  );
 });

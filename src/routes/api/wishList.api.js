@@ -18,6 +18,6 @@ _.route("/get-wishtlist").get(
 _.route("/delete-wishtlist").delete(
   //   authGuard,
   //   authorize("wishlist", "delete"),
-  wishListController.deleteWishlist
+  wishListController.deleteWishlistItem
 );
 module.exports = _;

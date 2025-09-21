@@ -133,17 +133,12 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
   if (brand) query.brand = brand;
 
   const products = await Product.find(query)
-    // .populate({
-    //   path: "category",
-    //   populate: {
-    //     path: "discount",
-    //   },
-    //   select: "-subcategories -createdAt -updatedAt",
-    // })
+
     .populate({
       path: "variant",
       populate: "stockVariantAdjust product",
     })
+    .populate("byReturn salesReturn")
     .populate("category brand  subcategory discount  stockAdjustment")
     .select("-updatedAt -createdAt");
 
@@ -155,17 +150,11 @@ exports.getProductBySlug = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const product = await Product.findOne({ slug })
     .populate({
-      path: "category",
-      populate: {
-        path: "discount",
-      },
-      select: "-subcategories -createdAt -updatedAt",
-    })
-    .populate({
       path: "variant",
-      populate: "stockVariantAdjust",
+      populate: "stockVariantAdjust product",
     })
-    .populate("brand discount subcategory stockAdjustment")
+    .populate("byReturn salesReturn")
+    .populate("category brand  subcategory discount  stockAdjustment")
     .select("-updatedAt -createdAt");
 
   if (!product) {

@@ -195,6 +195,22 @@ variantSchema.pre("findOneAndUpdate", function (next) {
   next();
 });
 
+// get all byReturn quantity data
+variantSchema.virtual("totalByReturnQuantity").get(function () {
+  return this.byReturn?.reduce((total, item) => {
+    total += item?.quantity;
+    return total;
+  }, 0);
+});
+
+// get all salesReturn quantity data
+variantSchema.virtual("totalSalesReturnQuantity").get(function () {
+  return this.salesReturn?.reduce((total, item) => {
+    total += item?.quantity;
+    return total;
+  }, 0);
+});
+
 // Check for duplicate variant by size, color, product
 variantSchema.pre("save", async function (next) {
   const existing = await this.constructor.findOne({
