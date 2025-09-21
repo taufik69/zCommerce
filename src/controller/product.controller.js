@@ -5,8 +5,6 @@ const Product = require("../models/product.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { apiResponse } = require("../utils/apiResponse");
-const NodeCache = require("node-cache");
-const myCache = new NodeCache();
 
 const {
   cloudinaryFileUpload,

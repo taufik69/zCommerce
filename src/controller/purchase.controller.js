@@ -65,6 +65,7 @@ exports.createPurchase = asynchandeler(async (req, res) => {
         productInfo.wholesalePrice = wholesalePrice;
         productInfo.purchasePrice = purchasePrice;
         productInfo.retailPrice = retailPrice;
+
         if (size)
           productInfo.size = Array.from(
             new Set([...(productInfo.size || []), size])

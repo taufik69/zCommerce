@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
+const purchaseModel = require("../models/purchase.model");
 
 const variantSchema = new mongoose.Schema(
   {
@@ -229,4 +230,48 @@ variantSchema.pre("save", async function (next) {
   next();
 });
 
+// check if slug already exist or not
+variantSchema.pre("save", async function (next) {
+  const existVariant = await this.constructor.findOne({ slug: this.slug });
+  if (
+    existVariant &&
+    existVariant._id &&
+    existVariant._id.toString() !== this._id.toString()
+  ) {
+    console.log(`${this.variantName} already exists Try another`);
+    throw new customError(
+      ` ${this.variantName} already exists Try another`,
+      400
+    );
+  }
+  next();
+});
+
+// find purchase model and return total purchased quantity in
+variantSchema.virtual("multipleVariantTotalPurchasedQuantity");
+
+// Middleware: শুধুমাত্র find এর জন্য
+variantSchema.post("find", async function (docs, next) {
+  await Promise.all(
+    docs.map(async (doc) => {
+      const purchases = await purchaseModel.find({
+        "allproduct.variant": doc._id,
+      });
+
+      let totalPurchased = 0;
+      purchases.forEach((purchase) => {
+        purchase.allproduct.forEach((item) => {
+          if (item.variant && item.variant.toString() === doc._id.toString()) {
+            totalPurchased += item.quantity || 0;
+          }
+        });
+      });
+
+      // Set the virtual property
+      doc.multipleVariantTotalPurchasedQuantity = totalPurchased;
+    })
+  );
+
+  next();
+});
 module.exports = mongoose.model("Variant", variantSchema);

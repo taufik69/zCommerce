@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
-const { updateProductInfoBySlug } = require("../controller/product.controller");
+const purchaseModel = require("../models/purchase.model");
 
 const reviewSchema = new mongoose.Schema(
   {
@@ -346,6 +346,35 @@ productSchema.virtual("sizeWiseStock").get(function () {
 
   // CASE 3: no variants and not singleVariant
   return result;
+});
+
+// search product id  in purchase model and return total purchased quantity in virtual
+// Virtual শুধু placeholder হিসেবে
+productSchema.virtual("singleVariantTotalPurchasedQuantity");
+
+// Middleware: শুধুমাত্র find এর জন্য
+productSchema.post("find", async function (docs, next) {
+  await Promise.all(
+    docs.map(async (doc) => {
+      const purchases = await purchaseModel.find({
+        "allproduct.product": doc._id,
+      });
+
+      let totalPurchased = 0;
+      purchases.forEach((purchase) => {
+        purchase.allproduct.forEach((item) => {
+          if (item.product && item.product.toString() === doc._id.toString()) {
+            totalPurchased += item.quantity || 0;
+          }
+        });
+      });
+
+      // Set the virtual property
+      doc.singleVariantTotalPurchasedQuantity = totalPurchased;
+    })
+  );
+
+  next();
 });
 
 const Product = mongoose.model("Product", productSchema);
