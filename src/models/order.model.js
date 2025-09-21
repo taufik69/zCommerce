@@ -156,6 +156,14 @@ const orderSchema = new mongoose.Schema(
         default: "pending",
       },
     },
+    orderType: {
+      type: String,
+      default: "complete", // complete or partial
+    },
+    isAutoPlaced: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

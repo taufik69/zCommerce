@@ -58,16 +58,34 @@ exports.addToWishlist = asynchandeler(async (req, res) => {
   apiResponse.sendSuccess(res, 200, "Item added to wishlist", wishlist);
 });
 
-
 // @desc get all useList using guestid or userid and populate product
-exports.getAllWishList = asynchandeler(async (req, res) => {
+// @desc Get all wishlist items for a user or guest
+exports.getAllUserWishlist = asynchandeler(async (req, res) => {
   const userId = req?.user?._id || null;
   const guestId = req?.query?.guestId || null;
+
+  if (!userId && !guestId) {
+    throw new customError("User or Guest ID is required", 400);
+  }
+
   const query = userId ? { user: userId } : { guestId };
+
+  // populate both product and variant
   const wishlist = await WishList.findOne(query)
-    .populate("items.product")
+    .populate({
+      path: "items.product",
+      select: "productTitle productSummary retailPrice wholesalePrice image",
+    })
+    .populate({
+      path: "items.variant",
+      select: "variantName retailPrice wholesalePrice stockVariant image",
+    })
     .lean();
-  if (!wishlist) throw new customError("Wishlist not found", 404);
+
+  if (!wishlist) {
+    throw new customError("Wishlist not found", 404);
+  }
+
   apiResponse.sendSuccess(res, 200, "Wishlist fetched successfully", wishlist);
 });
 
