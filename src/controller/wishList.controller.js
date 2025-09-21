@@ -11,7 +11,7 @@ exports.addToWishlist = asynchandeler(async (req, res) => {
     throw new customError("Product ID or Variant ID is required", 400);
   }
 
-  const userId = req?.user?._id || null;
+  const userId = req?.user?._id || req?.body?.userId || null;
   const guestId = req?.body?.guestId || null;
 
   if (!userId && !guestId) {
