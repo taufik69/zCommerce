@@ -131,13 +131,24 @@ exports.getAllPurchases = asynchandeler(async (req, res) => {
       path: "allproduct.variant",
     })
     .sort({ createdAt: -1 });
+
+  // serial যোগ করা হলো
+  const purchasesWithSerial = purchases.map((p, index) => {
+    const serialNumber = (index + 1).toString().padStart(6, "0");
+    return {
+      serial: `BUYRTN-${serialNumber}`, // prefix = BUYRTN-
+      ...p.toObject(),
+    };
+  });
+
   apiResponse.sendSuccess(
     res,
     200,
     "Purchases fetched successfully",
-    purchases
+    purchasesWithSerial
   );
 });
+
 // get single product using slug
 exports.getSinglePurchase = asynchandeler(async (req, res) => {
   const { id } = req.params;

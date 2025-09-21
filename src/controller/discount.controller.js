@@ -59,11 +59,20 @@ exports.getAllDiscounts = asynchandeler(async (req, res) => {
   const discounts = await Discount.find()
     .populate("category subCategory product")
     .sort({ createdAt: -1 });
+
+  // serial add করা
+  const discountsWithSerial = discounts.map((d, index) => {
+    const serialNumber = (index + 1).toString().padStart(6, "0");
+    return {
+      serial: `DISC-${serialNumber}`, // prefix = DISC-${serialNumber}
+      ...d.toObject(),
+    };
+  });
   return apiResponse.sendSuccess(
     res,
     200,
     "Discounts fetched successfully",
-    discounts
+    discountsWithSerial
   );
 });
 
