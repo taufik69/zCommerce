@@ -433,16 +433,7 @@ exports.updateOrder = asynchandeler(async (req, res) => {
   apiResponse.sendSuccess(res, 200, "Order updated successfully", singleOrder);
 });
 
-//@desc find oder by id and delete order
-exports.deleteOrder = asynchandeler(async (req, res) => {
-  const { id } = req.params;
-  const singleOrder = await Order.findOne({ _id: id });
-  if (!singleOrder) {
-    throw new customError("Order not found", 404);
-  }
-  await Order.deleteOne({ _id: id });
-  apiResponse.sendSuccess(res, 200, "Order deleted successfully", singleOrder);
-});
+
 
 // fiter order using datewise like today and yesterday last 7 days last month
 exports.filterOrderdatewise = asynchandeler(async (req, res) => {
@@ -489,4 +480,55 @@ exports.trackOrder = asynchandeler(async (req, res) => {
   }
   apiResponse.sendSuccess(res, 200, "Order fetched successfully", order);
 });
+
+// delete order when delete order then rollback stock and coupon usage and also delete invoice
+// (This functionality is now integrated into the deleteOrder method above)
+exports.deleteOrder = asynchandeler(async (req, res) => {
+  const { id } = req.params;
+  const singleOrder = await Order.findOne ({ _id: id });
+  if (!singleOrder) {
+    throw new customError("Order not found", 404);
+  }
+
+
+  // Rollback stock
+  const stockUpdatePromises = [];
+  for (const item of singleOrder.items) {
+    // Product stock update
+    if (item.product) {
+      stockUpdatePromises.push(
+        Product.updateOne(
+          { _id: item.product._id },
+          { $inc: { stock: item.quantity, totalSales: -item.quantity } },
+          { new: true }
+        )
+      );
+    }
+    // Variant stock update
+    if (item.variant) {
+      stockUpdatePromises.push(
+        Variant.updateOne(
+          { _id: item.variant._id },
+          { $inc: { stockVariant: item.quantity, totalSales: -item.quantity } },
+          { new: true }
+        )
+      );
+    }
+  }
+  await Promise.all(stockUpdatePromises);
+  // Rollback coupon usage
+  if (singleOrder.coupon) {
+    await Coupon.updateOne(
+      { _id: singleOrder.coupon },
+      { $inc: { usedCount: -1 } }
+    );
+  }
+  // Delete the order
+  await Order.deleteOne({ _id: id });
+  // Also delete associated invoice
+  await Invoice.deleteOne({ order: id });
+
+  apiResponse.sendSuccess(res, 200, "Order deleted successfully", null);
+});
+
 
