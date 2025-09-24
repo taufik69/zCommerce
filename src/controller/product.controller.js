@@ -427,33 +427,12 @@ exports.getDiscountProducts = asynchandeler(async (req, res) => {
 });
 
 //@desc get bestSellig product
-exports.getBestSellingProducts = asynchandeler(async (req, res) => {
-  const products = await Product.aggregate([
-    {
-      $match: {
-        stock: { $lte: 20 },
-      },
-    },
-    {
-      $lookup: {
-        from: "variants",
-        localField: "variant",
-        foreignField: "_id",
-        as: "variant",
-      },
-    },
-    {
-      $match: {
-        "variant.stockVariant": { $lte: 40 },
-      },
-    },
-    {
-      $sort: {
-        "variant.stockVariant": -1,
-        createdAt: -1,
-      },
-    },
-  ]);
+exports.getBestSellingProducts = asynchandeler(async (_, res) => {
+  const products = await Product.find({
+    totalSales: { $gt: 5 }
+  }).sort({ totalSales: -1 })
+    .populate("category subcategory brand variant discount")
+    .limit(10);
 
   apiResponse.sendSuccess(
     res,
