@@ -19,7 +19,7 @@ const merchantSchema = joi.object(
       "string.empty": "Service Provider is required.",
       "any.required": "Service Provider is required.",
     }),
-    store_id: joi.number().required().messages({
+    store_id: joi.number().messages({
       "string.empty": "Store ID is required.",
       "any.required": "Store ID is required.",
     }),

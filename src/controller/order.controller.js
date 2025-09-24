@@ -75,6 +75,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
   // Step 2: Calculate subtotal & Check stock
   let totalPriceofProducts = 0;
   let totalProductInfo = [];
+  let totalQuantity = 0;
 
   for (const item of cart.items) {
     // যদি product থাকে
@@ -101,6 +102,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
       });
       totalPriceofProducts += item.totalPrice;
       product.totalSales += item.quantity;
+      totalQuantity += item.quantity;
     }
 
     // যদি variant থাকে
@@ -127,6 +129,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
       });
       totalPriceofProducts += item.totalPrice;
       variant.totalSales += item.quantity;
+       totalQuantity += item.quantity; 
     }
   }
 
@@ -164,6 +167,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
       // paymentStatus: paymentMethod === "cod" ? "unpaid" : "pending",
       orderStatus: "Pending",
       coupon: coupon ? coupon._id : undefined,
+      totalQuantity,
     });
 
     // Step 7: Update stock and coupon usage after successful order creation

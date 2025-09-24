@@ -145,14 +145,14 @@ const orderSchema = new mongoose.Schema(
     courier: {
       name: {
         type: String,
-        enum: ["pathao", "redx", "steadfast", "ecourier", "deliverytiger"],
+
         default: null,
       },
       trackingId: { type: String, default: null },
       rawResponse: { type: mongoose.Schema.Types.Mixed, default: null },
       status: {
         type: String,
-        enum: ["pending", "dispatched", "accepted", "delivered", "cancelled"],
+
         default: "pending",
       },
     },
@@ -160,7 +160,7 @@ const orderSchema = new mongoose.Schema(
       type: String,
       default: "complete", // complete or partial
     },
-    followUp:{
+    followUp: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
@@ -169,6 +169,7 @@ const orderSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    totalQuantity: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

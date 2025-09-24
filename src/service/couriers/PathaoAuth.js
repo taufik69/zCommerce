@@ -17,24 +17,28 @@ class PathaoAuth {
       const payload =
         process.env.NODE_ENV === "production"
           ? {
+              base_url: this.baseURL,
               client_id: this.client_id,
               client_secret: this.client_secret,
             }
           : {
+              base_url: this.baseURL ,
               client_id: this.client_id,
-              client_secret: this.client_secret,
-              grant_type: "password",
-              username: "test@pathao.com",
-              password: "lovePathao",
+              client_secret: this.client_secret ,
+              username: "test@pathao.com" ,
+              grant_type: "password" ,
+              password: "lovePathao" ,
             };
 
       const response = await axios.post(
         `${this.baseURL}/aladdin/api/v1/issue-token`,
-        payload
+        payload,
+        { headers: { "Content-Type": "application/json" } }
       );
 
       const { access_token, refresh_token, expires_in } = response.data;
       this.refresh_token = refresh_token;
+     
       // Save token in DB
       const merchant = await Merchant.findOneAndUpdate(
         { merchantID: this.client_id },
@@ -70,7 +74,8 @@ class PathaoAuth {
           client_secret: this.client_secret,
           grant_type: "refresh_token",
           refresh_token: this.refresh_token,
-        }
+        },
+        { headers: { "Content-Type": "application/json" } }
       );
 
       const { access_token, refresh_token, expires_in } = response.data;
@@ -88,6 +93,7 @@ class PathaoAuth {
 
       return access_token;
     } catch (err) {
+      console.log(err);
       throw new customError(
         "Failed to refresh Pathao token: " + err.message,
         500
@@ -104,6 +110,7 @@ class PathaoAuth {
     if (!merchant.access_token || !merchant.refresh_token) {
       return await this.issueToken();
     }
+
 
     // CASE 2: Token expired → refresh
     if (Date.now() > merchant.token_expiry) {
