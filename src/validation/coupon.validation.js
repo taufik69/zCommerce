@@ -21,6 +21,10 @@ const couponSchema = joi
       "number.empty": "Discount value is required.",
       "any.required": "Discount value is required.",
     }),
+    couponStartAt: joi.date().required().messages({
+      "date.empty": "Coupon start date is required.",
+      "any.required": "Coupon start date is required.",
+    }),
     expireAt: joi.date().required().messages({
       "date.empty": "Expire at date is required.",
       "any.required": "Expire at date is required.",

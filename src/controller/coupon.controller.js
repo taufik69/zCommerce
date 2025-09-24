@@ -9,7 +9,6 @@ exports.createCoupon = asynchandeler(async (req, res) => {
   const value = await validateCoupon(req);
   const coupon = new Coupon(value);
   await coupon.save();
-
   apiResponse.sendSuccess(res, 201, "Coupon created successfully", coupon);
 });
 
