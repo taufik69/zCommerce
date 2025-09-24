@@ -433,8 +433,6 @@ exports.updateOrder = asynchandeler(async (req, res) => {
   apiResponse.sendSuccess(res, 200, "Order updated successfully", singleOrder);
 });
 
-
-
 // fiter order using datewise like today and yesterday last 7 days last month
 exports.filterOrderdatewise = asynchandeler(async (req, res) => {
   try {
