@@ -428,6 +428,8 @@ exports.updateOrder = asynchandeler(async (req, res) => {
   // Update order fields
   singleOrder.orderStatus = orderStatus;
   singleOrder.shippingInfo = shippingInfo;
+  singleOrder.followUp = req.user?._id || null;
+  
   await singleOrder.save();
 
   apiResponse.sendSuccess(res, 200, "Order updated successfully", singleOrder);

@@ -160,6 +160,11 @@ const orderSchema = new mongoose.Schema(
       type: String,
       default: "complete", // complete or partial
     },
+    followUp:{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     isAutoPlaced: {
       type: Boolean,
       default: false,
