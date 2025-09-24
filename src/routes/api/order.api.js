@@ -8,5 +8,6 @@ _.route("/single-order/:id").get(orderController.getSingleOrder);
 _.route("/order-update/:id").put(orderController.updateOrder);
 _.route("/order-delete/:id").delete(orderController.deleteOrder);
 _.route("/filterorderbydate").get(orderController.filterOrderdatewise);
+_.route("/track-order/:invoiceid").get(orderController.trackOrder);
 
 module.exports = _;

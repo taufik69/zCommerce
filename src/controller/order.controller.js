@@ -474,3 +474,19 @@ exports.filterOrderdatewise = asynchandeler(async (req, res) => {
     apiResponse.sendError(res, 500, "Error fetching orders", err.message);
   }
 });
+
+// track order by invoice id
+exports.trackOrder = asynchandeler(async (req, res) => {
+  const { invoiceid } = req.params;
+  const order = await Order.findOne({ invoiceId: invoiceid })
+    .populate("user")
+    .populate("deliveryCharge")
+    .populate("coupon") 
+    .sort({ createdAt: -1 })
+    .lean();
+  if (!order) {
+    throw new customError("Order not found", 404);
+  }
+  apiResponse.sendSuccess(res, 200, "Order fetched successfully", order);
+});
+
