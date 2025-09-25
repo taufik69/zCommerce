@@ -74,11 +74,11 @@ class SteadFastCourier extends BaseCourier {
       let query = {};
       if (startDate && endDate) {
         query.createdAt = {
-          $gte: new Date(startDate),
-          $lte: new Date(endDate),
+          $gte: startDate.toISOString(),
+          $lte: endDate.toISOString(),
         };
       }
-      const orders = await Order.find(query).sort({ createdAt: -1 });
+      const orders = await Order.find().sort({ createdAt: -1 });
 
       if (!orders.length) {
         throw new customError("No orders found for bulk create", 404);
