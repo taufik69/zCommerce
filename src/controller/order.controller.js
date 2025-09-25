@@ -129,7 +129,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
       });
       totalPriceofProducts += item.totalPrice;
       variant.totalSales += item.quantity;
-       totalQuantity += item.quantity; 
+      totalQuantity += item.quantity;
     }
   }
 
@@ -176,6 +176,12 @@ exports.createOrder = asynchandeler(async (req, res) => {
     for (const item of cart.items) {
       // Product stock update
       if (item.product) {
+        if (item.product.stock < item.quantity) {
+          throw new customError(
+            `${item.product.name} does not have enough stock`,
+            400
+          );
+        }
         stockUpdatePromises.push(
           Product.updateOne(
             { _id: item.product },
@@ -187,6 +193,12 @@ exports.createOrder = asynchandeler(async (req, res) => {
       }
       // Variant stock update
       if (item.variant) {
+        if (item.variant.stockVariant < item.quantity) {
+          throw new customError(
+            `${item.variant.variantName} does not have enough stock from variant`,
+            400
+          );
+        }
         stockUpdatePromises.push(
           Variant.updateOne(
             { _id: item.variant },
@@ -433,7 +445,7 @@ exports.updateOrder = asynchandeler(async (req, res) => {
   singleOrder.orderStatus = orderStatus;
   singleOrder.shippingInfo = shippingInfo;
   singleOrder.followUp = req.user?._id || null;
-  
+
   await singleOrder.save();
 
   apiResponse.sendSuccess(res, 200, "Order updated successfully", singleOrder);
@@ -476,7 +488,7 @@ exports.trackOrder = asynchandeler(async (req, res) => {
   const order = await Order.findOne({ invoiceId: invoiceid })
     .populate("user")
     .populate("deliveryCharge")
-    .populate("coupon") 
+    .populate("coupon")
     .sort({ createdAt: -1 })
     .lean();
   if (!order) {
@@ -489,11 +501,10 @@ exports.trackOrder = asynchandeler(async (req, res) => {
 // (This functionality is now integrated into the deleteOrder method above)
 exports.deleteOrder = asynchandeler(async (req, res) => {
   const { id } = req.params;
-  const singleOrder = await Order.findOne ({ _id: id });
+  const singleOrder = await Order.findOne({ _id: id });
   if (!singleOrder) {
     throw new customError("Order not found", 404);
   }
-
 
   // Rollback stock
   const stockUpdatePromises = [];
@@ -534,5 +545,3 @@ exports.deleteOrder = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(res, 200, "Order deleted successfully", null);
 });
-
-
