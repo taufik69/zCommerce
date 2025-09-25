@@ -60,7 +60,7 @@ const applyCouponDiscount = async (code, subtotal) => {
 // Main controller
 exports.createOrder = asynchandeler(async (req, res) => {
   const userId = req.user?._id || req.body.user || null;
-  const { guestId, shippingInfo, paymentMethod, couponCode, deliveryCharge } =
+  const { guestId, shippingInfo, paymentMethod, couponCode, deliveryCharge, orderType } =
     req.body;
 
   // Step 1: Load Cart
@@ -169,6 +169,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
       orderStatus: "Pending",
       coupon: coupon ? coupon._id : undefined,
       totalQuantity,
+      orderType : orderType
     });
 
     // Step 7: Update stock and coupon usage after successful order creation
