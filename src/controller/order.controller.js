@@ -445,6 +445,10 @@ exports.updateOrder = asynchandeler(async (req, res) => {
   singleOrder.orderStatus = orderStatus;
   singleOrder.shippingInfo = shippingInfo;
   singleOrder.followUp = req.user?._id || null;
+  if (shippingInfo) {
+    singleOrder.orderType = "complete";
+    singleOrder.isAutoPlaced = false;
+  }
 
   await singleOrder.save();
 
