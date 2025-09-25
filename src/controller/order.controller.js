@@ -25,6 +25,7 @@ const applyDeliveryCharge = async (deliveryChargeID) => {
   return dlc;
 };
 
+// testing command
 // Coupon utility
 const applyCouponDiscount = async (code, subtotal) => {
   if (!code)

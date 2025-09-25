@@ -80,11 +80,9 @@ exports.getAllUserWishlist = asynchandeler(async (req, res) => {
   const wishlist = await WishList.findOne(query)
     .populate({
       path: "items.product",
-      select: "productTitle productSummary retailPrice wholesalePrice image",
     })
     .populate({
       path: "items.variant",
-      select: "variantName retailPrice wholesalePrice stockVariant image",
     })
     .lean();
 
