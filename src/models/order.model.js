@@ -38,18 +38,18 @@ const orderSchema = new mongoose.Schema(
       phone: { type: String },
       address: { type: String, required: false },
       email: { type: String },
-      city: {
-        city_id: { type: Number },
-        city_name: { type: String },
-      },
-      zone: {
-        zone_id: { type: Number },
-        zone_name: { type: String },
-      },
-      area: {
-        area_id: { type: Number },
-        area_name: { type: String },
-      },
+      // city: {
+      //   city_id: { type: Number },
+      //   city_name: { type: String },
+      // },
+      // zone: {
+      //   zone_id: { type: Number },
+      //   zone_name: { type: String },
+      // },
+      // area: {
+      //   area_id: { type: Number },
+      //   area_name: { type: String },
+      // },
 
       country: {
         type: String,
