@@ -7,7 +7,7 @@ dbConnect()
   .then(() => {
     const PORT = process.env.PORT || 3000;
 
-    // শুধু server.listen() চালাবে
+    // just server.listen()
     server.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
     });

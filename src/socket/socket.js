@@ -27,7 +27,7 @@ module.exports = {
       console.log("User connected socket.handshake.query.userId:", userId);
 
       if (userId) {
-        // ✅ User নিজের userId নামে room এ join করবে
+        // Join a room with the userId
         socket.join(userId);
       }
 

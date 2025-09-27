@@ -158,7 +158,7 @@ const orderSchema = new mongoose.Schema(
     },
     orderType: {
       type: String,
-      default: "complete", // complete or partial
+      default: "complete", // complete or partialit
     },
     followUp: {
       type: mongoose.Schema.Types.ObjectId,
