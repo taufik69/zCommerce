@@ -323,10 +323,9 @@ exports.createOrder = asynchandeler(async (req, res) => {
         url: response.GatewayPageURL,
         order,
       });
-    } else {
-      // Final success response
-      apiResponse.sendSuccess(res, 201, "Order placed successfully", order);
     }
+    // Final success response
+    apiResponse.sendSuccess(res, 201, "Order placed successfully", order);
   } catch (error) {
     console.log(error);
     // If order creation or any subsequent step fails, we must rollback stock and coupon usage
