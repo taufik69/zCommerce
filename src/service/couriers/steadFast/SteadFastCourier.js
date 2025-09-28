@@ -32,6 +32,7 @@ class SteadFastCourier extends BaseCourier {
       // 3. API request
       const response = await axios.post(
         `${this.baseURL}/create_order`,
+
         payload,
         {
           headers: {
@@ -41,6 +42,7 @@ class SteadFastCourier extends BaseCourier {
           },
         }
       );
+      console.log("SteadFast create order response:", response);
 
       if (response.data.status !== 200) {
         throw new customError(
@@ -67,53 +69,98 @@ class SteadFastCourier extends BaseCourier {
       throw new customError("Failed to create steadFast order: " + err, 500);
     }
   }
-  //   create bulk order
+
   // Bulk Create Orders
   async bulkCreateOrders(startDate, endDate) {
     try {
       let query = {};
       if (startDate && endDate) {
-        query.createdAt = {
-          $gte: startDate.toISOString(),
-          $lte: endDate.toISOString(),
-        };
+        let start = startDate;
+        let end = endDate;
+        if (start > end) [start, end] = [end, start];
+        query.createdAt = { $gte: start, $lte: end };
       }
-      const orders = await Order.find().sort({ createdAt: -1 });
+
+      const orders = await Order.find(query);
 
       if (!orders.length) {
         throw new customError("No orders found for bulk create", 404);
       }
 
-      console.log(orders);
-      return;
-
-      // 2. Payload বানানো
-      const data = orders.map((order) => ({
-        invoice: order.invoiceId || order._id.toString(),
-        recipient_name: order.shippingInfo?.fullName || "N/A",
-        recipient_address: order.shippingInfo?.address || "N/A",
-        recipient_phone: order.shippingInfo?.phone || "",
-        cod_amount: order.finalAmount || 0,
-        note: order.note || "",
-      }));
-
-      // 3. API Request পাঠানো
-      const response = await axios.post(
-        `${this.baseUrl}/create_order/bulk-order`,
-        { data },
-        {
-          headers: {
-            "Api-Key": this.ApiKey,
-            "Secret-Key": this.ApiSecret,
-            "Content-Type": "application/json",
-          },
-        }
+      // Prepare valid orders
+      const validOrders = orders.filter(
+        (order) =>
+          order.invoiceId &&
+          order.shippingInfo?.fullName &&
+          order.shippingInfo?.phone &&
+          order.shippingInfo?.address &&
+          order.finalAmount > 0
       );
 
-      console.log("✅ Bulk Orders Created Successfully:", response.data);
-      return response.data;
+      if (validOrders.length === 0) {
+        throw new customError("No valid orders to send", 400);
+      }
+
+      // Send each order one by one using Promise.all
+      const results = await Promise.all(
+        validOrders.map(async (order) => {
+          try {
+            const payload = {
+              invoice: order.invoiceId,
+              recipient_name: order.shippingInfo.fullName,
+              recipient_phone: order.shippingInfo.phone,
+              recipient_address: order.shippingInfo.address,
+              cod_amount: order.finalAmount || 0,
+            };
+
+            const response = await axios.post(
+              `${this.baseURL}/create_order`,
+              payload,
+              {
+                headers: {
+                  "Api-Key": this.ApiKey,
+                  "Secret-Key": this.ApiSecret,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+
+            if (response.data.status !== 200) {
+              throw new customError(
+                `SteadFast API error: ${response.data.message}`,
+                500
+              );
+            }
+
+            const consignment = response.data.consignment;
+            order.courier = {
+              name: "steadfast",
+              trackingId: consignment.tracking_code,
+              status: consignment.status,
+              rawResponse: consignment,
+            };
+            await order.save();
+
+            return {
+              invoice: order.invoiceId,
+              trackingId: consignment.tracking_code,
+              status: consignment.status,
+              consignment_id: consignment.consignment_id,
+            };
+          } catch (err) {
+            console.error(`❌ Order ${order.invoiceId} error:`, err.message);
+            return {
+              invoice: order.invoiceId,
+              error: err.message,
+            };
+          }
+        })
+      );
+
+      console.log("✅ Bulk Orders Created (single API):", results);
+      return results;
     } catch (err) {
-      console.error("❌ Bulk Order Error:", err.response?.data || err.message);
+      console.error("❌ Bulk Order Error:", err);
       throw new customError(
         "Failed to bulk create Steadfast orders: " +
           (err.response?.data?.message || err.message),

@@ -82,6 +82,7 @@ exports.bulkSteadFastOrder = asynchandeler(async (req, res) => {
   if (!merchant) throw new customError("Merchant not found", 404);
   const courier = new SteadFastCourier(merchant);
   const orders = await courier.bulkCreateOrders(startDate, endDate);
+
   if (!orders)
     throw new customError("Failed to create Steadfast bulk orders", 500);
   apiResponse.sendSuccess(res, 201, "Steadfast bulk orders created", orders);

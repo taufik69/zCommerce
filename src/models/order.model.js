@@ -145,14 +145,12 @@ const orderSchema = new mongoose.Schema(
     courier: {
       name: {
         type: String,
-
         default: null,
       },
       trackingId: { type: String, default: null },
       rawResponse: { type: mongoose.Schema.Types.Mixed, default: null },
       status: {
         type: String,
-
         default: "pending",
       },
     },
