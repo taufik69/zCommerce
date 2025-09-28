@@ -13,6 +13,7 @@ _.route("/steadfast-create-order").post(courierController.createSteadFastOrder);
 _.route("/steadfast-bulk-create-orders").post(
   courierController.bulkSteadFastOrder
 );
+_.route("/steadfast-webhook").post(courierController.handleSteadFastWebhook);
 // _.route("/get-steadfast-order/:id").get(courierController.getSteadFastOrderById);
 // _.route("/cancel-steadfast-order/:id").post(courierController.cancelSteadFastOrderById);
 

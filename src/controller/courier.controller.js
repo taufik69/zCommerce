@@ -87,3 +87,10 @@ exports.bulkSteadFastOrder = asynchandeler(async (req, res) => {
     throw new customError("Failed to create Steadfast bulk orders", 500);
   apiResponse.sendSuccess(res, 201, "Steadfast bulk orders created", orders);
 });
+
+// Steadfast webhook handler
+exports.handleSteadFastWebhook = asynchandeler(async (req, res) => {
+  const courier = new SteadFastCourier();
+  const response = await courier.handleSteadFastWebhook(req, res);
+  apiResponse.sendSuccess(res, 200, "Webhook handled", response);
+});

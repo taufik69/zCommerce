@@ -2,6 +2,7 @@ const axios = require("axios");
 const BaseCourier = require("../BaseCourier");
 const Order = require("../../../models/order.model");
 const { customError } = require("../../../lib/CustomError");
+const { apiResponse } = require("../../../utils/apiResponse");
 
 class SteadFastCourier extends BaseCourier {
   constructor(merchant) {
@@ -166,6 +167,63 @@ class SteadFastCourier extends BaseCourier {
           (err.response?.data?.message || err.message),
         500
       );
+    }
+  }
+
+  // steadfast webhook handler
+  async handleSteadFastWebhook(req, res) {
+    try {
+      // 1️⃣ Token Verify
+      const authHeader = req.headers["authorization"];
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        throw new customError("Invalid authorization header", 401);
+      }
+
+      const token = authHeader.split(" ")[1];
+      if (token !== process.env.STEADFAST_API_KEY) {
+        throw new customError("Invalid API token", 403);
+      }
+      if (token !== this.ApiKey) {
+        throw new customError("Invalid API token", 403);
+      }
+
+      if (token !== this.ApiKey) {
+        throw new customError("Invalid API token", 403);
+      }
+
+      // 2️⃣ Webhook Data
+      const data = req.body;
+      const { invoice, status, tracking_code } = data;
+
+      if (!invoice) {
+        throw new customError("Invoice ID missing in webhook", 400);
+      }
+
+      const order = await Order.findOne({ invoiceId: invoice });
+      if (!order) {
+        throw new customError("Order not found for invoice: " + invoice, 404);
+      }
+
+      // 3️⃣ Update courier details
+      order.courier = order.courier || {};
+      order.courier.status = status || order.courier.status;
+      order.courier.trackingId = tracking_code || order.courier.trackingId;
+      order.courier.rawResponse = { ...order.courier.rawResponse, ...data };
+
+      await order.save();
+
+      // 5️⃣ Success response
+      return order;
+    } catch (err) {
+      console.error("❌ Steadfast Webhook Error:", err);
+
+      apiResponse.sendError(res, err.statusCode || 500, {
+        status: "error",
+        message:
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to handle Steadfast webhook",
+      });
     }
   }
 }
