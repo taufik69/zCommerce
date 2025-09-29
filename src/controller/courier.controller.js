@@ -18,18 +18,29 @@ exports.createPathaoOrder = asynchandeler(async (req, res) => {
   apiResponse.sendSuccess(res, 201, "Pathao order created", order);
 });
 
-// // Create bulk order
-// exports.bulkPathaoOrder = asynchandeler(async (req, res) => {
-//   const { merchantId, orderIds } = req.body;
+exports.bulkPathaoOrder = asynchandeler(async (req, res) => {
+  const { startDate, endDate, merchantId } = req.body;
+  const merchant = await Merchant.findById(merchantId);
+  if (!merchant) throw new customError("Merchant not found", 404);
+  const courier = new PathaoCourier(merchant);
+  const orders = await courier.bulkOrderByDate(startDate, endDate);
 
-//   const merchant = await Merchant.findById(merchantId);
-//   if (!merchant) throw new customError("Merchant not found", 404);
+  if (!orders)
+    throw new customError("Failed to create Pathao bulk orders", 500);
+  apiResponse.sendSuccess(res, 201, "Pathao bulk orders created", orders);
+});
 
-//   const courier = new PathaoCourier(merchant);
-//   const orders = await courier.bulkOrder(orderIds);
-
-//   apiResponse.sendSuccess(res, 201, "Pathao bulk orders created", orders);
-// });
+// get short info of a Pathao order by internal order ID
+exports.getPathaoOrderShortInfo = asynchandeler(async (req, res) => {
+  const { id } = req.params;
+  if (!id) throw new customError("Order ID is required", 400);
+  const merchant = await Merchant.findById(req.body.merchantId);
+  if (!merchant) throw new customError("Merchant not found", 404);
+  const courier = new PathaoCourier(merchant);
+  const orderInfo = await courier.getOrderInfo(id);
+  if (!orderInfo) throw new customError("Order not found", 404);
+  apiResponse.sendSuccess(res, 200, "Order info fetched", orderInfo);
+});
 
 //@desc Get available cities
 //@route GET /api/v1/courier/pathao/cities

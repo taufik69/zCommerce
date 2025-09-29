@@ -4,6 +4,8 @@ const courierController = require("../../controller/courier.controller");
 
 // Pathao Routes
 _.route("/pathao-create-order").post(courierController.createPathaoOrder);
+_.route("/pathao-bulk-create-orders").post(courierController.bulkPathaoOrder);
+_.route("/order-shortinfo/:id").get(courierController.getPathaoOrderShortInfo);
 _.route("/cities").get(courierController.getPathaoCities);
 _.route("/zone/:cityId").get(courierController.getPathaoZonesByCity);
 _.route("/areas/:zoneId").get(courierController.getPathaoAreasByZone);

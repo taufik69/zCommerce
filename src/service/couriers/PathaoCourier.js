@@ -12,6 +12,7 @@ class PathaoCourier extends BaseCourier {
     this.authService = new PathaoAuth(merchant);
   }
 
+  // single order creation
   async createOrder(orderId) {
     try {
       const order = await Order.findById(orderId);
@@ -56,7 +57,6 @@ class PathaoCourier extends BaseCourier {
         status: response.data.data.order_status,
         rawResponse: response.data,
       };
-
       await order.save();
       return order;
     } catch (err) {
@@ -65,50 +65,83 @@ class PathaoCourier extends BaseCourier {
     }
   }
 
-  async bulkOrder(orderIds) {
+  //bulk order creation by date range
+  async bulkOrderByDate(startDate, endDate) {
     try {
-      const orders = await Order.find({ _id: { $in: orderIds } });
-      if (!orders.length) throw new customError("No orders found", 404);
+      // 1. Orders
+      const query = {};
+      if (startDate && endDate) {
+        query.createdAt = {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate),
+        };
+      }
+
+      const orders = await Order.find(query);
+      if (!orders.length)
+        throw new customError("No orders found in this date range", 404);
+
+      const results = [];
+
+      // 2. Create orders one by one
+      for (const order of orders) {
+        try {
+          const createdOrder = await this.createOrder(order._id);
+          results.push({
+            orderId: order._id,
+            success: true,
+            courier: createdOrder.courier,
+          });
+        } catch (err) {
+          console.error(
+            `Failed to create Pathao order for ${order._id}:`,
+            err.response?.data || err.message
+          );
+          results.push({
+            orderId: order._id,
+            success: false,
+            error: err.response?.data || err.message,
+          });
+        }
+      }
+
+      return results;
+    } catch (err) {
+      console.log(err.response?.data || err.message);
+      throw new customError(
+        "Failed to process orders by date: " + err.message,
+        500
+      );
+    }
+  }
+
+  // Get short info of an order by ID
+  async getOrderInfo(consignmentId) {
+    try {
+      if (!consignmentId)
+        throw new customError("Consignment ID is required", 400);
 
       const accessToken = await this.authService.getValidToken();
+      console.log("Access Token:", accessToken); // Debug
+      if (!accessToken) throw new customError("Pathao token not found", 404);
 
-      const payload = orders.map((order) => ({
-        store_id: this.merchant.store_id,
-        merchant_order_id: order.invoiceId,
-        recipient_name: order.shippingInfo.fullName,
-        recipient_phone: order.shippingInfo.phone,
-        recipient_address: order.shippingInfo.address,
-        recipient_city: order.shippingInfo.city_id,
-        recipient_zone: order.shippingInfo.zone_id,
-        recipient_area: order.shippingInfo.area_id,
-        delivery_type: 48,
-        item_type: 2,
-        item_quantity: 1,
-        item_weight: "0.5",
-        item_description: order.productDescription || "Product",
-        amount_to_collect: order.finalAmount,
-      }));
-
-      const response = await axios.post(
-        `${this.baseURL}/aladdin/api/v1/orders/bulk`,
-        { orders: payload },
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+      const response = await axios.get(
+        `${this.baseURL}/aladdin/api/v1/orders/${consignmentId}/info`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
       );
 
-      response.data.data.forEach((item, index) => {
-        orders[index].courier = {
-          name: "Pathao",
-          trackingId: item.consignment_id,
-          status: item.order_status,
-          lastUpdated: new Date(),
-        };
-      });
-
-      await Promise.all(orders.map((o) => o.save()));
-      return orders;
+      return response.data;
     } catch (err) {
+      console.error(
+        "Pathao getOrderInfo error:",
+        err.response.data || err.message
+      );
       throw new customError(
-        "Failed to create bulk Pathao orders: " + err.message,
+        "Failed to get Pathao order info: " + err.message,
         500
       );
     }
