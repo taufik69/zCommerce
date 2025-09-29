@@ -42,6 +42,12 @@ exports.getPathaoOrderShortInfo = asynchandeler(async (req, res) => {
   apiResponse.sendSuccess(res, 200, "Order info fetched", orderInfo);
 });
 
+// pathao webhook handler
+exports.handlePathaoWebhook = asynchandeler(async (req, res) => {
+  const courier = new PathaoCourier();
+  await courier.handlePathaoWebhook(req, res);
+});
+
 //@desc Get available cities
 //@route GET /api/v1/courier/pathao/cities
 

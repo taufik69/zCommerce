@@ -3,6 +3,7 @@ const BaseCourier = require("./BaseCourier");
 const Order = require("../../models/order.model");
 const { customError } = require("../../lib/CustomError");
 const PathaoAuth = require("./PathaoAuth");
+const { apiResponse } = require("../../utils/apiResponse");
 
 class PathaoCourier extends BaseCourier {
   constructor(merchant) {
@@ -144,6 +145,44 @@ class PathaoCourier extends BaseCourier {
         "Failed to get Pathao order info: " + err.message,
         500
       );
+    }
+  }
+
+  // Handle Pathao webhook
+  async handlePathaoWebhook(req, res) {
+    try {
+      const signature = req.headers["X-PATHAO-Signature"];
+      // 1. Signature verify
+      if (signature !== process.env.webhookSecret) {
+        return res.status(401).json({ error: "Invalid signature" });
+      }
+
+      const consignmentId = req.body.consignment_id;
+      const orderStatus = req.body.order_status;
+
+      // 2. Order update DB তে
+      if (consignmentId && orderStatus) {
+        await Order.findOneAndUpdate(
+          { "courier.trackingId": consignmentId },
+          {
+            $set: {
+              "courier.status": orderStatus,
+            },
+          }
+        );
+      }
+
+      // 3. Response Pathao server
+      res.setHeader(
+        "X-Pathao-Merchant-Webhook-Integration-Secret",
+        process.env.WEBHOOK_SECRET
+      );
+      return res
+        .status(202)
+        .json({ message: "Webhook handled", data: req.body });
+    } catch (err) {
+      console.error("Webhook error:", err.message);
+      return res.status(500).json({ error: "Server error" });
     }
   }
 }
