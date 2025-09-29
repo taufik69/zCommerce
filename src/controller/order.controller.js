@@ -455,7 +455,7 @@ exports.updateOrder = asynchandeler(async (req, res) => {
 
   // Update order fields
   singleOrder.orderStatus = orderStatus;
-  singleOrder.shippingInfo = shippingInfo;
+  singleOrder.shippingInfo = shippingInfo || singleOrder.shippingInfo;
   singleOrder.followUp = req.user?._id || null;
   if (shippingInfo) {
     singleOrder.orderType = "complete";
