@@ -1,7 +1,7 @@
 // install first: npm install socket.io-client
 const { io } = require("socket.io-client");
 
-// তোমার socket server এর URL
+// socket server
 const socket = io("http://localhost:3000", {
   transports: ["websocket"],
   query: { userId: "427e8e5359725e2befde69e1" },

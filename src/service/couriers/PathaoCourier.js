@@ -16,48 +16,51 @@ class PathaoCourier extends BaseCourier {
     try {
       const order = await Order.findById(orderId);
       if (!order) throw new customError("Order not found", 404);
-    
       const accessToken = await this.authService.getValidToken();
       if (!accessToken) throw new customError("Pathao token not found", 404);
       if (!this.merchant.store_id)
         throw new customError("Pathao store ID not found", 404);
-      console.log("Access Token:", accessToken);
-      
+
+      // Make API request to create order
       const response = await axios.post(
         `${this.baseURL}/aladdin/api/v1/orders`,
         {
-          headers: { Authorization: `Bearer ${accessToken}` },
-          contentType: "application/json",
-        },
-        {
-          store_id: this.merchant.store_id || 316784,
+          store_id: this.merchant.store_id || 148890,
           recipient_name: order.shippingInfo.fullName,
           recipient_phone: order.shippingInfo.phone,
           recipient_address: order.shippingInfo.address,
-          recipient_city: order.shippingInfo.city_id,
-          recipient_zone: order.shippingInfo.zone_id,
           delivery_type: 48,
           item_type: 2,
           item_quantity: order.totalQuantity || 1,
-          item_weight: "0.5",
-          amount_to_collect: order.finalAmount,
+          item_weight: 0.5,
+          amount_to_collect: Number(order.finalAmount) || 0,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
         }
       );
-      console.log(response);
-      const trackingId = response.data.data.consignment_id;
 
+      if (response.data.code !== 200)
+        throw new customError(
+          "Failed to create Pathao order: " + response.statusText,
+          500
+        );
+
+      const trackingId = response.data.data.consignment_id;
       order.courier = {
         name: "pathao",
         trackingId,
         status: response.data.data.order_status,
-        lastUpdated: new Date(),
+        rawResponse: response.data,
       };
 
       await order.save();
       return order;
     } catch (err) {
-      console.log(err);
-
+      console.log(err.response.data);
       throw new customError("Failed to create Pathao order: " + err, 500);
     }
   }
