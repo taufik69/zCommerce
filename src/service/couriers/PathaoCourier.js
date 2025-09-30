@@ -157,6 +157,7 @@ class PathaoCourier extends BaseCourier {
         return res.status(401).json({ error: "Invalid signature" });
       }
 
+      console.log(signature, req.body);
       const consignmentId = req.body.consignment_id;
       const orderStatus = req.body.order_status;
 
