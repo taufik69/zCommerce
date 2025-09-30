@@ -151,36 +151,36 @@ class PathaoCourier extends BaseCourier {
   // Handle Pathao webhook
   async handlePathaoWebhook(req, res) {
     try {
-      const signature = req.headers["X-PATHAO-Signature"];
-      // 1. Signature verify
-      if (signature !== process.env.webhookSecret) {
+      const signature = req.headers["x-pathao-signature"];
+
+      // 1. Verify signature
+      if (signature !== process.env.WEBHOOK_SECRET) {
         return res.status(401).json({ error: "Invalid signature" });
       }
 
-      console.log(signature, req.body);
+      console.log("Signature:", signature, "Body:", req.body);
+
       const consignmentId = req.body.consignment_id;
       const orderStatus = req.body.order_status;
 
-      // 2. Order update DB তে
+      // 2. Update order in DB
       if (consignmentId && orderStatus) {
         await Order.findOneAndUpdate(
           { "courier.trackingId": consignmentId },
-          {
-            $set: {
-              "courier.status": orderStatus,
-            },
-          }
+          { $set: { "courier.status": orderStatus } }
         );
       }
 
-      // 3. Response Pathao server
+      // 3. Response to Pathao
       res.setHeader(
         "X-Pathao-Merchant-Webhook-Integration-Secret",
         process.env.WEBHOOK_SECRET
       );
-      return res
-        .status(202)
-        .json({ message: "Webhook handled", data: req.body });
+
+      return res.status(202).json({
+        message: "Webhook handled",
+        data: req.body,
+      });
     } catch (err) {
       console.error("Webhook error:", err.message);
       return res.status(500).json({ error: "Server error" });
