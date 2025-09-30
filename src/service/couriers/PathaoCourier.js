@@ -152,38 +152,44 @@ class PathaoCourier extends BaseCourier {
   async handlePathaoWebhook(req, res) {
     try {
       const signature = req.headers["x-pathao-signature"];
-
       // 1. Verify signature
       if (signature !== process.env.WEBHOOK_SECRET) {
         return res.status(401).json({ error: "Invalid signature" });
       }
-
       console.log("Signature:", signature, "Body:", req.body);
-
-      const consignmentId = req.body.consignment_id;
-      const orderStatus = req.body.order_status;
-
-      // 2. Update order in DB
-      if (consignmentId && orderStatus) {
-        await Order.findOneAndUpdate(
-          { "courier.trackingId": consignmentId },
-          { $set: { "courier.status": orderStatus } }
-        );
-      }
-
-      // 3. Response to Pathao
       res.setHeader(
         "X-Pathao-Merchant-Webhook-Integration-Secret",
         process.env.WEBHOOK_SECRET
       );
-
-      return res.status(202).json({
-        message: "Webhook handled",
-        data: req.body,
-      });
+      res.status(202).json({ message: "Webhook received" });
+      processWebhook(req.body);
     } catch (err) {
       console.error("Webhook error:", err.message);
       return res.status(500).json({ error: "Server error" });
+    }
+  }
+
+  // background processor
+  async processWebhook(body) {
+    try {
+      const consignmentId = body.consignment_id;
+      const orderStatus = body.order_status;
+
+      console.log("Processing webhook:", consignmentId, orderStatus);
+
+      if (consignmentId && orderStatus) {
+        // 2. Update order in DB
+        if (consignmentId && orderStatus) {
+          await Order.findOneAndUpdate(
+            { "courier.trackingId": consignmentId },
+            { $set: { "courier.status": orderStatus } }
+          );
+        }
+
+        console.log(`✅ Order ${consignmentId} updated to ${orderStatus}`);
+      }
+    } catch (err) {
+      console.error("Background webhook processing error:", err.message);
     }
   }
 }
