@@ -154,15 +154,15 @@ class PathaoCourier extends BaseCourier {
       const signature = req.headers["x-pathao-signature"];
       // 1. Verify signature
       if (signature !== process.env.WEBHOOK_SECRET) {
-        return res.status(401).json({ error: "Invalid signature" });
+        throw new customError("Invalid signature", 401);
       }
       console.log("Signature:", signature, "Body:", req.body);
       res.setHeader(
         "X-Pathao-Merchant-Webhook-Integration-Secret",
-        process.env.WEBHOOK_SECRET
+        process.env.WEBHOOK_SECRET || "f3992ecc-59da-4cbe-a049-a13da2018d51"
       );
       res.status(202).json({ message: "Webhook received" });
-      processWebhook(req.body);
+      await this.processWebhook(req.body);
     } catch (err) {
       console.error("Webhook error:", err.message);
       return res.status(500).json({ error: "Server error" });
