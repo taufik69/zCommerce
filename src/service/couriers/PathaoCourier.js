@@ -180,16 +180,16 @@ class PathaoCourier extends BaseCourier {
       if (consignmentId && orderStatus) {
         // 2. Update order in DB
         if (consignmentId && orderStatus) {
-          await Order.findOneAndUpdate(
+          const updatedOrder = await Order.findOneAndUpdate(
             { "courier.trackingId": consignmentId },
-            { $set: { "courier.status": orderStatus } }
+            { $set: { "courier.status": orderStatus } },
+            { new: true }
           );
+          console.log(`✅ Order ${consignmentId} updated to ${updatedOrder}`);
         }
-
-        console.log(`✅ Order ${consignmentId} updated to ${orderStatus}`);
       }
     } catch (err) {
-      console.error("Background webhook processing error:", err.message);
+      console.error("Background webhook processing error:", err);
     }
   }
 }

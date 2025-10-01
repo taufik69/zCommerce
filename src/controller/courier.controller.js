@@ -44,7 +44,9 @@ exports.getPathaoOrderShortInfo = asynchandeler(async (req, res) => {
 
 // pathao webhook handler
 exports.handlePathaoWebhook = asynchandeler(async (req, res) => {
-  const courier = new PathaoCourier();
+  const merchant = await Merchant.findOne({ serviceProvider: "pathao" });
+  if (!merchant) throw new customError("Merchant not found", 404);
+  const courier = new PathaoCourier(merchant);
   await courier.handlePathaoWebhook(req, res);
 });
 
