@@ -12,9 +12,25 @@ const crateTransactionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "TransitionCategory",
     },
-    transactionMode: {
+    account: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "TransitionCategory",
+      ref: "Account",
+    },
+    transactionDescription: {
+      type: String,
+      trim: true,
+    },
+    voucherNumber: {
+      type: String,
+      trim: true,
+    },
+    transactionType: {
+      type: String,
+      enum: ["cash recived", "cash payment"],
+    },
+    amount: {
+      type: Number,
+      required: true,
     },
   },
   { timestamps: true }

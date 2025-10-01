@@ -60,4 +60,5 @@ accountSchema.pre("findOneAndUpdate", async function (next) {
   next();
 });
 
-module.exports = mongoose.model("Account", accountSchema);
+module.exports =
+  mongoose.models.Account || mongoose.model("Account", accountSchema);
