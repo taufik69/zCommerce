@@ -585,3 +585,83 @@ exports.searchOrder = asynchandeler(async (req, res) => {
     .lean();
   apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
 });
+
+// get total order count pending order  shipped order hold order  deliverd order canclled order courier pending order
+exports.getOrderStatusCount = asynchandeler(async (req, res) => {
+  const orderCount = await Order.aggregate([
+    {
+      $group: {
+        _id: "$orderStatus",
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const totalOrder = await Order.countDocuments();
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    " Order Status Count fetched successfully",
+    { orderCount, totalOrder }
+  );
+});
+
+// get total order amount pending order  shipped order hold order  deliverd order canclled order courier pending order
+exports.getOrderCountAndAmount = asynchandeler(async (req, res) => {
+  const orderCountAndAmount = await Order.aggregate([
+    {
+      $group: {
+        _id: "$orderStatus",
+        count: { $sum: 1 },
+        amount: { $sum: "$finalAmount" },
+      },
+    },
+  ]);
+  const totalOrder = await Order.countDocuments();
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Order count and amount fetched successfully",
+    { orderCountAndAmount, totalOrder }
+  );
+});
+
+// date wise totalOrder
+exports.getTodayOrderCountAndAmount = asynchandeler(async (req, res) => {
+  // 1️⃣ Get today's date range
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0); // today 00:00:00
+
+  const endOfDay = new Date();
+  endOfDay.setHours(23, 59, 59, 999); // today 23:59:59
+
+  // 2️⃣ Aggregate today's orders by status
+  const orderCountAndAmount = await Order.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: startOfDay, $lte: endOfDay }, // filter today
+      },
+    },
+    {
+      $group: {
+        _id: "$orderStatus",
+        count: { $sum: 1 },
+        amount: { $sum: "$finalAmount" },
+      },
+    },
+  ]);
+
+  // 3️⃣ Total orders today
+  const todaytotalOrder = await Order.countDocuments({
+    createdAt: { $gte: startOfDay, $lte: endOfDay },
+  });
+
+  // 4️⃣ Send response
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Today's order count and amount fetched successfully",
+    { orderCountAndAmount, todaytotalOrder }
+  );
+});
