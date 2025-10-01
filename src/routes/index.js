@@ -47,6 +47,7 @@ _.use("/sizechart", sizeChartRoutes);
 _.use("/sales-return", require("./api/salesReturn.api"));
 _.use("/byretrun-Sale", require("./api/byretrunSale.api"));
 _.use("/transaction-category", require("./api/transitionCategory.api"));
+_.use("/account", require("./api/account.api"));
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });
