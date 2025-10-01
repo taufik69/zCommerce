@@ -161,7 +161,8 @@ class PathaoCourier extends BaseCourier {
         "X-Pathao-Merchant-Webhook-Integration-Secret",
         process.env.WEBHOOK_SECRET || "f3992ecc-59da-4cbe-a049-a13da2018d51"
       );
-      res.status(202).json({ message: "Webhook received" });
+      res.status(202).json({ message: "ok" });
+
       await this.processWebhook(req.body);
     } catch (err) {
       console.error("Webhook error:", err.message);
