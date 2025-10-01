@@ -11,6 +11,10 @@ const merchantSchema = joi.object(
       "string.empty": "Merchant Secret is required.",
       "any.required": "Merchant Secret is required.",
     }),
+    webhookSecret: joi.string().trim().required().messages({
+      "string.empty": "Webhook Secret is required.",
+      "any.required": "Webhook Secret is required.",
+    }),
     baseURL: joi.string().trim().uri().required().messages({
       "string.empty": "Base URL is required.",
       "string.uri": "Base URL must be a valid URL.",
