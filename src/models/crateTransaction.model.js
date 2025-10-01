@@ -1,6 +1,4 @@
 const mongoose = require("mongoose");
-const { default: slugify } = require("slugify");
-const { customError } = require("../lib/CustomError");
 
 const crateTransactionSchema = new mongoose.Schema(
   {
@@ -36,4 +34,6 @@ const crateTransactionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("CrateTransaction", crateTransactionSchema);
+module.exports =
+  mongoose.models.CrateTransaction ||
+  mongoose.model("CrateTransaction", crateTransactionSchema);
