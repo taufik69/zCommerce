@@ -19,11 +19,11 @@ exports.createPathaoOrder = asynchandeler(async (req, res) => {
 });
 
 exports.bulkPathaoOrder = asynchandeler(async (req, res) => {
-  const { startDate, endDate, merchantId } = req.body;
+  const { orderIds, merchantId } = req.body;
   const merchant = await Merchant.findById(merchantId);
   if (!merchant) throw new customError("Merchant not found", 404);
   const courier = new PathaoCourier(merchant);
-  const orders = await courier.bulkOrderByDate(startDate, endDate);
+  const orders = await courier.bulkOrderByIds(orderIds);
 
   if (!orders)
     throw new customError("Failed to create Pathao bulk orders", 500);
