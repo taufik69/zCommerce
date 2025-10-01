@@ -561,3 +561,14 @@ exports.deleteOrder = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(res, 200, "Order deleted successfully", null);
 });
+
+// get all pending courier
+exports.getAllPendingOrders = asynchandeler(async (req, res) => {
+  const orders = await Order.find({ orderStatus: "CourierPending" })
+    .populate("user")
+    .populate("deliveryCharge")
+    .populate("coupon")
+    .sort({ createdAt: -1 })
+    .lean();
+  apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
+});
