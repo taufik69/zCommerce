@@ -122,14 +122,7 @@ class SteadFastCourier extends BaseCourier {
       }
 
       const token = authHeader.split(" ")[1];
-      if (token !== process.env.STEADFAST_API_KEY) {
-        throw new customError("Invalid API token", 403);
-      }
-      if (token !== this.ApiKey) {
-        throw new customError("Invalid API token", 403);
-      }
-
-      if (token !== this.ApiKey) {
+      if (token !== process.env.STEADFAST_API_KEY && token !== this.ApiKey) {
         throw new customError("Invalid API token", 403);
       }
 
@@ -141,13 +134,13 @@ class SteadFastCourier extends BaseCourier {
         throw new customError("Invoice ID missing in webhook", 400);
       }
 
+      // 3️⃣ Order find
       const order = await Order.findOne({ invoiceId: invoice });
       if (!order) {
         throw new customError("Order not found for invoice: " + invoice, 404);
       }
 
-      // 3️⃣ Update courier details
-      order.courier = order.courier || {};
+      // 4️⃣ Update courier details
       order.courier.status = status || order.courier.status;
       order.courier.trackingId = tracking_code || order.courier.trackingId;
       order.courier.rawResponse = { ...order.courier.rawResponse, ...data };
@@ -155,17 +148,22 @@ class SteadFastCourier extends BaseCourier {
       await order.save();
 
       // 5️⃣ Success response
+      console.log("✅ SteadFast Webhook processed successfully");
+      res.status(200).json({
+        status: "success",
+        message: "Webhook received successfully.",
+      });
       return order;
     } catch (err) {
       console.error("❌ Steadfast Webhook Error:", err);
-
-      apiResponse.sendError(res, err.statusCode || 500, {
+      res.status(200).json({
         status: "error",
-        message:
-          err.response?.data?.message ||
-          err.message ||
-          "Failed to handle Steadfast webhook",
+        message: "Invalid consignment ID.",
       });
+      throw new customError(
+        "Failed to process Steadfast webhook: " + err.message,
+        500
+      );
     }
   }
 }

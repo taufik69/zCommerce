@@ -108,7 +108,9 @@ exports.bulkSteadFastOrder = asynchandeler(async (req, res) => {
 
 // Steadfast webhook handler
 exports.handleSteadFastWebhook = asynchandeler(async (req, res) => {
-  const courier = new SteadFastCourier();
+  const merchant = await Merchant.findOne({ serviceProvider: "Steadfast" });
+  if (!merchant) throw new customError("Merchant not found", 404);
+  const courier = new SteadFastCourier(merchant);
   const response = await courier.handleSteadFastWebhook(req, res);
   apiResponse.sendSuccess(res, 200, "Webhook handled", response);
 });
