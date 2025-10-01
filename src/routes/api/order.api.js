@@ -11,5 +11,6 @@ _.route("/filterorderbydate").get(orderController.filterOrderdatewise);
 _.route("/track-order/:invoiceid").get(orderController.trackOrder);
 _.route("/delete-Order/:id").delete(orderController.deleteOrder);
 _.route("/getallcourierpendingorder").get(orderController.getAllPendingOrders);
+_.route("/getorderbyid").get(orderController.searchOrder);
 
 module.exports = _;

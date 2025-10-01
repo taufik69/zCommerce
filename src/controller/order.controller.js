@@ -572,3 +572,16 @@ exports.getAllPendingOrders = asynchandeler(async (req, res) => {
     .lean();
   apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
 });
+
+// search order by invoiceId or orderid (_id)
+exports.searchOrder = asynchandeler(async (req, res) => {
+  const { search } = req.query;
+  const orders = await Order.findOne({
+    invoiceId: search,
+  })
+    .populate("user")
+    .populate("deliveryCharge")
+    .populate("coupon")
+    .lean();
+  apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
+});
