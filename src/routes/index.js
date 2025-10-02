@@ -49,6 +49,7 @@ _.use("/byretrun-Sale", require("./api/byretrunSale.api"));
 _.use("/transaction-category", require("./api/transitionCategory.api"));
 _.use("/account", require("./api/account.api"));
 _.use("/transaction", require("./api/createTransaction.api"));
+_.use("/moneytransfer", require("./api/moneyTransfer.api"));
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });
