@@ -665,3 +665,21 @@ exports.getTodayOrderCountAndAmount = asynchandeler(async (req, res) => {
     { orderCountAndAmount, todaytotalOrder }
   );
 });
+
+// get courier pathao name
+exports.getCourierInfo = asynchandeler(async (req, res) => {
+  const { search } = req.query;
+
+  let courierName = search === "pathao" ? "pathao" : "steadfast";
+
+  const orders = await Order.find({
+    "courier.name": { $regex: `^${courierName}$`, $options: "i" },
+  })
+    .populate("user")
+    .populate("deliveryCharge")
+    .populate("coupon")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
+});
