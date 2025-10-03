@@ -12,7 +12,8 @@ socket.on("connect", () => {
   console.log(" Connected to server with id:", socket.id);
 });
 
-// cart update
+// cart updat
+// e
 socket.on("cartUpdated", (data) => {
   console.log("📩 cartUpdated:", data);
 });
