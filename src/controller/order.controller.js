@@ -683,3 +683,14 @@ exports.getCourierInfo = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
 });
+
+// getDeliveryBoyOrders
+exports.getDeliveryBoyOrders = asynchandeler(async (_, res) => {
+  const orders = await Order.find({ "courier.trackingId": { $ne: null } })
+    .populate("user")
+    .populate("deliveryCharge")
+    .populate("coupon")
+    .sort({ createdAt: -1 })
+    .lean();
+  apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
+});
