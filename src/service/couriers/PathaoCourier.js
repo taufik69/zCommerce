@@ -67,24 +67,72 @@ class PathaoCourier extends BaseCourier {
   }
 
   //bulk order creation by date range
-  async bulkOrderByDate(startDate, endDate) {
+  // async bulkOrderByDate(startDate, endDate) {
+  //   try {
+  //     // 1. Orders
+  //     const query = {};
+  //     if (startDate && endDate) {
+  //       query.createdAt = {
+  //         $gte: new Date(startDate),
+  //         $lte: new Date(endDate),
+  //       };
+  //     }
+
+  //     const orders = await Order.find(query);
+  //     if (!orders.length)
+  //       throw new customError("No orders found in this date range", 404);
+
+  //     const results = [];
+
+  //     // 2. Create orders one by one
+  //     for (const order of orders) {
+  //       try {
+  //         const createdOrder = await this.createOrder(order._id);
+  //         results.push({
+  //           orderId: order._id,
+  //           success: true,
+  //           courier: createdOrder.courier,
+  //         });
+  //       } catch (err) {
+  //         console.error(
+  //           `Failed to create Pathao order for ${order._id}:`,
+  //           err.response?.data || err.message
+  //         );
+  //         results.push({
+  //           orderId: order._id,
+  //           success: false,
+  //           error: err.response?.data || err.message,
+  //         });
+  //       }
+  //     }
+
+  //     return results;
+  //   } catch (err) {
+  //     console.log(err.response?.data || err.message);
+  //     throw new customError(
+  //       "Failed to process orders by date: " + err.message,
+  //       500
+  //     );
+  //   }
+  // }
+
+  // bulk order create from frontend orderIds
+  async bulkOrderByIds(orderIds) {
     try {
-      // 1. Orders
-      const query = {};
-      if (startDate && endDate) {
-        query.createdAt = {
-          $gte: new Date(startDate),
-          $lte: new Date(endDate),
-        };
+      if (!Array.isArray(orderIds) || !orderIds.length) {
+        throw new customError("Order IDs array is required", 400);
       }
 
-      const orders = await Order.find(query);
-      if (!orders.length)
-        throw new customError("No orders found in this date range", 404);
+      // 1. find orders by ids
+      const orders = await Order.find({ _id: { $in: orderIds } });
+
+      if (!orders.length) {
+        throw new customError("No orders found for given IDs", 404);
+      }
 
       const results = [];
 
-      // 2. Create orders one by one
+      // 2. create courier orders one by one
       for (const order of orders) {
         try {
           const createdOrder = await this.createOrder(order._id);
@@ -95,7 +143,7 @@ class PathaoCourier extends BaseCourier {
           });
         } catch (err) {
           console.error(
-            `Failed to create Pathao order for ${order._id}:`,
+            `❌ Failed to create Pathao order for ${order._id}:`,
             err.response?.data || err.message
           );
           results.push({
@@ -108,9 +156,9 @@ class PathaoCourier extends BaseCourier {
 
       return results;
     } catch (err) {
-      console.log(err.response?.data || err.message);
+      console.error("Bulk order error:", err.response?.data || err.message);
       throw new customError(
-        "Failed to process orders by date: " + err.message,
+        "Failed to process bulk orders: " + err.message,
         500
       );
     }

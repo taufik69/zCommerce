@@ -72,99 +72,41 @@ class SteadFastCourier extends BaseCourier {
   }
 
   // Bulk Create Orders
-  async bulkCreateOrders(startDate, endDate) {
+  // Bulk Create Orders (with orderIds array)
+  async bulkCreateOrders(orderIds = []) {
     try {
-      let query = {};
-      if (startDate && endDate) {
-        let start = startDate;
-        let end = endDate;
-        if (start > end) [start, end] = [end, start];
-        query.createdAt = { $gte: start, $lte: end };
+      if (!orderIds.length) {
+        throw new customError("No orderIds provided", 400);
       }
 
-      const orders = await Order.find(query);
-
-      if (!orders.length) {
-        throw new customError("No orders found for bulk create", 404);
-      }
-
-      // Prepare valid orders
-      const validOrders = orders.filter(
-        (order) =>
-          order.invoiceId &&
-          order.shippingInfo?.fullName &&
-          order.shippingInfo?.phone &&
-          order.shippingInfo?.address &&
-          order.finalAmount > 0
-      );
-
-      if (validOrders.length === 0) {
-        throw new customError("No valid orders to send", 400);
-      }
-
-      // Send each order one by one using Promise.all
+      // Create orders one by one
       const results = await Promise.all(
-        validOrders.map(async (order) => {
+        orderIds.map(async (orderId) => {
           try {
-            const payload = {
-              invoice: order.invoiceId,
-              recipient_name: order.shippingInfo.fullName,
-              recipient_phone: order.shippingInfo.phone,
-              recipient_address: order.shippingInfo.address,
-              cod_amount: order.finalAmount || 0,
-            };
-
-            const response = await axios.post(
-              `${this.baseURL}/create_order`,
-              payload,
-              {
-                headers: {
-                  "Api-Key": this.ApiKey,
-                  "Secret-Key": this.ApiSecret,
-                  "Content-Type": "application/json",
-                },
-              }
-            );
-
-            if (response.data.status !== 200) {
-              throw new customError(
-                `SteadFast API error: ${response.data.message}`,
-                500
-              );
-            }
-
-            const consignment = response.data.consignment;
-            order.courier = {
-              name: "steadfast",
-              trackingId: consignment.tracking_code,
-              status: consignment.status,
-              rawResponse: consignment,
-            };
-            await order.save();
+            // Create order
+            const order = await this.createOrder(orderId);
 
             return {
               invoice: order.invoiceId,
-              trackingId: consignment.tracking_code,
-              status: consignment.status,
-              consignment_id: consignment.consignment_id,
+              trackingId: order.courier?.trackingId,
+              status: order.courier?.status,
             };
           } catch (err) {
-            console.error(`❌ Order ${order.invoiceId} error:`, err.message);
+            console.error(`❌ Order ${orderId} error:`, err.message);
             return {
-              invoice: order.invoiceId,
+              orderId,
               error: err.message,
             };
           }
         })
       );
 
-      console.log("✅ Bulk Orders Created (single API):", results);
+      console.log("✅ Bulk Orders Created:", results);
       return results;
     } catch (err) {
       console.error("❌ Bulk Order Error:", err);
       throw new customError(
-        "Failed to bulk create Steadfast orders: " +
-          (err.response?.data?.message || err.message),
+        "Failed to bulk create Steadfast orders: " + err.message,
         500
       );
     }
@@ -180,14 +122,7 @@ class SteadFastCourier extends BaseCourier {
       }
 
       const token = authHeader.split(" ")[1];
-      if (token !== process.env.STEADFAST_API_KEY) {
-        throw new customError("Invalid API token", 403);
-      }
-      if (token !== this.ApiKey) {
-        throw new customError("Invalid API token", 403);
-      }
-
-      if (token !== this.ApiKey) {
+      if (token !== process.env.STEADFAST_API_KEY && token !== this.ApiKey) {
         throw new customError("Invalid API token", 403);
       }
 
@@ -199,13 +134,13 @@ class SteadFastCourier extends BaseCourier {
         throw new customError("Invoice ID missing in webhook", 400);
       }
 
+      // 3️⃣ Order find
       const order = await Order.findOne({ invoiceId: invoice });
       if (!order) {
         throw new customError("Order not found for invoice: " + invoice, 404);
       }
 
-      // 3️⃣ Update courier details
-      order.courier = order.courier || {};
+      // 4️⃣ Update courier details
       order.courier.status = status || order.courier.status;
       order.courier.trackingId = tracking_code || order.courier.trackingId;
       order.courier.rawResponse = { ...order.courier.rawResponse, ...data };
@@ -213,17 +148,22 @@ class SteadFastCourier extends BaseCourier {
       await order.save();
 
       // 5️⃣ Success response
+      console.log("✅ SteadFast Webhook processed successfully");
+      res.status(200).json({
+        status: "success",
+        message: "Webhook received successfully.",
+      });
       return order;
     } catch (err) {
       console.error("❌ Steadfast Webhook Error:", err);
-
-      apiResponse.sendError(res, err.statusCode || 500, {
+      res.status(200).json({
         status: "error",
-        message:
-          err.response?.data?.message ||
-          err.message ||
-          "Failed to handle Steadfast webhook",
+        message: "Invalid consignment ID.",
       });
+      throw new customError(
+        "Failed to process Steadfast webhook: " + err.message,
+        500
+      );
     }
   }
 }

@@ -37,7 +37,6 @@ class PathaoAuth {
       );
 
       const { access_token, refresh_token, expires_in } = response.data;
-      this.refresh_token = refresh_token;
 
       // Save token in DB
       const merchant = await Merchant.findOneAndUpdate(
@@ -55,10 +54,10 @@ class PathaoAuth {
 
       return access_token;
     } catch (err) {
-      console.log(err);
-
+      console.error("❌ Issue token error:", err.response?.data || err.message);
       throw new customError(
-        "Failed to issue Pathao token: " + err.message,
+        "Failed to issue Pathao token: " +
+          (err.response?.data?.message || err.message),
         500
       );
     }
@@ -67,19 +66,24 @@ class PathaoAuth {
   /** STEP 2: Refresh token */
   async refreshToken() {
     try {
+      // Get latest merchant info (with stored refresh_token)
+      const merchant = await Merchant.findOne({ merchantID: this.client_id });
+      if (!merchant) throw new customError("Merchant not found", 404);
+      if (!merchant.refresh_token)
+        throw new customError("No refresh token found in DB", 400);
+
       const response = await axios.post(
         `${this.baseURL}/aladdin/api/v1/issue-token`,
         {
           client_id: this.client_id,
           client_secret: this.client_secret,
           grant_type: "refresh_token",
-          refresh_token: this.refresh_token,
+          refresh_token: merchant.refresh_token,
         },
         { headers: { "Content-Type": "application/json" } }
       );
 
       const { access_token, refresh_token, expires_in } = response.data;
-      this.refresh_token = refresh_token;
 
       await Merchant.findOneAndUpdate(
         { merchantID: this.client_id },
@@ -87,15 +91,19 @@ class PathaoAuth {
           access_token,
           refresh_token,
           token_expiry: Date.now() + expires_in * 1000,
-        },
-        { new: true }
+        }
       );
 
+      console.log("✅ Token refreshed successfully:", access_token);
       return access_token;
     } catch (err) {
-      console.log(err);
+      console.error(
+        "❌ Refresh token error:",
+        err.response?.data || err.message
+      );
       throw new customError(
-        "Failed to refresh Pathao token: " + err.message,
+        "Failed to refresh Pathao token: " +
+          (err.response?.data?.message || err.message),
         500
       );
     }
@@ -122,3 +130,5 @@ class PathaoAuth {
 }
 
 module.exports = PathaoAuth;
+
+// https://courier-api-sandbox.pathao.com/aladdin/api/v1/orders

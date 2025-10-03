@@ -7,6 +7,7 @@ const merchantSchema = new mongoose.Schema({
   baseURL: { type: String, required: true },
   serviceProvider: { type: String, required: true },
   store_id: { type: Number, default: null },
+  webhookSecret: { type: String, default: null },
   access_token: { type: String, trim: true },
   refresh_token: { type: String, trim: true },
   token_expiry: { type: Date },

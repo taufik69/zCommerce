@@ -19,11 +19,11 @@ exports.createPathaoOrder = asynchandeler(async (req, res) => {
 });
 
 exports.bulkPathaoOrder = asynchandeler(async (req, res) => {
-  const { startDate, endDate, merchantId } = req.body;
+  const { orderIds, merchantId } = req.body;
   const merchant = await Merchant.findById(merchantId);
   if (!merchant) throw new customError("Merchant not found", 404);
   const courier = new PathaoCourier(merchant);
-  const orders = await courier.bulkOrderByDate(startDate, endDate);
+  const orders = await courier.bulkOrderByIds(orderIds);
 
   if (!orders)
     throw new customError("Failed to create Pathao bulk orders", 500);
@@ -95,11 +95,11 @@ exports.createSteadFastOrder = asynchandeler(async (req, res) => {
 
 // create bulk order
 exports.bulkSteadFastOrder = asynchandeler(async (req, res) => {
-  const { startDate, endDate, merchantId } = req.body;
+  const { orderIds, merchantId } = req.body;
   const merchant = await Merchant.findById(merchantId);
   if (!merchant) throw new customError("Merchant not found", 404);
   const courier = new SteadFastCourier(merchant);
-  const orders = await courier.bulkCreateOrders(startDate, endDate);
+  const orders = await courier.bulkCreateOrders(orderIds);
 
   if (!orders)
     throw new customError("Failed to create Steadfast bulk orders", 500);
@@ -108,7 +108,9 @@ exports.bulkSteadFastOrder = asynchandeler(async (req, res) => {
 
 // Steadfast webhook handler
 exports.handleSteadFastWebhook = asynchandeler(async (req, res) => {
-  const courier = new SteadFastCourier();
+  const merchant = await Merchant.findOne({ serviceProvider: "steadfast" });
+  if (!merchant) throw new customError("Merchant not found", 404);
+  const courier = new SteadFastCourier(merchant);
   const response = await courier.handleSteadFastWebhook(req, res);
   apiResponse.sendSuccess(res, 200, "Webhook handled", response);
 });

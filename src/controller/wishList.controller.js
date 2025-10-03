@@ -90,6 +90,12 @@ exports.getAllUserWishlist = asynchandeler(async (req, res) => {
     throw new customError("Wishlist not found", 404);
   }
 
+ const io = getIO();
+  io.to(userId || guestId).emit("getwishlist", {
+    message: "📋 Wishlist fetched successfully",
+    wishlist: wishlist,
+  });
+
   apiResponse.sendSuccess(res, 200, "Wishlist fetched successfully", wishlist);
 });
 
@@ -97,6 +103,7 @@ exports.getAllUserWishlist = asynchandeler(async (req, res) => {
 // @desc Delete a single item from wishlist
 exports.deleteWishlistItem = asynchandeler(async (req, res) => {
   const { productId, variantId } = req.body;
+
 
   if (!productId && !variantId) {
     throw new customError("Product ID or Variant ID is required", 400);

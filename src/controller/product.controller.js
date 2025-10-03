@@ -116,22 +116,56 @@ exports.createProduct = asynchandeler(async (req, res) => {
 });
 
 //@desc Get all porducts using pipeline aggregation
+// exports.getAllProducts = asynchandeler(async (req, res) => {
+//   const { category, subcategory, brand, minPrice, maxPrice } = req.query;
+  
+//   // please do not delete this code
+//   // if (minPrice) query.retailPrice = { $gte: minPrice };
+//   // if (maxPrice) query.retailPrice = { $lte: maxPrice };
+//   // if (minPrice && maxPrice) {
+//   //   query.retailPrice = { $gte: minPrice, $lte: maxPrice };
+//   // }
+
+//   const query = {};
+//   if (category) query.category = category;
+//   if (subcategory) query.subcategory = subcategory;
+//   if (brand) query.brand = brand;
+
+//   const products = await Product.find(query)
+
+//     .populate({
+//       path: "variant",
+//       populate: "stockVariantAdjust product",
+//     })
+//     .populate({
+//       path: "byReturn",
+//       populate: "product variant",
+//     })
+//     .populate({
+//       path: "salesReturn",
+//       populate: "product variant",
+//     })
+//     .populate("category brand  subcategory discount  stockAdjustment")
+//     .select("-updatedAt -createdAt");
+
+//   apiResponse.sendSuccess(res, 200, "Products fetched  successfully", products);
+// });
+
 exports.getAllProducts = asynchandeler(async (req, res) => {
   const { category, subcategory, brand, minPrice, maxPrice } = req.query;
-  // please do not delete this code
-  // if (minPrice) query.retailPrice = { $gte: minPrice };
-  // if (maxPrice) query.retailPrice = { $lte: maxPrice };
-  // if (minPrice && maxPrice) {
-  //   query.retailPrice = { $gte: minPrice, $lte: maxPrice };
-  // }
 
   const query = {};
   if (category) query.category = category;
   if (subcategory) query.subcategory = subcategory;
   if (brand) query.brand = brand;
 
-  const products = await Product.find(query)
+  // Price filtering
+  const priceFilter = {};
+  if (minPrice) priceFilter.$gte = parseFloat(minPrice);
+  if (maxPrice) priceFilter.$lte = parseFloat(maxPrice);
 
+  // Fetch products first
+  const products = await Product.find(query)
     .populate({
       path: "variant",
       populate: "stockVariantAdjust product",
@@ -144,11 +178,36 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
       path: "salesReturn",
       populate: "product variant",
     })
-    .populate("category brand  subcategory discount  stockAdjustment")
+    .populate("category brand subcategory discount stockAdjustment")
     .select("-updatedAt -createdAt");
 
-  apiResponse.sendSuccess(res, 200, "Products fetched  successfully", products);
+  // Now filter based on price (after population)
+  const filteredProducts = products.filter((product) => {
+    // Single variant
+    if (product.variantType === "singleVariant") {
+      if (Object.keys(priceFilter).length === 0) return true;
+      const price = product.retailPrice || 0;
+      if (priceFilter.$gte && price < priceFilter.$gte) return false;
+      if (priceFilter.$lte && price > priceFilter.$lte) return false;
+      return true;
+    }
+
+    // Multiple variant
+    if (product.variantType === "multipleVariant" && Array.isArray(product.variant)) {
+      return product.variant.some((v) => {
+        const price = v.retailPrice || 0;
+        if (priceFilter.$gte && price < priceFilter.$gte) return false;
+        if (priceFilter.$lte && price > priceFilter.$lte) return false;
+        return true;
+      });
+    }
+
+    return true;
+  });
+
+  apiResponse.sendSuccess(res, 200, "Products fetched successfully", filteredProducts);
 });
+
 
 //@desc Get product by slug
 exports.getProductBySlug = asynchandeler(async (req, res) => {
