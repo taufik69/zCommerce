@@ -241,7 +241,7 @@ exports.getProductBySlug = asynchandeler(async (req, res) => {
       path: "salesReturn",
       populate: "product variant",
     })
-    .populate("category brand  discount stockAdjustment")
+    .populate("brand  discount stockAdjustment")
     .populate({
       path: "category",
       populate: "discount",
