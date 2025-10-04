@@ -439,11 +439,11 @@ exports.getAllMultipleVariantProducts = asynchandeler(async (req, res) => {
 exports.getNewArrivalProducts = asynchandeler(async (req, res) => {
   const products = await Product.find({})
     .sort({ createdAt: -1 })
-    .populate(" brand variant discount");
-  populate({
-    path: "category",
-    populate: "discount",
-  });
+    .populate(" brand variant discount")
+    .populate({
+      path: "category",
+      populate: "discount",
+    });
   populate({
     path: "subcategory",
     populate: "discount",
@@ -539,11 +539,12 @@ exports.getBestSellingProducts = asynchandeler(async (_, res) => {
     .populate({
       path: "category",
       populate: "discount",
-    });
-  populate({
-    path: "subcategory",
-    populate: "discount",
-  }).limit(10);
+    })
+    .populate({
+      path: "subcategory",
+      populate: "discount",
+    })
+    .limit(10);
 
   apiResponse.sendSuccess(
     res,
