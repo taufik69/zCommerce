@@ -12,6 +12,7 @@ const {
   uploadBarcodeToCloudinary,
 } = require("../helpers/cloudinary");
 const { validateProduct } = require("../validation/product.validation");
+const { populate } = require("../models/purchase.model");
 
 // Create a new product (only required fields)
 exports.createProduct = asynchandeler(async (req, res) => {
@@ -424,8 +425,15 @@ exports.getAllMultipleVariantProducts = asynchandeler(async (req, res) => {
 exports.getNewArrivalProducts = asynchandeler(async (req, res) => {
   const products = await Product.find({})
     .sort({ createdAt: -1 })
-    .populate("category subcategory brand variant discount")
-    .limit(20);
+    .populate(" brand variant discount");
+  populate({
+    path: "category",
+    populate: "discount",
+  });
+  populate({
+    path: "subcategory",
+    populate: "discount",
+  }).limit(20);
   apiResponse.sendSuccess(
     res,
     200,
@@ -495,8 +503,15 @@ exports.getRelatedProducts = asynchandeler(async (req, res) => {
 //@desc   discount product
 exports.getDiscountProducts = asynchandeler(async (req, res) => {
   const products = await Product.find({ discount: { $ne: null } })
-    .populate("category subcategory brand variant discount")
-    .sort({ createdAt: -1 });
+    .populate(" brand variant discount")
+    .populate({
+      path: "category",
+      populate: "discount",
+    });
+  populate({
+    path: "subcategory",
+    populate: "discount",
+  }).sort({ createdAt: -1 });
   apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
 });
 
@@ -506,8 +521,15 @@ exports.getBestSellingProducts = asynchandeler(async (_, res) => {
     totalSales: { $gt: 5 },
   })
     .sort({ totalSales: -1 })
-    .populate("category subcategory brand variant discount")
-    .limit(10);
+    .populate(" brand variant discount")
+    .populate({
+      path: "category",
+      populate: "discount",
+    });
+  populate({
+    path: "subcategory",
+    populate: "discount",
+  }).limit(10);
 
   apiResponse.sendSuccess(
     res,
