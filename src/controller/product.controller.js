@@ -443,11 +443,12 @@ exports.getNewArrivalProducts = asynchandeler(async (req, res) => {
     .populate({
       path: "category",
       populate: "discount",
-    });
-  populate({
-    path: "subcategory",
-    populate: "discount",
-  }).limit(20);
+    })
+    .populate({
+      path: "subcategory",
+      populate: "discount",
+    })
+    .limit(20);
   apiResponse.sendSuccess(
     res,
     200,
