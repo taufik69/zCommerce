@@ -118,7 +118,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
 //@desc Get all porducts using pipeline aggregation
 // exports.getAllProducts = asynchandeler(async (req, res) => {
 //   const { category, subcategory, brand, minPrice, maxPrice } = req.query;
-  
+
 //   // please do not delete this code
 //   // if (minPrice) query.retailPrice = { $gte: minPrice };
 //   // if (maxPrice) query.retailPrice = { $lte: maxPrice };
@@ -178,7 +178,15 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
       path: "salesReturn",
       populate: "product variant",
     })
-    .populate("category brand subcategory discount stockAdjustment")
+    .populate("category brand  discount stockAdjustment")
+    .populate({
+      path: "category",
+      populate: "discount",
+    })
+    .populate({
+      path: "subcategory",
+      populate: "discount",
+    })
     .select("-updatedAt -createdAt");
 
   // Now filter based on price (after population)
@@ -193,7 +201,10 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
     }
 
     // Multiple variant
-    if (product.variantType === "multipleVariant" && Array.isArray(product.variant)) {
+    if (
+      product.variantType === "multipleVariant" &&
+      Array.isArray(product.variant)
+    ) {
       return product.variant.some((v) => {
         const price = v.retailPrice || 0;
         if (priceFilter.$gte && price < priceFilter.$gte) return false;
@@ -205,9 +216,13 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
     return true;
   });
 
-  apiResponse.sendSuccess(res, 200, "Products fetched successfully", filteredProducts);
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Products fetched successfully",
+    filteredProducts
+  );
 });
-
 
 //@desc Get product by slug
 exports.getProductBySlug = asynchandeler(async (req, res) => {
@@ -488,8 +503,9 @@ exports.getDiscountProducts = asynchandeler(async (req, res) => {
 //@desc get bestSellig product
 exports.getBestSellingProducts = asynchandeler(async (_, res) => {
   const products = await Product.find({
-    totalSales: { $gt: 5 }
-  }).sort({ totalSales: -1 })
+    totalSales: { $gt: 5 },
+  })
+    .sort({ totalSales: -1 })
     .populate("category subcategory brand variant discount")
     .limit(10);
 
