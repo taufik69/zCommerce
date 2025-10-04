@@ -439,7 +439,7 @@ exports.getAllMultipleVariantProducts = asynchandeler(async (req, res) => {
 exports.getNewArrivalProducts = asynchandeler(async (req, res) => {
   const products = await Product.find({})
     .sort({ createdAt: -1 })
-    .populate(" brand variant discount")
+    .populate("brand variant discount")
     .populate({
       path: "category",
       populate: "discount",
@@ -517,7 +517,7 @@ exports.getRelatedProducts = asynchandeler(async (req, res) => {
 //@desc   discount product
 exports.getDiscountProducts = asynchandeler(async (req, res) => {
   const products = await Product.find({ discount: { $ne: null } })
-    .populate(" brand variant discount")
+    .populate("brand variant discount")
     .populate({
       path: "category",
       populate: "discount",
@@ -535,7 +535,7 @@ exports.getBestSellingProducts = asynchandeler(async (_, res) => {
     totalSales: { $gt: 5 },
   })
     .sort({ totalSales: -1 })
-    .populate(" brand variant discount")
+    .populate("brand variant discount")
     .populate({
       path: "category",
       populate: "discount",
