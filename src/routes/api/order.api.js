@@ -18,5 +18,6 @@ _.route("/datewiseordersummary").get(
   orderController.getTodayOrderCountAndAmount
 );
 _.route("/getcourierinfo").get(orderController.getCourierInfo);
+_.route("/couriersendedorders").get(orderController.getDeliveryBoyOrders);
 
 module.exports = _;

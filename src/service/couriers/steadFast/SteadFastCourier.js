@@ -62,6 +62,7 @@ class SteadFastCourier extends BaseCourier {
         rawResponse: response.data,
         lastUpdated: new Date(),
       };
+      order.orderStatus = `COURIER_${response.data.consignment.status}`;
 
       await order.save();
       return order;

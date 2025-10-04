@@ -51,7 +51,11 @@ _.use("/account", require("./api/account.api"));
 _.use("/transaction", require("./api/createTransaction.api"));
 _.use("/moneytransfer", require("./api/moneyTransfer.api"));
 _.use("/fundhandover", require("./api/fundhandover.api"));
+<<<<<<< HEAD
 _.use("/siteinformation", require("./api/siteinformation.api"));
+=======
+_.use("/invoice", require("./api/invoice.api"));
+>>>>>>> 30f13692b87d77709ed4f0e6dbbfd4d7021fc9e1
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });

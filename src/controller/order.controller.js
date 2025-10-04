@@ -87,7 +87,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
   let totalQuantity = 0;
 
   for (const item of cart.items) {
-    // যদি product থাকে
+    // if product exist
     if (item.product) {
       const product = await Product.findById(item.product).populate(
         "category subcategory brand"
@@ -114,7 +114,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
       totalQuantity += item.quantity;
     }
 
-    // যদি variant থাকে
+    // if variant exist
     if (item.variant) {
       const variant = await Variant.findById(item.variant).populate("product");
 
@@ -681,5 +681,16 @@ exports.getCourierInfo = asynchandeler(async (req, res) => {
     .sort({ createdAt: -1 })
     .lean();
 
+  apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
+});
+
+// getDeliveryBoyOrders
+exports.getDeliveryBoyOrders = asynchandeler(async (_, res) => {
+  const orders = await Order.find({ "courier.trackingId": { $ne: null } })
+    .populate("user")
+    .populate("deliveryCharge")
+    .populate("coupon")
+    .sort({ createdAt: -1 })
+    .lean();
   apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
 });

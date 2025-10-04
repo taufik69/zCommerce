@@ -58,6 +58,8 @@ class PathaoCourier extends BaseCourier {
         status: response.data.data.order_status,
         rawResponse: response.data,
       };
+      //  orderStatus: "CourierPending"
+      order.orderStatus = `COURIER_${response.data.data.order_status}`;
       await order.save();
       return order;
     } catch (err) {
