@@ -522,11 +522,12 @@ exports.getDiscountProducts = asynchandeler(async (req, res) => {
     .populate({
       path: "category",
       populate: "discount",
-    });
-  populate({
-    path: "subcategory",
-    populate: "discount",
-  }).sort({ createdAt: -1 });
+    })
+    .populate({
+      path: "subcategory",
+      populate: "discount",
+    })
+    .sort({ createdAt: -1 });
   apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
 });
 
