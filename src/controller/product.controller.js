@@ -233,9 +233,23 @@ exports.getProductBySlug = asynchandeler(async (req, res) => {
       path: "variant",
       populate: "stockVariantAdjust product",
     })
-    .populate("byReturn salesReturn")
-    .populate("category brand  subcategory discount  stockAdjustment")
-    .select("-updatedAt -createdAt");
+    .populate({
+      path: "byReturn",
+      populate: "product variant",
+    })
+    .populate({
+      path: "salesReturn",
+      populate: "product variant",
+    })
+    .populate("category brand  discount stockAdjustment")
+    .populate({
+      path: "category",
+      populate: "discount",
+    })
+    .populate({
+      path: "subcategory",
+      populate: "discount",
+    });
 
   if (!product) {
     throw new customError(404, "Product not found");
