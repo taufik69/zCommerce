@@ -7,9 +7,12 @@ const purchaseModel = require("../models/purchase.model");
 exports.purchaseInvoice = asynchandeler(async (req, res) => {
   const { startDate, endDate, supplierName } = req.body;
 
-  if (!startDate || !endDate)
+  // Required validation
+  if (!startDate || !endDate) {
     throw new customError("startDate and endDate are required", 400);
+  }
 
+  // Base match query
   const match = {
     createdAt: {
       $gte: new Date(startDate),
@@ -17,16 +20,16 @@ exports.purchaseInvoice = asynchandeler(async (req, res) => {
     },
   };
 
-  if (supplierName) {
+  // Optional supplierName filter
+  if (supplierName && supplierName.trim() !== "") {
     match.supplierName = { $regex: supplierName, $options: "i" };
   }
 
   const result = await purchaseModel.aggregate([
     { $match: match },
-
     { $unwind: { path: "$allproduct", preserveNullAndEmptyArrays: true } },
 
-    // Convert string IDs to ObjectId
+    // ✅ Convert IDs safely
     {
       $addFields: {
         "allproduct.product": {
@@ -56,7 +59,7 @@ exports.purchaseInvoice = asynchandeler(async (req, res) => {
       },
     },
 
-    // product lookup
+    // ✅ Lookup product (main)
     {
       $lookup: {
         from: "products",
@@ -67,7 +70,7 @@ exports.purchaseInvoice = asynchandeler(async (req, res) => {
     },
     { $unwind: { path: "$productData", preserveNullAndEmptyArrays: true } },
 
-    // variant lookup
+    // ✅ Lookup variant
     {
       $lookup: {
         from: "variants",
@@ -78,16 +81,41 @@ exports.purchaseInvoice = asynchandeler(async (req, res) => {
     },
     { $unwind: { path: "$variantData", preserveNullAndEmptyArrays: true } },
 
+    // ✅ Lookup variant.product → populate variant's product object
     {
-      $addFields: {
-        "allproduct.product": "$productData",
-        "allproduct.variant": "$variantData",
+      $lookup: {
+        from: "products",
+        localField: "variantData.product",
+        foreignField: "_id",
+        as: "variantProductData",
+      },
+    },
+    {
+      $unwind: {
+        path: "$variantProductData",
+        preserveNullAndEmptyArrays: true,
       },
     },
 
-    { $project: { productData: 0, variantData: 0 } },
+    // ✅ Merge all fields properly
+    {
+      $addFields: {
+        "variantData.product": "$variantProductData",
+        "allproduct.variant": "$variantData",
+        "allproduct.product": "$productData",
+      },
+    },
 
-    // regroup back
+    // Clean temp data
+    {
+      $project: {
+        productData: 0,
+        variantData: 0,
+        variantProductData: 0,
+      },
+    },
+
+    // ✅ Group by purchase
     {
       $group: {
         _id: "$_id",
@@ -102,7 +130,7 @@ exports.purchaseInvoice = asynchandeler(async (req, res) => {
       },
     },
 
-    // total summary
+    // ✅ Total summary
     {
       $group: {
         _id: null,
@@ -117,8 +145,9 @@ exports.purchaseInvoice = asynchandeler(async (req, res) => {
     },
   ]);
 
-  if (!result.length)
+  if (!result.length) {
     return apiResponse.sendSuccess(res, 200, "No data found", []);
+  }
 
   return apiResponse.sendSuccess(res, 200, "Invoice summary", result[0]);
 });
