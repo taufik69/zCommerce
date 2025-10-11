@@ -4,6 +4,7 @@ const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 const purchaseModel = require("../models/purchase.model");
 const byReturnModel = require("../models/byReturnSale.model");
+const orderModel = require("../models/order.model");
 
 exports.purchaseInvoice = asynchandeler(async (req, res) => {
   const { startDate, endDate, supplierName } = req.body;
@@ -375,40 +376,40 @@ exports.getPurchaseBySupplier = asynchandeler(async (req, res) => {
     },
 
     // 📦 Project final structure
-    // {
-    //   $project: {
-    //     _id: 1,
-    //     serialId: "$_id",
-    //     supplierName: 1,
-    //     productBarCode: 1,
-    //     productName: 1,
-    //     variantName: 1,
-    //     color: 1,
-    //     size: 1,
-    //     quantity: 1,
-    //     retailPrice: 1,
-    //     totalRetailPricePerItem: 1,
-    //     date: 1,
-    //   },
-    // },
+    {
+      $project: {
+        _id: 1,
+        serialId: "$_id",
+        supplierName: 1,
+        productBarCode: 1,
+        productName: 1,
+        variantName: 1,
+        color: 1,
+        size: 1,
+        quantity: 1,
+        retailPrice: 1,
+        totalRetailPricePerItem: 1,
+        date: 1,
+      },
+    },
 
     // 📊 Calculate total quantity & retail price
-    // {
-    //   $group: {
-    //     _id: null,
-    //     purchases: { $push: "$$ROOT" },
-    //     totalQuantity: { $sum: "$quantity" },
-    //     totalRetailPrice: { $sum: "$totalRetailPricePerItem" },
-    //   },
-    // },
-    // {
-    //   $project: {
-    //     _id: 0,
-    //     purchases: 1,
-    //     totalQuantity: 1,
-    //     totalRetailPrice: 1,
-    //   },
-    // },
+    {
+      $group: {
+        _id: null,
+        purchases: { $push: "$$ROOT" },
+        totalQuantity: { $sum: "$quantity" },
+        totalRetailPrice: { $sum: "$totalRetailPricePerItem" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        purchases: 1,
+        totalQuantity: 1,
+        totalRetailPrice: 1,
+      },
+    },
   ]);
 
   if (!result.length) {
@@ -422,3 +423,215 @@ exports.getPurchaseBySupplier = asynchandeler(async (req, res) => {
     result[0]
   );
 });
+
+// geta all order and calculate tatoal product price or varinat producxt price or deliveryCharge price
+exports.getInvoiceReport = asynchandeler(async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  // 🔍 Date Filter
+  const filter = {};
+  if (startDate && endDate) {
+    filter.createdAt = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+
+  // 🧾 Fetch Orders
+  const orders = await orderModel
+    .find(filter)
+    .populate("followUp", "name") // Follow up by user name
+    .populate("deliveryCharge", "amount")
+    .sort({ createdAt: 1 });
+
+  if (!orders.length) {
+    return apiResponse.sendSuccess(res, 200, "No invoice data found", []);
+  }
+
+  // 🧮 Summary calculation
+  const summary = {
+    totalOrders: 0,
+    totalOrderValue: 0,
+    totalDiscountQty: 0,
+    totalDiscountValue: 0,
+    totalDeliveryValue: 0,
+    totalCourierQty: 0,
+    totalCourierValue: 0,
+    totalPendingQty: 0,
+    totalPendingValue: 0,
+    totalConfirmedQty: 0,
+    totalConfirmedValue: 0,
+    totalHoldQty: 0,
+    totalHoldValue: 0,
+    totalPackagingQty: 0,
+    totalPackagingValue: 0,
+    totalDeliveredQty: 0,
+    totalDeliveredValue: 0,
+    totalCancelledQty: 0,
+    totalCancelledValue: 0,
+  };
+
+  const orderList = orders.map((order) => {
+    // === Customer Info ===
+    const customerInfo = {
+      name: order.shippingInfo.fullName,
+      phone: order.shippingInfo.phone,
+      address: order.shippingInfo.address,
+    };
+
+    // === Product Info ===
+    const productInfo = order.items.map((item) => ({
+      productName: item.name,
+      color: item.color,
+      size: item.size,
+      sku: item.sku || null, // থাকলে SKU
+      quantity: item.quantity,
+      retailPrice: item.retailPrice,
+      totalPrice: item.totalPrice,
+    }));
+
+    // === Price Info ===
+    const total = order.items.reduce((sum, i) => sum + (i.retailPrice || 0), 0);
+    const discount = order.discountAmount || 0;
+    const subTotal = order.finalAmount || 0;
+
+    // === Delivery Info ===
+    const delivery = order.deliveryCharge?.amount || 0;
+
+    // === Follow Up ===
+    const followUpBy = order.followUp?.name || "-";
+
+    // === Update summary ===
+    summary.totalOrders += 1;
+    summary.totalOrderValue += subTotal;
+    summary.totalDiscountQty += order.items.length;
+    summary.totalDiscountValue += discount;
+    summary.totalDeliveryValue += delivery;
+
+    // === Status Based Counts ===
+    const addTo = (qtyField, valueField, qty, val) => {
+      summary[qtyField] += qty;
+      summary[valueField] += val;
+    };
+
+    switch (order.orderStatus) {
+      case "Pending":
+        addTo("totalPendingQty", "totalPendingValue", 1, subTotal);
+        break;
+      case "Hold":
+        addTo("totalHoldQty", "totalHoldValue", 1, subTotal);
+        break;
+      case "Confirmed":
+        addTo("totalConfirmedQty", "totalConfirmedValue", 1, subTotal);
+        break;
+      case "Packaging":
+        addTo("totalPackagingQty", "totalPackagingValue", 1, subTotal);
+        break;
+      case "Courier":
+        addTo("totalCourierQty", "totalCourierValue", 1, subTotal);
+        break;
+      case "Delivered":
+        addTo("totalDeliveredQty", "totalDeliveredValue", 1, subTotal);
+        break;
+      case "Cancelled":
+        addTo("totalCancelledQty", "totalCancelledValue", 1, subTotal);
+        break;
+    }
+
+    // === Final Order Info ===
+    return {
+      orderId: order.invoiceId,
+      date: order.createdAt,
+      customerInfo,
+      productInfo,
+      total,
+      discount,
+      subTotal,
+      delivery,
+      followUpBy,
+      status: order.orderStatus,
+    };
+  });
+
+  apiResponse.sendSuccess(res, 200, "Invoice report fetched successfully", {
+    reportPeriod: { startDate, endDate },
+    summary,
+    orderList,
+  });
+});
+
+// get all order info
+exports.getOrderSummaryByDate = asynchandeler(async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  const match = {};
+  if (startDate && endDate) {
+    match.createdAt = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+
+  const summary = await orderModel.aggregate([
+    // 🔍 Optional date filter
+    { $match: match },
+
+    // 🧮 Group by order status
+    {
+      $group: {
+        _id: "$orderStatus",
+        totalQty: { $sum: 1 },
+        totalValue: { $sum: "$finalAmount" },
+      },
+    },
+
+    // 📊 Combine all statuses + calculate grand total + total orders + total amount
+    {
+      $group: {
+        _id: null,
+        statuses: { $push: "$$ROOT" },
+        grandTotalQty: { $sum: "$totalQty" },
+        grandTotalValue: { $sum: "$totalValue" },
+        totalOrderCount: { $sum: "$totalQty" },
+        totalAmount: { $sum: "$totalValue" }, // sum of all order amounts
+      },
+    },
+
+    // 🧾 Final projection
+    {
+      $project: {
+        _id: 0,
+        statuses: 1,
+        grandTotal: {
+          qty: "$grandTotalQty",
+          value: "$grandTotalValue",
+        },
+        totalOrderCount: 1,
+        totalAmount: 1,
+      },
+    },
+  ]);
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Date-wise order summary fetched successfully",
+    summary[0] || {
+      statuses: [],
+      grandTotal: { qty: 0, value: 0 },
+      totalOrderCount: 0,
+      totalAmount: 0,
+    }
+  );
+});
+
+// get courier info
+// exports.getCourierInfo = asynchandeler(async (req, res) => {
+//   const courierInfo = await courierModel.find();
+//   apiResponse.sendSuccess(
+//     res,
+//     200,
+//     "Courier info fetched successfully",
+//     courierInfo
+//   );
+// });
