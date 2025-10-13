@@ -6,5 +6,6 @@ _.route("/purchase-summary").post(invoiceController.purchaseSummary);
 _.route("/buyreturn-invoice").post(invoiceController.getPurchaseBySupplier);
 _.route("/order-invoice").post(invoiceController.getInvoiceReport);
 _.route("/order-status").post(invoiceController.getOrderSummaryByDate);
+_.route("/courier-sendinfo").post(invoiceController.getCourierSendInformation);
 
 module.exports = _;

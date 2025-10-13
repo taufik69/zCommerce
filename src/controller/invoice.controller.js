@@ -626,12 +626,77 @@ exports.getOrderSummaryByDate = asynchandeler(async (req, res) => {
 });
 
 // get courier info
-// exports.getCourierInfo = asynchandeler(async (req, res) => {
-//   const courierInfo = await courierModel.find();
-//   apiResponse.sendSuccess(
-//     res,
-//     200,
-//     "Courier info fetched successfully",
-//     courierInfo
-//   );
-// });
+
+exports.getCourierSendInformation = asynchandeler(async (req, res) => {
+  const { startDate, endDate, courierName } = req.body;
+
+  const filter = {};
+
+  // ✅ Date range filter
+  if (startDate && endDate) {
+    filter.createdAt = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+
+  // ✅ Exact courier name filter
+  if (courierName && courierName.trim() !== "") {
+    filter["courier.name"] = courierName;
+  }
+
+  // ✅ Fetch orders with populated followUp and deliveryCharge
+  const orders = await orderModel
+    .find(filter)
+    .populate("followUp", "fullName") // get followUp name
+    .populate("deliveryCharge") // get delivery document
+    .lean();
+
+  if (!orders.length) {
+    throw new customError("No courier data found for given filter", 404);
+  }
+
+  // ✅ Calculate totals
+  let totalDeliveryCharge = 0;
+  let totalProductAmount = 0;
+  let productTotal = 0;
+
+  const ordersWithDelivery = orders.map((order) => {
+    const deliveryChargeAmount = order.deliveryCharge?.deliveryCharge || 0;
+    const finalAmount = order.finalAmount || 0;
+
+    totalDeliveryCharge += deliveryChargeAmount;
+    totalProductAmount += finalAmount;
+
+    return {
+      ...order,
+      deliveryCharge: deliveryChargeAmount,
+      followUp: order.followUp?.fullName || "N/A",
+    };
+  });
+
+  // calculate product or varinat total reatial price and quantity
+  orders.forEach((order) => {
+    order.items.forEach((item) => {
+      if (item.product) {
+        productTotal += item.product.retailPrice * item.quantity;
+      }
+
+      if (item.variant) {
+        productTotal += item.variant.retailPrice * item.quantity;
+      }
+    });
+  });
+
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Courier information fetched successfully",
+    {
+      orders: ordersWithDelivery,
+      totalProductAmount,
+      totalDeliveryCharge,
+      productTotal,
+    }
+  );
+});
