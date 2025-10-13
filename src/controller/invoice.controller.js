@@ -5,6 +5,7 @@ const { apiResponse } = require("../utils/apiResponse");
 const purchaseModel = require("../models/purchase.model");
 const byReturnModel = require("../models/byReturnSale.model");
 const orderModel = require("../models/order.model");
+const StockAdjustModel = require("../models/stockadjust.model");
 
 exports.purchaseInvoice = asynchandeler(async (req, res) => {
   const { startDate, endDate, supplierName } = req.body;
@@ -626,7 +627,6 @@ exports.getOrderSummaryByDate = asynchandeler(async (req, res) => {
 });
 
 // get courier info
-
 exports.getCourierSendInformation = asynchandeler(async (req, res) => {
   const { startDate, endDate, courierName } = req.body;
 
@@ -698,5 +698,52 @@ exports.getCourierSendInformation = asynchandeler(async (req, res) => {
       totalDeliveryCharge,
       productTotal,
     }
+  );
+});
+exports.overallStock = asynchandeler(async (req, res) => {
+  const { startDate, endDate } = req.query; // or req.body if POST
+
+  const filter = {};
+
+  // ✅ Apply date filter if provided
+  if (startDate && endDate) {
+    filter.createdAt = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+
+  const stockAdjusts = await StockAdjustModel.find(filter)
+    .populate({
+      path: "productId",
+      populate: {
+        path: "variant category subcategory brand discount",
+      },
+      select:
+        "-description  -warrantyInformation -shippingInformation -retailProfitMarginbyPercentance -retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt",
+    })
+    .populate({
+      path: "variantId",
+      populate: {
+        path: "product",
+        populate: "category subcategory brand discount",
+        select:
+          "-description  -warrantyInformation -shippingInformation -retailProfitMarginbyPercentance -retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt",
+      },
+      select:
+        "-retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt -retailProfitMarginbyPercentance",
+    })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  if (!stockAdjusts.length) {
+    throw new customError("No stock adjustments found for given filter", 404);
+  }
+
+  return apiResponse.sendSuccess(
+    res,
+    200,
+    "Stock adjustments retrieved successfully",
+    stockAdjusts
   );
 });
