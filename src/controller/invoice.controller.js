@@ -1054,3 +1054,107 @@ exports.getTransactionSummaryByDateAndAccount = asynchandeler(
     );
   }
 );
+
+// account name wise summary
+exports.getAcoountNamewiseTransaction = asynchandeler(async (req, res) => {
+  const { startDate, endDate } = req.body;
+
+  const match = {};
+
+  // ✅ Date range filter
+  if (startDate && endDate) {
+    match.date = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+
+  const report = await createTransactionModel.aggregate([
+    { $match: match },
+
+    // ✅ Join account info
+    {
+      $lookup: {
+        from: "accounts",
+        localField: "account",
+        foreignField: "_id",
+        as: "account",
+      },
+    },
+    { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
+
+    // ✅ Group by account name
+    {
+      $group: {
+        _id: "$account.name", // Group by account name
+        receivedAmount: {
+          $sum: {
+            $cond: [
+              { $eq: ["$transactionType", "cash recived"] },
+              "$amount",
+              0,
+            ],
+          },
+        },
+        paymentAmount: {
+          $sum: {
+            $cond: [
+              { $eq: ["$transactionType", "cash payment"] },
+              "$amount",
+              0,
+            ],
+          },
+        },
+      },
+    },
+
+    // ✅ Add balance field
+    {
+      $addFields: {
+        balance: { $subtract: ["$receivedAmount", "$paymentAmount"] },
+      },
+    },
+
+    // ✅ Sort by account name ascending
+    { $sort: { _id: 1 } },
+  ]);
+
+  // ✅ Serial number and grand total calculation
+  let serial = 1;
+  let totalReceived = 0;
+  let totalPayment = 0;
+  let totalBalance = 0;
+
+  const data = report.map((item) => {
+    totalReceived += item.receivedAmount;
+    totalPayment += item.paymentAmount;
+    totalBalance += item.balance;
+
+    return {
+      serial: serial++,
+      accountName: item._id || "Unknown Account",
+      receivedAmount: item.receivedAmount,
+      paymentAmount: item.paymentAmount,
+      balance: item.balance,
+    };
+  });
+
+  // ✅ Grand totals
+  const summary = {
+    totalReceived,
+    totalPayment,
+    totalBalance,
+  };
+
+  // ✅ Final API response
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Account-wise transaction summary fetched successfully",
+    {
+      filters: { startDate, endDate },
+      summary,
+      report: data,
+    }
+  );
+});

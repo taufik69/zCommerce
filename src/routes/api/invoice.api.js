@@ -16,5 +16,8 @@ _.route("/transaction-summary").post(
 _.route("/transaction-accountwise").post(
   invoiceController.getTransactionSummaryByDateAndAccount
 );
+_.route("/transaction-accountnamewisesummary").post(
+  invoiceController.getAcoountNamewiseTransaction
+);
 
 module.exports = _;
