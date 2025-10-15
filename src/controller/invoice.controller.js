@@ -7,6 +7,7 @@ const byReturnModel = require("../models/byReturnSale.model");
 const orderModel = require("../models/order.model");
 const StockAdjustModel = require("../models/stockadjust.model");
 const createTransactionModel = require("../models/crateTransaction.model");
+const fundhandoverModel = require("../models/fundHandoverDescription.model");
 
 exports.purchaseInvoice = asynchandeler(async (req, res) => {
   const { startDate, endDate, supplierName } = req.body;
@@ -1156,5 +1157,89 @@ exports.getAcoountNamewiseTransaction = asynchandeler(async (req, res) => {
       summary,
       report: data,
     }
+  );
+});
+
+// fund hanover
+exports.getFundHandoverReport = asynchandeler(async (req, res) => {
+  const { startDate, endDate } = req.body;
+
+  const match = {};
+  if (startDate && endDate) {
+    match.date = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+
+  const report = await fundhandoverModel.aggregate([
+    { $match: match },
+    {
+      $lookup: {
+        from: "accounts",
+        localField: "fundPaymentMode",
+        foreignField: "_id",
+        as: "fundPaymentMode",
+      },
+    },
+    {
+      $unwind: {
+        path: "$fundPaymentMode",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $group: {
+        _id: "$name",
+        totalAmount: { $sum: "$amount" },
+        handovers: {
+          $push: {
+            date: "$date",
+            fundHandoverId: "$_id",
+            description: "$transactionDescription",
+            voucherNumber: "$voucherNumber",
+            paymentMode: "$fundPaymentMode.name",
+            amount: "$amount",
+          },
+        },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  // ✅ Merge all into a single object
+  let serial = 1;
+  let grandTotal = 0;
+  let details = [];
+
+  report.forEach((person) => {
+    grandTotal += person.totalAmount;
+
+    const personDetails = person.handovers.map((item) => ({
+      date: item.date ? item.date.toISOString().split("T")[0] : "",
+      fundHandoverId: item.fundHandoverId,
+      description: item.description || "N/A",
+      voucherNumber: item.voucherNumber || "N/A",
+      paymentMode: item.paymentMode || "N/A",
+      amount: item.amount || 0,
+      giverReceiver: person._id || "Unknown",
+      serial: `FHTRX-${String(serial++).padStart(6, "0")}`,
+    }));
+
+    details = details.concat(personDetails);
+  });
+
+  const finalReport = {
+    serial: 1,
+    giverReceiver: "All",
+    totalAmount: grandTotal,
+    details,
+  };
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Fund handover report fetched successfully (merged into single object)",
+    finalReport
   );
 });

@@ -19,5 +19,6 @@ _.route("/transaction-accountwise").post(
 _.route("/transaction-accountnamewisesummary").post(
   invoiceController.getAcoountNamewiseTransaction
 );
+_.route("/getFundHandoverReport").post(invoiceController.getFundHandoverReport);
 
 module.exports = _;
