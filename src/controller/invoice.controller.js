@@ -10,6 +10,8 @@ const createTransactionModel = require("../models/crateTransaction.model");
 const tranasactionCategoryModel = require("../models/transitionCategory.model");
 const fundhandoverModel = require("../models/fundHandoverDescription.model");
 const invoiceModel = require("../models/invoice.model");
+const VariantModel = require("../models/variant.model");
+const ProductModel = require("../models/product.model");
 
 exports.purchaseInvoice = asynchandeler(async (req, res) => {
   const { startDate, endDate, supplierName } = req.body;
@@ -1528,4 +1530,83 @@ exports.getOrdersByDateAndFollowUp = asynchandeler(async (req, res) => {
     totalDeliveryCharge,
     totalPrice,
   });
+});
+
+// push web sales variant
+exports.getZeroSaleVariantsLast30Days = asynchandeler(async (req, res) => {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  // Find variants with totalSales = 0
+  const variants = await VariantModel.find({
+    totalSales: 0,
+    createdAt: { $gte: thirtyDaysAgo },
+  })
+    .populate("product") // populate product name if needed
+    .populate("stockVariantAdjust") // include adjustments for virtuals
+    .populate("byReturn") // populate byReturn for virtual
+    .populate("salesReturn"); // populate salesReturn for virtual
+
+  // Optionally, map to include virtuals if needed
+  const data = variants.map((v) => ({
+    _id: v._id,
+    variantName: v.variantName,
+    product: v.product,
+    size: v.size,
+    color: v.color,
+    totalSales: v.totalSales,
+    openingStock: v.openingStock,
+    multiVariantOpeningStock: v.multiVariantOpeningStock,
+    totalByReturnQuantity: v.totalByReturnQuantity,
+    totalSalesReturnQuantity: v.totalSalesReturnQuantity,
+    multipleVariantTotalPurchasedQuantity:
+      v.multipleVariantTotalPurchasedQuantity,
+  }));
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Last 30 days zero sale variants fetched successfully",
+    data
+  );
+});
+
+// push web sales product
+exports.getZeroSaleProductsLast30Days = asynchandeler(async (req, res) => {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  // Find products with totalSales = 0 in last 30 days
+  const products = await ProductModel.find({
+    totalSales: 0,
+    createdAt: { $gte: thirtyDaysAgo },
+  })
+    .populate("variant") // include variants for size-wise stock and other virtuals
+    .populate("stockAdjustment")
+    .populate("byReturn")
+    .populate("salesReturn");
+
+  // Map to include virtuals and relevant fields
+  const data = products.map((p) => ({
+    _id: p._id,
+    name: p.name,
+    slug: p.slug,
+    variantType: p.variantType,
+    stock: p.stock,
+    openingStock: p.singleVariantOpeningStock,
+    adjustmentPlus: p.adjustmentSingleVariantPlus,
+    adjustmentMinus: p.adjustmentSingleVariantMinus,
+    totalByReturnQuantity: p.totalByReturnQuantity,
+    totalSalesReturnQuantity: p.totalSalesReturnQuantity,
+    singleVariantTotalPurchasedQuantity: p.singleVariantTotalPurchasedQuantity,
+    sizeWiseStock: p.sizeWiseStock,
+    totalSales: p.totalSales,
+  }));
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Last 30 days zero sale products fetched successfully",
+    data
+  );
 });

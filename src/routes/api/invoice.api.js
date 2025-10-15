@@ -25,5 +25,11 @@ _.route("/netwiseprofit-report").post(
   invoiceController.getInvoiceNetWiseProfit
 );
 _.route("/followup-report").post(invoiceController.getOrdersByDateAndFollowUp);
+_.route("/pushwebsalesvariant").get(
+  invoiceController.getZeroSaleVariantsLast30Days
+);
+_.route("/pushwebsalesproduct").get(
+  invoiceController.getZeroSaleProductsLast30Days
+);
 
 module.exports = _;
