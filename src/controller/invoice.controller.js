@@ -7,6 +7,7 @@ const byReturnModel = require("../models/byReturnSale.model");
 const orderModel = require("../models/order.model");
 const StockAdjustModel = require("../models/stockadjust.model");
 const createTransactionModel = require("../models/crateTransaction.model");
+const tranasactionCategoryModel = require("../models/transitionCategory.model");
 const fundhandoverModel = require("../models/fundHandoverDescription.model");
 const invoiceModel = require("../models/invoice.model");
 
@@ -1311,6 +1312,161 @@ exports.getInvoiceReport = asynchandeler(async (req, res) => {
   resultArray.push({
     summary: true,
     totalFinalAmount,
+    totalProfit,
+  });
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Invoice report fetched successfully",
+    resultArray
+  );
+});
+
+// net wise profit
+
+exports.getInvoiceNetWiseProfit = asynchandeler(async (req, res) => {
+  const { startDate, endDate } = req.body;
+
+  const match = {};
+
+  // Date filter
+  if (startDate && endDate) {
+    match.createdAt = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+
+  const invoices = await invoiceModel.aggregate([
+    { $match: match },
+
+    // Project required fields
+    {
+      $project: {
+        ProductInfo: 1,
+      },
+    },
+
+    // Calculate profit per invoice
+    {
+      $addFields: {
+        profit: {
+          $sum: {
+            $map: {
+              input: "$ProductInfo",
+              as: "p",
+              in: {
+                $subtract: ["$$p.retailPrice", "$$p.purchasePrice"],
+              },
+            },
+          },
+        },
+      },
+    },
+
+    {
+      $project: {
+        profit: 1,
+      },
+    },
+
+    // Sort by date ascending
+    { $sort: { createdAt: 1 } },
+  ]);
+
+  // Calculate totals
+  let totalProfit = 0;
+
+  invoices.map((inv) => {
+    totalProfit += inv.profit || 0;
+  });
+
+  // get all transactions summamry
+
+  const report = await createTransactionModel.aggregate([
+    { $match: match },
+
+    // ✅ Join category
+    {
+      $lookup: {
+        from: "transitioncategories",
+        localField: "transactionCategory",
+        foreignField: "_id",
+        as: "transactionCategory",
+      },
+    },
+    {
+      $unwind: {
+        path: "$transactionCategory",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
+    // ✅ Sort by latest date before grouping
+    { $sort: { date: -1 } },
+
+    // ✅ Group by category and transaction type
+    {
+      $group: {
+        _id: {
+          category: "$transactionCategory.name",
+          type: "$transactionType",
+        },
+        totalAmount: { $sum: "$amount" },
+        latestDescription: { $first: "$transactionDescription" },
+      },
+    },
+
+    // ✅ Pivot payment/receive into same row
+    {
+      $group: {
+        _id: "$_id.category",
+        description: { $first: "$latestDescription" },
+        receivedAmount: {
+          $sum: {
+            $cond: [{ $eq: ["$_id.type", "cash recived"] }, "$totalAmount", 0],
+          },
+        },
+        paymentAmount: {
+          $sum: {
+            $cond: [{ $eq: ["$_id.type", "cash payment"] }, "$totalAmount", 0],
+          },
+        },
+      },
+    },
+
+    // ✅ Sort alphabetically or by name
+    { $sort: { _id: 1 } },
+  ]);
+
+  // ✅ Add serial number and grand total
+  let serial = 1;
+  let grandReceived = 0;
+  let grandPayment = 0;
+
+  const data = report.map((item) => {
+    grandReceived += item.receivedAmount;
+    grandPayment += item.paymentAmount;
+    return {
+      serial: serial++,
+      categoryName: item._id || "Unknown",
+      description: item.description || "-",
+      receivedAmount: item.receivedAmount,
+      paymentAmount: item.paymentAmount,
+    };
+  });
+
+  const summary = {
+    grandReceived,
+    grandPayment,
+    netBalance: grandReceived - grandPayment,
+  };
+
+  let resultArray = [];
+  resultArray.push({
+    ...summary,
+    report: data,
     totalProfit,
   });
 
