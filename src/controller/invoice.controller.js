@@ -6,6 +6,7 @@ const purchaseModel = require("../models/purchase.model");
 const byReturnModel = require("../models/byReturnSale.model");
 const orderModel = require("../models/order.model");
 const StockAdjustModel = require("../models/stockadjust.model");
+const createTransactionModel = require("../models/crateTransaction.model");
 
 exports.purchaseInvoice = asynchandeler(async (req, res) => {
   const { startDate, endDate, supplierName } = req.body;
@@ -747,3 +748,309 @@ exports.overallStock = asynchandeler(async (req, res) => {
     stockAdjusts
   );
 });
+
+// transaction report
+
+exports.getTransactionReport = asynchandeler(async (req, res) => {
+  const { startDate, endDate, transactionCategory } = req.query;
+
+  // 🔍 Filter conditions
+  const match = {};
+
+  // Date range
+  if (startDate && endDate) {
+    match.date = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+
+  // Category filter
+  if (transactionCategory) {
+    match.transactionCategory = new mongoose.Types.ObjectId(
+      transactionCategory
+    );
+  }
+
+  // 🧮 Aggregation pipeline
+  const report = await createTransactionModel.aggregate([
+    { $match: match },
+
+    // populate equivalent via lookup
+    {
+      $lookup: {
+        from: "transitioncategories",
+        localField: "transactionCategory",
+        foreignField: "_id",
+        as: "transactionCategory",
+      },
+    },
+    {
+      $unwind: {
+        path: "$transactionCategory",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
+    {
+      $lookup: {
+        from: "accounts",
+        localField: "account",
+        foreignField: "_id",
+        as: "account",
+      },
+    },
+    { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
+
+    // 🧮 Calculate totals
+    {
+      $facet: {
+        transactions: [{ $sort: { date: -1 } }], // all transactions
+        totals: [
+          {
+            $group: {
+              _id: "$transactionType",
+              totalAmount: { $sum: "$amount" },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  // 🧾 Extract summary
+  const data = report[0] || { transactions: [], totals: [] };
+
+  let cashReceived = 0;
+  let cashPayment = 0;
+
+  data.totals.forEach((t) => {
+    if (t._id === "cash recived") cashReceived = t.totalAmount;
+    if (t._id === "cash payment") cashPayment = t.totalAmount;
+  });
+
+  const summary = {
+    cashReceived,
+    cashPayment,
+  };
+
+  apiResponse.sendSuccess(res, 200, "Transaction report fetched successfully", {
+    filters: { startDate, endDate, transactionCategory },
+    summary,
+    transactions: data.transactions,
+  });
+});
+
+// transaction summary
+exports.getTransactionSummaryByDate = asynchandeler(async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  const match = {};
+
+  // ✅ Filter by date range
+  if (startDate && endDate) {
+    match.date = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+
+  const report = await createTransactionModel.aggregate([
+    { $match: match },
+
+    // ✅ Join category
+    {
+      $lookup: {
+        from: "transitioncategories",
+        localField: "transactionCategory",
+        foreignField: "_id",
+        as: "transactionCategory",
+      },
+    },
+    {
+      $unwind: {
+        path: "$transactionCategory",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
+    // ✅ Sort by latest date before grouping
+    { $sort: { date: -1 } },
+
+    // ✅ Group by category and transaction type
+    {
+      $group: {
+        _id: {
+          category: "$transactionCategory.name",
+          type: "$transactionType",
+        },
+        totalAmount: { $sum: "$amount" },
+        latestDescription: { $first: "$transactionDescription" },
+      },
+    },
+
+    // ✅ Pivot payment/receive into same row
+    {
+      $group: {
+        _id: "$_id.category",
+        description: { $first: "$latestDescription" },
+        receivedAmount: {
+          $sum: {
+            $cond: [{ $eq: ["$_id.type", "cash recived"] }, "$totalAmount", 0],
+          },
+        },
+        paymentAmount: {
+          $sum: {
+            $cond: [{ $eq: ["$_id.type", "cash payment"] }, "$totalAmount", 0],
+          },
+        },
+      },
+    },
+
+    // ✅ Sort alphabetically or by name
+    { $sort: { _id: 1 } },
+  ]);
+
+  // ✅ Add serial number and grand total
+  let serial = 1;
+  let grandReceived = 0;
+  let grandPayment = 0;
+
+  const data = report.map((item) => {
+    grandReceived += item.receivedAmount;
+    grandPayment += item.paymentAmount;
+    return {
+      serial: serial++,
+      categoryName: item._id || "Unknown",
+      description: item.description || "-",
+      receivedAmount: item.receivedAmount,
+      paymentAmount: item.paymentAmount,
+    };
+  });
+
+  const summary = {
+    grandReceived,
+    grandPayment,
+    netBalance: grandReceived - grandPayment,
+  };
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Date-wise transaction summary fetched successfully",
+    {
+      filters: { startDate, endDate },
+      summary,
+      report: data,
+    }
+  );
+});
+
+// account wise transaction summary
+exports.getTransactionSummaryByDateAndAccount = asynchandeler(
+  async (req, res) => {
+    const { startDate, endDate, account } = req.body;
+
+    const match = {};
+
+    // ✅ Date range filter
+    if (startDate && endDate) {
+      match.date = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+    }
+
+    // ✅ Account filter (only if provided)
+    if (account && account !== "") {
+      match.account = new mongoose.Types.ObjectId(account);
+    }
+
+    const report = await createTransactionModel.aggregate([
+      { $match: match },
+
+      // ✅ Join account info
+      {
+        $lookup: {
+          from: "accounts",
+          localField: "account",
+          foreignField: "_id",
+          as: "account",
+        },
+      },
+      { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
+
+      // ✅ Group by date
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+          receivedAmount: {
+            $sum: {
+              $cond: [
+                { $eq: ["$transactionType", "cash recived"] },
+                "$amount",
+                0,
+              ],
+            },
+          },
+          paymentAmount: {
+            $sum: {
+              $cond: [
+                { $eq: ["$transactionType", "cash payment"] },
+                "$amount",
+                0,
+              ],
+            },
+          },
+        },
+      },
+
+      // ✅ Calculate balance
+      {
+        $addFields: {
+          balance: { $subtract: ["$receivedAmount", "$paymentAmount"] },
+        },
+      },
+
+      // ✅ Sort by date ascending
+      { $sort: { _id: 1 } },
+    ]);
+
+    // ✅ Add serial number + grand totals
+    let serial = 1;
+    let totalReceived = 0;
+    let totalPayment = 0;
+    let totalBalance = 0;
+
+    const data = report.map((item) => {
+      totalReceived += item.receivedAmount;
+      totalPayment += item.paymentAmount;
+      totalBalance += item.balance;
+
+      return {
+        serial: serial++,
+        date: item._id,
+        receivedAmount: item.receivedAmount,
+        paymentAmount: item.paymentAmount,
+        balance: item.balance,
+      };
+    });
+
+    const summary = {
+      totalReceived,
+      totalPayment,
+      totalBalance,
+    };
+
+    apiResponse.sendSuccess(
+      res,
+      200,
+      "Transaction summary fetched successfully",
+      {
+        filters: { startDate, endDate, account: account || "All Accounts" },
+        summary,
+        report: data,
+      }
+    );
+  }
+);

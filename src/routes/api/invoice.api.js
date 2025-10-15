@@ -8,5 +8,13 @@ _.route("/order-invoice").post(invoiceController.getInvoiceReport);
 _.route("/order-status").post(invoiceController.getOrderSummaryByDate);
 _.route("/courier-sendinfo").post(invoiceController.getCourierSendInformation);
 _.route("/overallStock").post(invoiceController.overallStock);
+// tranaction category
+_.route("/transaction-report").post(invoiceController.getTransactionReport);
+_.route("/transaction-summary").post(
+  invoiceController.getTransactionSummaryByDate
+);
+_.route("/transaction-accountwise").post(
+  invoiceController.getTransactionSummaryByDateAndAccount
+);
 
 module.exports = _;
