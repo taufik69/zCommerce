@@ -1477,3 +1477,55 @@ exports.getInvoiceNetWiseProfit = asynchandeler(async (req, res) => {
     resultArray
   );
 });
+
+//USER WEB SALES INVOICE
+exports.getOrdersByDateAndFollowUp = asynchandeler(async (req, res) => {
+  const { startDate, endDate, followUpId } = req.body;
+
+  const match = {};
+
+  // Date filter
+  if (startDate && endDate) {
+    match.createdAt = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+
+  // FollowUp filter
+  if (followUpId) {
+    match.followUp = followUpId;
+  }
+
+  const orders = await orderModel
+    .find(match)
+    .populate("user")
+    .populate("items.productId")
+    .populate("followUp")
+    .populate("items.variantId")
+    .populate("coupon")
+    .populate("deliveryCharge")
+    .sort({ createdAt: -1 });
+  console.log(orders);
+  return;
+
+  // ✅ Calculate totals
+  const totalDeliveryCharge = orders.reduce(
+    (sum, order) => sum + (order.deliveryCharge?.deliveryCharge || 0),
+    0
+  );
+
+  const totalPrice = orders.reduce(
+    (sum, order) =>
+      sum +
+      (order.items?.reduce((itemSum, i) => itemSum + (i.totalPrice || 0), 0) ||
+        0),
+    0
+  );
+
+  apiResponse.sendSuccess(res, 200, "Orders fetched successfully", {
+    orders,
+    totalDeliveryCharge,
+    totalPrice,
+  });
+});

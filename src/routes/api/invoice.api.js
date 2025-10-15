@@ -24,5 +24,6 @@ _.route("/invoicewise-report").post(invoiceController.getInvoiceReport);
 _.route("/netwiseprofit-report").post(
   invoiceController.getInvoiceNetWiseProfit
 );
+_.route("/followup-report").post(invoiceController.getOrdersByDateAndFollowUp);
 
 module.exports = _;
