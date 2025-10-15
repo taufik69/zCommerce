@@ -8,6 +8,7 @@ const orderModel = require("../models/order.model");
 const StockAdjustModel = require("../models/stockadjust.model");
 const createTransactionModel = require("../models/crateTransaction.model");
 const fundhandoverModel = require("../models/fundHandoverDescription.model");
+const invoiceModel = require("../models/invoice.model");
 
 exports.purchaseInvoice = asynchandeler(async (req, res) => {
   const { startDate, endDate, supplierName } = req.body;
@@ -1241,5 +1242,82 @@ exports.getFundHandoverReport = asynchandeler(async (req, res) => {
     200,
     "Fund handover report fetched successfully (merged into single object)",
     finalReport
+  );
+});
+
+//INVOICE WISE WEB PROFIT
+
+exports.getInvoiceReport = asynchandeler(async (req, res) => {
+  const { startDate, endDate } = req.body;
+
+  const match = {};
+
+  // Date filter
+  if (startDate && endDate) {
+    match.createdAt = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+
+  const invoices = await invoiceModel.aggregate([
+    { $match: match },
+
+    // Project required fields
+    {
+      $project: {
+        invoiceId: 1,
+        orderId: "$order",
+        date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+        customerName: "$customerDetails.fullName",
+        customerMobile: "$customerDetails.phone",
+        finalAmount: 1,
+        ProductInfo: 1,
+      },
+    },
+
+    // Calculate profit per invoice
+    {
+      $addFields: {
+        profit: {
+          $sum: {
+            $map: {
+              input: "$ProductInfo",
+              as: "p",
+              in: {
+                $subtract: ["$$p.retailPrice", "$$p.purchasePrice"],
+              },
+            },
+          },
+        },
+      },
+    },
+
+    // Sort by date ascending
+    { $sort: { createdAt: 1 } },
+  ]);
+
+  // Calculate totals
+  let totalFinalAmount = 0;
+  let totalProfit = 0;
+
+  const resultArray = invoices.map((inv) => {
+    totalFinalAmount += inv.finalAmount || 0;
+    totalProfit += inv.profit || 0;
+    return inv;
+  });
+
+  // Push summary as last object
+  resultArray.push({
+    summary: true,
+    totalFinalAmount,
+    totalProfit,
+  });
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Invoice report fetched successfully",
+    resultArray
   );
 });

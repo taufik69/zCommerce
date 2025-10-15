@@ -47,6 +47,7 @@ const invoiceSchema = new Schema(
     paymentGatewayUrl: {
       type: String,
     },
+    ProductInfo: {},
   },
   {
     timestamps: true, // Automatically add createdAt and updatedAt fields
