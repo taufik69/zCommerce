@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema(
     twoFactorEnabled: { type: Boolean, default: false },
     isBlocked: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
-    createdBy: { type: String },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     refreshToken: {
       type: String,
     },
@@ -46,6 +46,15 @@ const userSchema = new mongoose.Schema(
 userSchema.pre("save", async function (next) {
   if (this.isModified("password")) {
     this.password = await bcrypt.hash(this.password, 10);
+  }
+  next();
+});
+
+// compare password
+userSchema.pre("findOneAndUpdate", async function (next) {
+  const update = this.getUpdate();
+  if (update.password) {
+    update.password = await bcrypt.hash(update.password, 10);
   }
   next();
 });

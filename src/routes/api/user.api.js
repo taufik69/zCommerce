@@ -2,6 +2,11 @@ const express = require("express");
 const _ = express.Router();
 const authController = require("../../controller/user.controller");
 const { authGuard } = require("../../middleware/authMiddleware");
+const {
+  multipleFileUpload,
+  singleFileUpload,
+} = require("../../middleware/multer.middleware");
+
 _.post("/registeruser", authController.registerUser);
 _.post("/login", authController.login);
 _.post("/refresh-token", authController.refreshToken);
@@ -25,5 +30,10 @@ _.put(
   authGuard,
   authController.removePermissionFromUser
 );
+
 _.get("/isSuperAdmin", authController.isSuperAdmin);
+_.post("/add-user", singleFileUpload("image"), authController.addUser);
+_.get("/get-user-added-by-admin", authController.getUserAddedByAdmin);
+_.delete("/detete-user/:id", authController.deleteUser);
+_.put("/user-update/:id", singleFileUpload("image"), authController.updateUser);
 module.exports = _;

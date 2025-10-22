@@ -8,6 +8,10 @@ const { apiResponse } = require("../utils/apiResponse");
 const { customError } = require("../lib/CustomError");
 const { validateUser } = require("../validation/user.validation");
 const { asynchandeler } = require("../lib/asyncHandeler");
+const {
+  cloudinaryFileUpload,
+  deleteCloudinaryFile,
+} = require("../helpers/cloudinary");
 
 // user registraion/ or add user
 exports.registerUser = asynchandeler(async (req, res) => {
@@ -28,8 +32,8 @@ exports.registerUser = asynchandeler(async (req, res) => {
     password,
     phone,
     image: image || null,
-    roles: ["687f69506c48eb6386dc5f6b"],
-    permissions: ["688349a1e7a73135ef6c3969"],
+    roles: [],
+    permissions: [],
   });
 
   await user.save();
@@ -386,4 +390,158 @@ exports.isSuperAdmin = asynchandeler(async (req, res) => {
   return apiResponse.sendSuccess(res, 200, "User fetched successfully", {
     isSuperAdmin,
   });
+});
+
+// add user
+exports.addUser = asynchandeler(async (req, res) => {
+  // Validate input
+  const value = await validateUser(req);
+  const { optimizeUrl } = await cloudinaryFileUpload(value.image.path);
+
+  const user = new User({
+    ...value,
+    image: optimizeUrl || null,
+    roles: value.role ? [value.role] : [],
+    createdBy: req.user._id || null,
+  });
+  await user.save();
+
+  // again find user
+  const userObj = await User.findById(user._id)
+    .populate({
+      path: "roles",
+    })
+    .populate("permissions")
+    .select(
+      "-password -__v -resetPasswordToken -resetPasswordExpires -updatedAt -wishList -cart -newsLetterSubscribe -lastlogin -lastLogout -createdAt -refreshToken -twoFactorEnabled -newsLetterSubscribe -isEmailVerified -isPhoneVerified"
+    );
+  apiResponse.sendSuccess(res, 201, "User added successfully", userObj);
+});
+
+// get user added by admin
+exports.getUserAddedByAdmin = asynchandeler(async (req, res) => {
+  const users = await User.find({})
+    .select(
+      "-__v -password -refreshToken -createdAt -twoFactorEnabled -newsLetterSubscribe"
+    )
+    .populate("roles");
+
+  // filter users added by admin and roles array have some value
+
+  const filteredUsers = users.filter(
+    (user) => user.roles && user.roles.length > 0
+  );
+  console.log("req.user._id:", filteredUsers);
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Users fetched successfully",
+    filteredUsers
+  );
+});
+
+// user update
+exports.updateUser = asynchandeler(async (req, res) => {
+  const { id } = req.params;
+  const data = req.body;
+
+  // ✅ Manual basic field validation
+  const requiredFields = ["name", "email", "phone"];
+  for (const field of requiredFields) {
+    if (!data[field] || data[field].toString().trim() === "") {
+      throw new customError(`${field} is required`, 400);
+    }
+  }
+
+  // ✅ Prepare update object
+  const updateData = {
+    name: data.name,
+    email: data.email,
+    phone: data.phone,
+  };
+
+  // ✅ Add password only if given
+  if (data.password && data.password.trim() !== "") {
+    updateData.password = data.password;
+  }
+
+  // ✅ Replace roles array if new role given
+  if (data.role) {
+    updateData.roles = [data.role];
+  }
+
+  // ✅ Handle image upload & old image deletion
+  if (req.file) {
+    const validTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
+    if (!validTypes.includes(req.file.mimetype)) {
+      throw new customError(
+        "Invalid image format. Only JPG, PNG, and WEBP are allowed.",
+        400
+      );
+    }
+    if (req.file.size > 2 * 1024 * 1024) {
+      throw new customError("Image size should be less than 2MB.", 400);
+    }
+
+    // Find existing user to get old image
+    const existingUser = await User.findById(id);
+    if (!existingUser) {
+      throw new customError("User not found", 404);
+    }
+
+    // Delete old image from Cloudinary if it exists
+    if (existingUser.image) {
+      const match = existingUser.image.split("/");
+      const publicId = match[match.length - 1].split(".")[0];
+      if (publicId) {
+        await deleteCloudinaryFile(publicId.split("?")[0]);
+      }
+    }
+
+    // Upload new image
+    const upload = await cloudinaryFileUpload(req.file.path);
+    updateData.image = upload.optimizeUrl;
+  }
+
+  // ✅ Update user in DB
+  const updatedUser = await User.findByIdAndUpdate(id, updateData, {
+    new: true,
+    runValidators: true,
+  })
+    .populate("roles")
+    .populate("permissions")
+    .select(
+      "-password -__v -resetPasswordToken -resetPasswordExpires -updatedAt -wishList -cart -newsLetterSubscribe -lastlogin -lastLogout -createdAt -refreshToken -twoFactorEnabled -isEmailVerified -isPhoneVerified"
+    );
+
+  if (!updatedUser) {
+    throw new customError("User not found", 404);
+  }
+
+  apiResponse.sendSuccess(res, 200, "User updated successfully", updatedUser);
+});
+
+// delte user
+exports.deleteUser = asynchandeler(async (req, res) => {
+  const { id } = req.params;
+
+  // Find user first
+  const user = await User.findById(id);
+  if (!user) {
+    throw new customError("User not found", 404);
+  }
+
+  // Delete image from Cloudinary if exists
+  if (user.image) {
+    const match = user.image.split("/");
+    const publicId = match[match.length - 1].split(".")[0];
+    if (publicId) {
+      await deleteCloudinaryFile(publicId.split("?")[0]);
+    }
+  }
+
+  // Delete user from DB
+  await User.findByIdAndDelete(id);
+
+  apiResponse.sendSuccess(res, 200, "User deleted successfully", user);
 });
