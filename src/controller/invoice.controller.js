@@ -431,6 +431,21 @@ exports.getPurchaseBySupplier = asynchandeler(async (req, res) => {
   );
 });
 
+// get supplier name wise summary
+exports.getSupplierSummary = asynchandeler(async (req, res) => {
+  const result = await purchaseModel
+    .find({
+      supplierName: { $ne: "" },
+    })
+    .select("supplierName");
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Supplier summary fetched successfully",
+    result
+  );
+});
+
 // geta all order and calculate tatoal product price or varinat producxt price or deliveryCharge price
 exports.getInvoiceReport = asynchandeler(async (req, res) => {
   const { startDate, endDate } = req.query;
@@ -1610,3 +1625,5 @@ exports.getZeroSaleProductsLast30Days = asynchandeler(async (req, res) => {
     data
   );
 });
+
+// get all supplier purchase report
