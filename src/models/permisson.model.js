@@ -4,13 +4,6 @@ const permissionSchema = new mongoose.Schema(
   {
     slug: { type: String, unique: true },
     permissionName: { type: String, required: true, unique: true },
-    actions: [
-      {
-        type: String,
-        enum: ["view", "add", "delete", "update"],
-        default: ["view"],
-      },
-    ],
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

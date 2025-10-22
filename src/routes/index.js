@@ -53,6 +53,7 @@ _.use("/moneytransfer", require("./api/moneyTransfer.api"));
 _.use("/fundhandover", require("./api/fundhandover.api"));
 _.use("/siteinformation", require("./api/siteinformation.api"));
 _.use("/invoice", require("./api/invoice.api"));
+_.use("/userpermission", require("./api/userpermission.api"));
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });
