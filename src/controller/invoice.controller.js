@@ -814,7 +814,14 @@ exports.getTransactionReport = asynchandeler(async (req, res) => {
     .sort({ date: -1 });
 
   if (!transactions.length) {
-    throw new customError("No transactions found", 404);
+    apiResponse.sendSuccess(res, 200, "Transaction not found !!", {
+      filters: { startDate, endDate, transactionCategory },
+      summary: {
+        cashReceived: 0,
+        cashPayment: 0,
+      },
+      transactions: [],
+    });
   }
 
   // 🧮 Calculate total amounts
