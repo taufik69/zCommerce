@@ -36,7 +36,8 @@ const crateTransactionSchema = new mongoose.Schema(
 
 // check transactionCategory existence before save
 crateTransactionSchema.pre("save", async function (next) {
-  const tranasactionCategoryModel = require("./transactionCategory.model");
+  const tranasactionCategoryModel = require("../models/transitionCategory.model");
+
   const category = await tranasactionCategoryModel.findById(
     this.transactionCategory
   );
