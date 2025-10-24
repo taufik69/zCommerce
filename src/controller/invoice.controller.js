@@ -801,7 +801,7 @@ exports.getTransactionReport = asynchandeler(async (req, res) => {
     };
   }
 
-  // 🏷️ Transaction Category filter (only if provided)
+  // 🏷️ Transaction Category filter
   if (transactionCategory) {
     filter.transactionCategory = transactionCategory;
   }
