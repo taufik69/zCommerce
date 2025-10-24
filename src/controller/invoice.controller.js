@@ -770,6 +770,12 @@ exports.overallStock = asynchandeler(async (req, res) => {
   );
 });
 
+// get account all
+exports.getAllAccounts = asynchandeler(async (req, res) => {
+  const accounts = await accountModel.find().sort({ name: 1 });
+  apiResponse.sendSuccess(res, 200, "Accounts fetched successfully", accounts);
+});
+
 //get tranaaction category
 exports.getTransactionCategories = asynchandeler(async (req, res) => {
   const categories = await createTransactionModel
@@ -784,69 +790,57 @@ exports.getTransactionCategories = asynchandeler(async (req, res) => {
     categories
   );
 });
-
-// get account all
-exports.getAllAccounts = asynchandeler(async (req, res) => {
-  const accounts = await accountModel.find().sort({ name: 1 });
-  apiResponse.sendSuccess(res, 200, "Accounts fetched successfully", accounts);
-});
-
 // transaction report
 exports.getTransactionReport = asynchandeler(async (req, res) => {
   const { startDate, endDate, transactionCategory } = req.body;
 
   const filter = {};
 
-  // 📅 Date filter
-  if (startDate && endDate) {
+  // ✅ Validate and apply date range
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
     filter.date = {
-      $gte: new Date(startDate),
-      $lte: new Date(endDate),
+      $gte: start,
+      $lte: end,
     };
   }
 
-  // 🏷️ Transaction Category filter
-  if (transactionCategory) {
+  // ✅ Category filter (only if valid)
+  if (transactionCategory && transactionCategory.trim() !== "") {
     filter.transactionCategory = transactionCategory;
   }
 
-  // 🔍 Fetch transactions with populated data
+  // 🔍 Fetch transactions
   const transactions = await createTransactionModel
     .find(filter)
     .populate("transactionCategory")
     .populate("account")
     .sort({ date: -1 });
 
+  // 🧮 If no transactions found
   if (!transactions.length) {
-    apiResponse.sendSuccess(res, 200, "Transaction not found !!", {
+    return apiResponse.sendSuccess(res, 200, "Transaction not found !!", {
       filters: { startDate, endDate, transactionCategory },
-      summary: {
-        cashReceived: 0,
-        cashPayment: 0,
-      },
+      summary: { cashReceived: 0, cashPayment: 0 },
       transactions: [],
     });
   }
 
-  // 🧮 Calculate total amounts
+  // 🧮 Calculate totals
   let cashReceived = 0;
   let cashPayment = 0;
 
   transactions.forEach((tx) => {
-    if (tx.transactionType?.toLowerCase() === "cash recived") {
-      cashReceived += tx.amount;
-    } else if (tx.transactionType?.toLowerCase() === "cash payment") {
-      cashPayment += tx.amount;
-    }
+    const type = tx.transactionType?.toLowerCase();
+    if (type === "cash recived") cashReceived += tx.amount;
+    else if (type === "cash payment") cashPayment += tx.amount;
   });
 
-  // ✅ Summary
-  const summary = {
-    cashReceived,
-    cashPayment,
-  };
+  const summary = { cashReceived, cashPayment };
 
-  // ✅ Response
+  // ✅ Send Response
   apiResponse.sendSuccess(res, 200, "Transaction report fetched successfully", {
     filters: { startDate, endDate, transactionCategory },
     summary,

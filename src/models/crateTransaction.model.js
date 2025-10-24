@@ -34,19 +34,6 @@ const crateTransactionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// check transactionCategory existence before save
-crateTransactionSchema.pre("save", async function (next) {
-  const tranasactionCategoryModel = require("../models/transitionCategory.model");
-
-  const category = await tranasactionCategoryModel.findById(
-    this.transactionCategory
-  );
-  if (!category) {
-    throw new Error("Invalid transaction category");
-  }
-  next();
-});
-
 module.exports =
   mongoose.models.CrateTransaction ||
   mongoose.model("CrateTransaction", crateTransactionSchema);
