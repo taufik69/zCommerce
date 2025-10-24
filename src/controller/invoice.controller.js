@@ -789,92 +789,57 @@ exports.getAllAccounts = asynchandeler(async (req, res) => {
 
 // transaction report
 exports.getTransactionReport = asynchandeler(async (req, res) => {
-  const { startDate, endDate, transactionCategory } = req.query;
+  const { startDate, endDate, transactionCategory } = req.body;
 
-  // 🔍 Filter conditions
-  const match = {};
+  const filter = {};
 
-  // Date range
+  // 📅 Date filter
   if (startDate && endDate) {
-    match.date = {
+    filter.date = {
       $gte: new Date(startDate),
       $lte: new Date(endDate),
     };
   }
 
-  // Category filter
+  // 🏷️ Transaction Category filter (only if provided)
   if (transactionCategory) {
-    match.transactionCategory = new mongoose.Types.ObjectId(
-      transactionCategory
-    );
+    filter.transactionCategory = transactionCategory;
   }
 
-  // 🧮 Aggregation pipeline
-  const report = await createTransactionModel.aggregate([
-    { $match: match },
+  // 🔍 Fetch transactions with populated data
+  const transactions = await createTransactionModel
+    .find(filter)
+    .populate("transactionCategory")
+    .populate("account")
+    .sort({ date: -1 });
 
-    // populate equivalent via lookup
-    {
-      $lookup: {
-        from: "transitioncategories",
-        localField: "transactionCategory",
-        foreignField: "_id",
-        as: "transactionCategory",
-      },
-    },
-    {
-      $unwind: {
-        path: "$transactionCategory",
-        preserveNullAndEmptyArrays: true,
-      },
-    },
+  if (!transactions.length) {
+    throw new customError("No transactions found", 404);
+  }
 
-    {
-      $lookup: {
-        from: "accounts",
-        localField: "account",
-        foreignField: "_id",
-        as: "account",
-      },
-    },
-    { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
-
-    // 🧮 Calculate totals
-    {
-      $facet: {
-        transactions: [{ $sort: { date: -1 } }], // all transactions
-        totals: [
-          {
-            $group: {
-              _id: "$transactionType",
-              totalAmount: { $sum: "$amount" },
-            },
-          },
-        ],
-      },
-    },
-  ]);
-
-  // 🧾 Extract summary
-  const data = report[0] || { transactions: [], totals: [] };
-
+  // 🧮 Calculate total amounts
   let cashReceived = 0;
   let cashPayment = 0;
 
-  data.totals.forEach((t) => {
-    if (t._id === "cash recived") cashReceived = t.totalAmount;
-    if (t._id === "cash payment") cashPayment = t.totalAmount;
+  transactions.forEach((tx) => {
+    if (tx.transactionType?.toLowerCase() === "cash recived") {
+      cashReceived += tx.amount;
+    } else if (tx.transactionType?.toLowerCase() === "cash payment") {
+      cashPayment += tx.amount;
+    }
   });
 
+  // ✅ Summary
   const summary = {
     cashReceived,
     cashPayment,
   };
 
+  // ✅ Response
   apiResponse.sendSuccess(res, 200, "Transaction report fetched successfully", {
     filters: { startDate, endDate, transactionCategory },
     summary,
-    transactions: data.transactions,
+    transactions,
   });
 });
 
