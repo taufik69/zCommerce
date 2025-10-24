@@ -12,6 +12,7 @@ const fundhandoverModel = require("../models/fundHandoverDescription.model");
 const invoiceModel = require("../models/invoice.model");
 const VariantModel = require("../models/variant.model");
 const ProductModel = require("../models/product.model");
+const accountModel = require("../models/account.model");
 
 exports.purchaseInvoice = asynchandeler(async (req, res) => {
   const { startDate, endDate, supplierName } = req.body;
@@ -778,6 +779,12 @@ exports.getTransactionCategories = asynchandeler(async (req, res) => {
     "Transaction categories fetched successfully",
     categories
   );
+});
+
+// get account all
+exports.getAllAccounts = asynchandeler(async (req, res) => {
+  const accounts = await accountModel.find().sort({ name: 1 });
+  apiResponse.sendSuccess(res, 200, "Accounts fetched successfully", accounts);
 });
 
 // transaction report

@@ -13,6 +13,7 @@ _.route("/overallStock").post(invoiceController.overallStock);
 _.route("/transaction-category").get(
   invoiceController.getTransactionCategories
 );
+_.route("/getallaccounts").get(invoiceController.getAllAccounts);
 _.route("/transaction-report").post(invoiceController.getTransactionReport);
 _.route("/transaction-summary").post(
   invoiceController.getTransactionSummaryByDate
