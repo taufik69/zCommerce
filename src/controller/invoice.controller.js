@@ -771,12 +771,40 @@ exports.overallStock = asynchandeler(async (req, res) => {
 });
 
 // get account all
+// ...existing code...
 exports.getAllAccounts = asynchandeler(async (req, res) => {
-  const accounts = await accountModel.find().sort({ name: 1 });
-  apiResponse.sendSuccess(res, 200, "Accounts fetched successfully", accounts);
+  // fetch transactions that have account reference and populate only needed fields
+  const transactions = await createTransactionModel
+    .find({ account: { $exists: true } })
+    .populate("account", "_id name")
+    .select("account -_id");
+
+  // collect unique accounts using Map (keyed by id)
+  const uniqueAccountsMap = new Map();
+  transactions.forEach((tx) => {
+    const acc = tx.account;
+    if (acc && acc._id) {
+      uniqueAccountsMap.set(acc._id.toString(), {
+        _id: acc._id,
+        name: acc.name,
+      });
+    }
+  });
+
+  // convert to array and sort by name
+  const uniqueAccounts = Array.from(uniqueAccountsMap.values()).sort((a, b) =>
+    (a.name || "").localeCompare(b.name || "")
+  );
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Accounts fetched successfully",
+    uniqueAccounts
+  );
 });
 
-//get tranaaction category
+//get transaction category
 exports.getTransactionCategories = asynchandeler(async (req, res) => {
   const categories = await createTransactionModel
     .find({ transactionCategory: { $exists: true } })
