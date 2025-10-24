@@ -769,8 +769,18 @@ exports.overallStock = asynchandeler(async (req, res) => {
   );
 });
 
-// transaction report
+//get tranaaction category
+exports.getTransactionCategories = asynchandeler(async (req, res) => {
+  const categories = await tranasactionCategoryModel.find().sort({ name: 1 });
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Transaction categories fetched successfully",
+    categories
+  );
+});
 
+// transaction report
 exports.getTransactionReport = asynchandeler(async (req, res) => {
   const { startDate, endDate, transactionCategory } = req.query;
 

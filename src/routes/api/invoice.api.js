@@ -10,6 +10,9 @@ _.route("/order-status").post(invoiceController.getOrderSummaryByDate);
 _.route("/courier-sendinfo").post(invoiceController.getCourierSendInformation);
 _.route("/overallStock").post(invoiceController.overallStock);
 // tranaction category
+_.route("/transaction-category").get(
+  invoiceController.getTransactionCategories
+);
 _.route("/transaction-report").post(invoiceController.getTransactionReport);
 _.route("/transaction-summary").post(
   invoiceController.getTransactionSummaryByDate
