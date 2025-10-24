@@ -772,7 +772,11 @@ exports.overallStock = asynchandeler(async (req, res) => {
 
 //get tranaaction category
 exports.getTransactionCategories = asynchandeler(async (req, res) => {
-  const categories = await tranasactionCategoryModel.find().sort({ name: 1 });
+  const categories = await createTransactionModel
+    .find({ transactionCategory: { $exists: true } })
+    .populate("transactionCategory")
+    .select("transactionCategory -_id ")
+    .sort({ createdAt: 1 });
   apiResponse.sendSuccess(
     res,
     200,
