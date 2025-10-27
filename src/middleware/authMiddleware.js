@@ -23,6 +23,7 @@ exports.authGuard = asynchandeler(async (req, res, next) => {
   })
     .populate("roles")
     .populate("permissions.permission")
+    .populate("createdBy")
     .select(
       "-__v -wishList -cart -newsLetterSubscribe -refreshToken -password -twoFactorEnabled  "
     );

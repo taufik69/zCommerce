@@ -127,6 +127,7 @@ exports.updateUserPermissions = asynchandeler(async (req, res) => {
   }
 
   user.permissions = userPermissions;
+  user.createdBy = req.user?.id;
   await user.save();
 
   const updatedUser = await User.findById(userId)
@@ -139,7 +140,6 @@ exports.updateUserPermissions = asynchandeler(async (req, res) => {
       name: updatedUser.name,
       email: updatedUser.email,
     },
-    permissions: updatedUser.permissions,
   });
 });
 

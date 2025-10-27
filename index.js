@@ -6,7 +6,6 @@ const { customError } = require("./src/lib/CustomError");
 dbConnect()
   .then(() => {
     const PORT = process.env.PORT || 3000;
-
     // just server.listen()
     server.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);

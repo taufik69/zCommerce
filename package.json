@@ -10,7 +10,8 @@
     "seed:permissions": "node src/seeder/permissionSeeder.js",
     "seed:delivery": "node src/seeder/deliverySeeder.js",
     "seed:roles": "node src/seeder/roleSeeder.js",
-    "socket": "node src/socket/client.js"
+    "socket": "node src/socket/client.js",
+    "admin":"node src/seeder/addAdminSeeder.js"
   },
   "keywords": [],
   "author": "",
