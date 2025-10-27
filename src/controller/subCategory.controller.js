@@ -147,7 +147,10 @@ exports.deleteSubCategory = asynchandeler(async (req, res) => {
 // @desc    Activate a subcategory by slug
 exports.activateSubCategory = asynchandeler(async (req, res) => {
   const { slug } = req.params;
-  const subCategory = await Subcategory.findOne({ slug, isActive: false });
+  const subCategory = await Subcategory.findOne({
+    slug: "kabli-panjabi",
+  });
+
   if (!subCategory) {
     throw new customError("Subcategory not found", 404);
   }
@@ -163,7 +166,7 @@ exports.activateSubCategory = asynchandeler(async (req, res) => {
 // @desc    Deactivate a subcategory by slug
 exports.deactivateSubCategory = asynchandeler(async (req, res) => {
   const { slug } = req.params;
-  const subCategory = await Subcategory.findOne({ slug, isActive: true });
+  const subCategory = await Subcategory.findOne({ slug });
   if (!subCategory) {
     throw new customError("Subcategory not found", 404);
   }
