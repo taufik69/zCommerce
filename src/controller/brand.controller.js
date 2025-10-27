@@ -10,9 +10,10 @@ const {
 // @desc    Create a new brand
 // @route   POST /api/v1/brand
 exports.createBrand = asynchandeler(async (req, res) => {
-  const { name } = req.body; // array of brand names
-  const files = req.files; // array of images
+  const { name } = req.body;
+  const files = req.files;
 
+  // ✅ Validation
   if (!Array.isArray(name) || name.length === 0) {
     throw new customError("At least one brand name is required", 400);
   }
@@ -25,21 +26,38 @@ exports.createBrand = asynchandeler(async (req, res) => {
     throw new customError("Each brand must have an image", 400);
   }
 
-  let savedBrands = [];
+  // ✅ Send immediate response (non-blocking)
+  apiResponse.sendSuccess(
+    res,
+    202,
+    "Brands created successfully. Processing in background."
+  );
 
-  for (let i = 0; i < name.length; i++) {
-    const imageUpload = await cloudinaryFileUpload(files[i].path);
+  // ✅ Background processing (fire-and-forget)
+  (async () => {
+    try {
+      let savedBrands = [];
 
-    const brand = new Brand({
-      name: name[i],
-      image: imageUpload.optimizeUrl,
-    });
+      for (let i = 0; i < name.length; i++) {
+        const imageUpload = await cloudinaryFileUpload(files[i].path);
 
-    await brand.save();
-    savedBrands.push(brand);
-  }
+        const brand = new Brand({
+          name: name[i],
+          image: imageUpload.optimizeUrl,
+        });
 
-  apiResponse.sendSuccess(res, 201, "Brands created successfully", savedBrands);
+        await brand.save();
+        savedBrands.push(brand);
+      }
+
+      console.log(
+        "✅ Background Brand Creation Completed:",
+        savedBrands.length
+      );
+    } catch (error) {
+      console.error("❌ Background brand creation failed:", error.message);
+    }
+  })();
 });
 
 // get all brands
@@ -66,85 +84,110 @@ exports.getBrandBySlug = asynchandeler(async (req, res, next) => {
 exports.updateBrand = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
-  // Find the brand by slug
+  // ✅ Step 1: Find the brand
   const brand = await Brand.findOne({ slug, isActive: true });
   if (!brand) {
     throw new customError("Brand not found", 404);
   }
 
-  let optimizeUrlsCloudinary = [];
+  // ✅ Step 2: Send immediate response (non-blocking)
+  apiResponse.sendSuccess(
+    res,
+    202,
+    "Brand update is successfully. Processing in background.",
+    { slug }
+  );
 
-  // Check if new images are provided
-  if (req?.files?.length) {
-    // Delete all old images from Cloudinary
-    const deletePromises = brand.image.map(async (imageUrl) => {
-      const match = imageUrl.split("/");
-      const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
+  // ✅ Step 3: Background processing (fire-and-forget)
+  (async () => {
+    try {
+      let optimizeUrlsCloudinary = [];
 
-      if (!publicId) {
-        throw new customError("Invalid image URL", 400);
+      if (req?.files?.length) {
+        // Delete old images
+        const deletePromises = brand.image.map(async (imageUrl) => {
+          const match = imageUrl.split("/");
+          const publicId = match[match.length - 1].split(".")[0];
+          if (publicId) {
+            await deleteCloudinaryFile(publicId.split("?")[0]);
+          } else {
+            console.warn(`⚠️ Invalid image URL for brand: ${brand._id}`);
+          }
+        });
+
+        await Promise.all(deletePromises);
+
+        // Upload new images
+        const uploadPromises = req.files.map(async (file) => {
+          const result = await cloudinaryFileUpload(file.path);
+          if (!result) {
+            throw new customError("Image upload failed", 500);
+          }
+          return result.optimizeUrl;
+        });
+
+        optimizeUrlsCloudinary = await Promise.all(uploadPromises);
       }
 
-      await deleteCloudinaryFile(publicId.split("?")[0]);
-    });
-
-    await Promise.all(deletePromises); // Wait for all deletions to complete
-
-    // Upload the new images to Cloudinary
-    const uploadPromises = req.files.map(async (file) => {
-      const result = await cloudinaryFileUpload(file.path);
-
-      if (!result) {
-        throw new customError("Image upload failed", 500);
+      // Update brand in DB
+      brand.name = req.body.name || brand.name;
+      if (optimizeUrlsCloudinary.length > 0) {
+        brand.image = optimizeUrlsCloudinary;
       }
-      return result.optimizeUrl; // Return the optimized URL
-    });
 
-    optimizeUrlsCloudinary = await Promise.all(uploadPromises); // Wait for all uploads to finish
-  }
-
-  // Update the brand in the database
-  brand.name = req.body.name || brand.name;
-  if (optimizeUrlsCloudinary.length > 0) {
-    brand.image = optimizeUrlsCloudinary; // Replace all images
-  }
-  await brand.save();
-
-  // Send success response
-  apiResponse.sendSuccess(res, 200, "Brand updated successfully", {
-    brand,
-  });
+      await brand.save();
+      console.log(`✅ Background brand update completed: ${brand._id}`);
+    } catch (error) {
+      console.error(`❌ Background brand update failed:`, error.message);
+    }
+  })();
 });
 
 // @desc    Delete a brand by slug
 exports.deleteBrand = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
-  // Find the brand by slug
+  // ✅ Step 1: Find the brand
   const brand = await Brand.findOne({ slug, isActive: true });
   if (!brand) {
     throw new customError("Brand not found", 404);
   }
 
-  // Delete all images from Cloudinary
-  const deletePromises = brand.image.map(async (imageUrl) => {
-    const match = imageUrl.split("/");
-    const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
-    console.log("publicId", publicId.split("?")[0]);
+  // ✅ Step 2: Send immediate response (non-blocking)
+  apiResponse.sendSuccess(
+    res,
+    202,
+    "Brand deletion is successfully being processed in the background",
+    { slug }
+  );
 
-    if (!publicId) {
-      throw new customError("Invalid image URL", 400);
+  // ✅ Step 3: Background processing (fire-and-forget)
+  (async () => {
+    try {
+      if (brand.image?.length > 0) {
+        const deletePromises = brand.image.map(async (imageUrl) => {
+          const match = imageUrl.split("/");
+          const publicId = match[match.length - 1].split(".")[0]; // Extract public ID
+
+          if (publicId) {
+            await deleteCloudinaryFile(publicId.split("?")[0]);
+            console.log(`🗑️ Deleted Cloudinary image: ${publicId}`);
+          } else {
+            console.warn(`⚠️ Invalid image URL for brand: ${brand._id}`);
+          }
+        });
+
+        await Promise.all(deletePromises);
+      }
+
+      // Delete the brand document from DB
+      await Brand.deleteOne({ slug });
+      console.log(`✅ Background brand deletion completed: ${slug}`);
+    } catch (error) {
+      console.error(
+        `❌ Background brand deletion failed: ${slug}`,
+        error.message
+      );
     }
-
-    await deleteCloudinaryFile(publicId.split("?")[0]);
-  });
-  await Promise.all(deletePromises); // Wait for all deletions to complete
-
-  // delete the brand from the database
-  await Brand.deleteOne({ slug });
-
-  // Send success response
-  apiResponse.sendSuccess(res, 200, "Brand deleted successfully", {
-    brand,
-  });
+  })();
 });
