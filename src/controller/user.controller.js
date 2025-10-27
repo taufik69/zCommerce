@@ -394,28 +394,36 @@ exports.isSuperAdmin = asynchandeler(async (req, res) => {
 
 // add user
 exports.addUser = asynchandeler(async (req, res) => {
-  // Validate input
   const value = await validateUser(req);
-  const { optimizeUrl } = await cloudinaryFileUpload(value.image.path);
 
-  const user = new User({
+  // Create user first
+  const user = await User.create({
     ...value,
-    image: optimizeUrl || null,
+    image: null,
     roles: value.role ? [value.role] : [],
-    createdBy: req.user._id || null,
+    createdBy: req.user?._id || null,
   });
-  await user.save();
 
-  // again find user
-  const userObj = await User.findById(user._id)
-    .populate({
-      path: "roles",
-    })
-    .populate("permissions")
-    .select(
-      "-password -__v -resetPasswordToken -resetPasswordExpires -updatedAt -wishList -cart -newsLetterSubscribe -lastlogin -lastLogout -createdAt -refreshToken -twoFactorEnabled -newsLetterSubscribe -isEmailVerified -isPhoneVerified"
-    );
-  apiResponse.sendSuccess(res, 201, "User added successfully", userObj);
+  // Start upload in background (non-blocking)
+  (async () => {
+    try {
+      const { optimizeUrl } = await cloudinaryFileUpload(value.image.path);
+      await User.findByIdAndUpdate(user._id, { image: optimizeUrl });
+    } catch (err) {
+      console.error("Background image upload failed:", err.message);
+    }
+  })();
+
+  apiResponse.sendSuccess(
+    res,
+    201,
+    "User created successfully (image uploading in background)",
+    {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+    }
+  );
 });
 
 // get user added by admin
