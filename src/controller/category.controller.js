@@ -11,9 +11,10 @@ const {
 // @desc    Create a new category
 
 exports.createCategory = asynchandeler(async (req, res) => {
-  const { name } = req.body; // array of names
-  const files = req.files; // array of images
+  const { name } = req.body; // Expect array of names
+  const files = req.files; // Expect array of images
 
+  // ✅ Validation
   if (!Array.isArray(name) || name.length === 0) {
     throw new customError("At least one category name is required", 400);
   }
@@ -26,26 +27,34 @@ exports.createCategory = asynchandeler(async (req, res) => {
     throw new customError("Each category must have an image", 400);
   }
 
-  let savedCategories = [];
+  // ✅ Send response immediately (non-blocking)
+  apiResponse.sendSuccess(res, 202, "Categories are being created ");
 
-  for (let i = 0; i < name.length; i++) {
-    const imageUpload = await cloudinaryFileUpload(files[i].path);
+  // ✅ Handle upload & DB insert in background (fire and forget)
+  (async () => {
+    try {
+      let savedCategories = [];
 
-    const category = new Category({
-      name: name[i],
-      image: imageUpload.optimizeUrl,
-    });
+      for (let i = 0; i < name.length; i++) {
+        const imageUpload = await cloudinaryFileUpload(files[i].path);
 
-    await category.save();
-    savedCategories.push(category);
-  }
+        const category = new Category({
+          name: name[i],
+          image: imageUpload.optimizeUrl,
+        });
 
-  apiResponse.sendSuccess(
-    res,
-    201,
-    "Categories created successfully",
-    savedCategories
-  );
+        await category.save();
+        savedCategories.push(category);
+      }
+
+      console.log(
+        "✅ Background Category Creation Completed:",
+        savedCategories
+      );
+    } catch (error) {
+      console.error("❌ Background category creation failed:", error.message);
+    }
+  })();
 });
 
 // @desc    Get all categories
@@ -87,70 +96,102 @@ exports.getCategoryBySlug = asynchandeler(async (req, res) => {
 // @desc    Update a category by slug
 exports.updateCategory = asynchandeler(async (req, res) => {
   const { slug } = req.params;
+
+  // ✅ Step 1: Find the existing category
   const category = await Category.findOne({ slug, isActive: true });
   if (!category) {
     throw new customError("Category not found", 404);
   }
-  let optimizeUrlCloudinary = null;
-  // upload the image into cloudinary
-  if (req?.files?.length) {
-    // delete the old image from cloudinary
-    const imageUrl = category.image;
-    // Regex to extract the ID
 
-    // Match the regex and extract the ID
-    const match = imageUrl.split("/");
-    const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
+  // ✅ Step 2: Send immediate response (non-blocking)
+  apiResponse.sendSuccess(res, 202, "Category update is successfully ");
 
-    if (!publicId) {
-      throw new customError("Invalid image URL", 400);
+  // ✅ Step 3: Handle background update (fire and forget)
+  (async () => {
+    try {
+      let optimizeUrlCloudinary = null;
+
+      // If new image provided
+      if (req?.files?.length) {
+        const imageUrl = category.image;
+
+        // Extract Cloudinary public ID
+        const match = imageUrl.split("/");
+        const publicId = match[match.length - 1].split(".")[0];
+
+        if (!publicId) {
+          console.error(
+            "⚠️ Invalid Cloudinary image URL for category:",
+            category._id
+          );
+        } else {
+          // ✅ Delete old image from Cloudinary
+          await deleteCloudinaryFile(publicId.split("?")[0]);
+        }
+
+        // ✅ Upload new image to Cloudinary
+        const { optimizeUrl } = await cloudinaryFileUpload(req.files[0].path);
+        optimizeUrlCloudinary = optimizeUrl;
+      }
+
+      // ✅ Update fields in DB
+      category.name = req.body.name || category.name;
+      category.image = optimizeUrlCloudinary || category.image;
+      await category.save();
+
+      console.log("✅ Background category update completed:", category._id);
+    } catch (error) {
+      console.error("❌ Background category update failed:", error.message);
     }
-    await deleteCloudinaryFile(publicId.split("?")[0]);
-    // upload the new image into cloudinary
-    const { optimizeUrl } = await cloudinaryFileUpload(req.files[0].path);
-    optimizeUrlCloudinary = optimizeUrl;
-  }
-
-  // now update the category to the database
-  category.name = req.body.name || category.name;
-  category.image = optimizeUrlCloudinary || category.image;
-  await category.save();
-  // send success response
-  apiResponse.sendSuccess(res, 200, "Category updated successfully", {
-    category,
-  });
+  })();
 });
 
 // @desc    Delete a category by slug
 exports.deleteCategory = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
-  // Find the category by slug and ensure it is active
+  // ✅ Step 1: Find the category
   const category = await Category.findOne({ slug, isActive: true });
   if (!category) {
     throw new customError("Category not found", 404);
   }
 
-  // Delete the old image from Cloudinary
-  const imageUrl = category.image;
-  const match = imageUrl.split("/");
-  const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
+  // ✅ Step 2: Send response immediately (non-blocking)
+  apiResponse.sendSuccess(
+    res,
+    202,
+    "Category deletion is being processed in the background",
+    { slug }
+  );
 
-  if (!publicId) {
-    throw new customError("Invalid image URL", 400);
-  }
+  // ✅ Step 3: Run deletion process in background
+  (async () => {
+    try {
+      const imageUrl = category.image;
 
-  // Delete the image from Cloudinary
-  await deleteCloudinaryFile(publicId.split("?")[0]);
+      // Extract Cloudinary public ID
+      const match = imageUrl.split("/");
+      const publicId = match[match.length - 1].split(".")[0];
 
-  // Delete the category document from the database
-  await Category.findOneAndDelete({ slug, isActive: true });
+      if (publicId) {
+        // ✅ Delete image from Cloudinary
+        await deleteCloudinaryFile(publicId.split("?")[0]);
+        console.log(`🗑️ Cloudinary image deleted for category: ${slug}`);
+      } else {
+        console.warn(`⚠️ Invalid image URL for category: ${slug}`);
+      }
 
-  // Send success response
-  apiResponse.sendSuccess(res, 200, "Category deleted successfully", {
-    slug,
-    category,
-  });
+      // ✅ Delete category document from DB
+      await Category.findOneAndDelete({ slug, isActive: true });
+
+      console.log(`✅ Background category deletion completed: ${slug}`);
+    } catch (error) {
+      console.error(
+        `❌ Background deletion failed for ${slug}:`,
+        error.message
+      );
+    }
+  })();
 });
 
 // @desc activate a category by slug

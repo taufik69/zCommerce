@@ -91,7 +91,7 @@ userSchema.methods.generateJwtAccessToken = function () {
       name: this.name,
       phone: this.phone,
     },
-    process.env.ACCESS_TOKEN_SCCRECT,
+    process.env.ACCESS_TOKEN_SECRET,
     {
       expiresIn: process.env.ACCESS_TOKEN_EXPRIY,
     }

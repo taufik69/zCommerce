@@ -22,7 +22,6 @@ const deliveryTypes = [
 
 async function seedDelivery() {
   try {
-    await Delivery.deleteMany({});
     console.log("All delivery types deleted.");
 
     // Check if delivery types already exist

@@ -30,7 +30,6 @@ const permission = [
 
 async function seedPermisson() {
   try {
-    await Permission.deleteMany({});
     console.log("Cleared existing permissions.");
     // Check existing permissions
     const existingPermissions = await Permission.find({});

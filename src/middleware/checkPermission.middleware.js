@@ -6,8 +6,6 @@ const { custom } = require("joi");
 const authorize = (moduleName, action) =>
   asynchandeler(async (req, res, next) => {
     // Ensure req.user is set by auth middleware
-
-    console.log("runing ", action)
     if (!req.user || !req.user.id) {
       throw new customError("Unauthorized: User not found in request", 401);
     }
@@ -21,14 +19,14 @@ const authorize = (moduleName, action) =>
     // Check permissions
     const allowed = req.user?.permissions?.find((perm) => {
       return (
-        perm.slug === moduleName?.toString()?.toLowerCase() &&
+        perm.permission.slug === moduleName?.toString()?.toLowerCase() &&
         perm.actions &&
         perm.actions.includes(action)
       );
     });
 
     if (allowed) {
-      // If permission is found, proceed to the next middleware
+      req.permission = allowed;
       next();
     } else {
       throw new customError(

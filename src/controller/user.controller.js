@@ -58,13 +58,16 @@ exports.registerUser = asynchandeler(async (req, res) => {
 exports.login = asynchandeler(async (req, res) => {
   const { email, password, phone } = req.body;
 
-  const user = await User.findOne({ $or: [{ email }, { phone }] }).select(
-    "-__v -wishList -cart -newsLetterSubscribe  -lastLogout -createdAt  -twoFactorEnabled -newsLetterSubscribe -isEmailVerified -isPhoneVerified -roles -permission"
-  );
+  const user = await User.findOne({ $or: [{ email }, { phone }] })
+    .populate("roles")
+    .populate("permissions.permission")
+    .select(
+      "-__v -wishList -cart -newsLetterSubscribe  -lastLogout -createdAt  -twoFactorEnabled -newsLetterSubscribe -isEmailVerified -isPhoneVerified -roles -permission"
+    );
   if (!user) {
     throw new customError("User not found", 404);
   }
-
+  //check password
   const isPasswordMatch = await user.comparePassword(password);
   if (!isPasswordMatch) {
     throw new customError("Invalid credentials", 401);

@@ -7,16 +7,13 @@ const { asynchandeler } = require("../lib/asyncHandeler");
 
 exports.authGuard = asynchandeler(async (req, res, next) => {
   let token =
-    req.headers?.authorization?.trim() ||
-    req.cookies?.accessToken?.trim() ||
-    req.cookies?.token?.trim();
-
+    req.headers?.authorization?.replace("Bearer ", "") || req.body?.token;
 
   if (!token || token === "null" || token === "undefined") {
     throw new customError("Token not found or Invalid / Token Required", 401);
   }
 
-  const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SCCRECT);
+  const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
   if (!decoded) {
     throw new customError("Invalid token", 401);
@@ -25,9 +22,9 @@ exports.authGuard = asynchandeler(async (req, res, next) => {
     $or: [{ email: decoded.email }, { phone: decoded.phone }],
   })
     .populate("roles")
-    .populate("permissions")
+    .populate("permissions.permission")
     .select(
-      "-__v -wishList -cart -newsLetterSubscribe -lastLogout -createdAt -twoFactorEnabled -isEmailVerified -isPhoneVerified -roles -permission"
+      "-__v -wishList -cart -newsLetterSubscribe -refreshToken -password -twoFactorEnabled  "
     );
 
   if (!user) {

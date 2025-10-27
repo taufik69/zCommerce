@@ -39,7 +39,6 @@ const defaultRole = [
 
 const roleSeeder = async () => {
   try {
-    await Role.deleteMany({});
     console.log("All roles deleted successfully.");
 
     const existingRoles = await Role.find();
