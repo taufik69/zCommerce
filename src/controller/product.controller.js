@@ -16,7 +16,7 @@ const { populate } = require("../models/purchase.model");
 
 // Create a new product (only required fields)
 exports.createProduct = asynchandeler(async (req, res) => {
-  // Validate required fields
+  // ✅ Step 1: Validate required fields
   const value = await validateProduct(req);
   const {
     name,
@@ -37,33 +37,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
     variantType,
   } = value;
 
-  // Generate barcode using bwip-js
-  // const barcode = await bwipjs.toBuffer({
-  //   bcid: "code128",
-  //   text: `${sku}-${Date.now()}`.toLocaleUpperCase().slice(0, 13), // Unique identifier
-  //   scale: 3,
-  //   height: 10,
-  //   includetext: true,
-  //   textxalign: "center",
-  //   backgroundcolor: "FFFFFF",
-  //   // No need for output: 'svg'
-  // });
-
-  // const base64Barcode = `data:image/png;base64,${barcode.toString("base64")}`;
-  // // upload barcode to cloudinary
-  // const { optimizeUrl: barcodeUrl } = await uploadBarcodeToCloudinary(
-  //   base64Barcode
-  // );
-
-  // upload images to cloudinary
-  const imageUploads = req.files.image
-    ? await Promise.all(
-        req.files.image.map((file) => cloudinaryFileUpload(file.path))
-      )
-    : [];
-  const imageUrls = imageUploads.map((img) => img.optimizeUrl);
-
-  // Create product
+  // ✅ Step 2: Create basic product first (without images & QR)
   const product = new Product({
     name,
     barCode: barCode || `${Date.now()}`.toLocaleUpperCase().slice(0, 13),
@@ -80,40 +54,68 @@ exports.createProduct = asynchandeler(async (req, res) => {
     warrantyInformation,
     manufactureCountry,
     stock,
-    image: imageUrls,
     variantType,
     ...req.body,
   });
 
   await product.save();
 
-  // now create QR code and update product with QR code
+  // ✅ Step 3: Send immediate response
+  apiResponse.sendSuccess(
+    res,
+    202,
+    "Product creation is being processed in the background",
+    { productId: product._id }
+  );
 
-  const qrCode = await QRCode.toBuffer(
-    JSON.stringify(
-      `${
-        process.env.PRODUCT_QR_URL || "https://www.facebook.com/zahirulislamdev"
-      }`
-    ), // next time add a frontend product deatil page link
-    {
-      errorCorrectionLevel: "H",
-      margin: 2,
-      width: 200,
-      height: 200,
-      type: "png",
+  // ✅ Step 4: Background processing (fire-and-forget)
+  (async () => {
+    try {
+      // Upload images if provided
+      let imageUrls = [];
+      if (req.files?.image?.length) {
+        const imageUploads = await Promise.all(
+          req.files.image.map((file) => cloudinaryFileUpload(file.path))
+        );
+        imageUrls = imageUploads.map((img) => img.optimizeUrl);
+        product.image = imageUrls;
+      }
+
+      // Generate QR code
+      const qrCodeBuffer = await QRCode.toBuffer(
+        JSON.stringify(
+          `${
+            process.env.PRODUCT_QR_URL ||
+            "https://www.facebook.com/zahirulislamdev"
+          }`
+        ),
+        {
+          errorCorrectionLevel: "H",
+          margin: 2,
+          width: 200,
+          height: 200,
+          type: "png",
+        }
+      );
+
+      const base64qrCode = `data:image/png;base64,${qrCodeBuffer.toString(
+        "base64"
+      )}`;
+      const { optimizeUrl: qrCodeUrl } = await uploadBarcodeToCloudinary(
+        base64qrCode
+      );
+      product.qrCode = qrCodeUrl || null;
+
+      // Save product with images & QR
+      await product.save();
+      console.log(`✅ Background product creation completed: ${product._id}`);
+    } catch (error) {
+      console.error(
+        `❌ Background product creation failed: ${product._id}`,
+        error.message
+      );
     }
-  );
-  const base64qrCode = `data:image/png;base64,${qrCode.toString("base64")}`;
-
-  const { optimizeUrl: qrCodeUrl } = await uploadBarcodeToCloudinary(
-    base64qrCode
-  );
-  product.qrCode = qrCodeUrl || null;
-
-  await product.save();
-  // Send success response
-
-  apiResponse.sendSuccess(res, 201, "Product created successfully", product);
+  })();
 });
 
 //@desc Get all porducts using pipeline aggregation
@@ -285,23 +287,38 @@ exports.addProductImage = asynchandeler(async (req, res) => {
     return apiResponse.sendError(res, 404, "Product not found");
   }
 
-  // Check if files are provided
+  // ✅ Step 1: Validate files
   if (!req.files || !req.files.image || req.files.image.length === 0) {
     return apiResponse.sendError(res, 400, "No image files provided");
   }
 
-  // Upload new images to Cloudinary
-  const imageUploads = await Promise.all(
-    req.files.image.map((file) => cloudinaryFileUpload(file.path))
+  // ✅ Step 2: Send immediate response
+  apiResponse.sendSuccess(
+    res,
+    202,
+    "Image upload is being processed in the background",
+    { slug }
   );
-  const newImageUrls = imageUploads.map((img) => img.optimizeUrl);
 
-  // Add new image URLs to product.image array
-  product.image = [...product.image, ...newImageUrls];
+  // ✅ Step 3: Background processing
+  (async () => {
+    try {
+      const imageUploads = await Promise.all(
+        req.files.image.map((file) => cloudinaryFileUpload(file.path))
+      );
+      const newImageUrls = imageUploads.map((img) => img.optimizeUrl);
 
-  await product.save();
+      product.image = [...product.image, ...newImageUrls];
+      await product.save();
 
-  apiResponse.sendSuccess(res, 200, "Image(s) added successfully", product);
+      console.log(`✅ Background images added to product: ${product._id}`);
+    } catch (error) {
+      console.error(
+        `❌ Background image upload failed for product: ${product._id}`,
+        error.message
+      );
+    }
+  })();
 });
 
 //@desc find the product by slug and select image and send image urls and delte this image from cloudinary
@@ -314,26 +331,46 @@ exports.deleteProductImage = asynchandeler(async (req, res) => {
     throw new customError(404, "Product not found");
   }
 
-  // Support both single and multiple image URLs
+  // ✅ Step 1: Normalize imageUrl to array
   if (!Array.isArray(imageUrl)) {
     imageUrl = [imageUrl];
   }
 
-  // Delete each image from Cloudinary and remove from product.image array
-  for (const url of imageUrl) {
-    const match = url.split("/");
-    const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
-    if (!publicId) {
-      throw new customError(400, `Invalid image URL: ${url}`);
+  // ✅ Step 2: Send immediate response
+  apiResponse.sendSuccess(
+    res,
+    202,
+    "Image deletion is being processed in the background",
+    { slug }
+  );
+
+  // ✅ Step 3: Background processing
+  (async () => {
+    try {
+      for (const url of imageUrl) {
+        const match = url.split("/");
+        const publicId = match[match.length - 1].split(".")[0]; // Extract public ID
+
+        if (!publicId) {
+          console.warn(
+            `⚠️ Invalid image URL: ${url} for product: ${product._id}`
+          );
+          continue;
+        }
+
+        await deleteCloudinaryFile(publicId.split("?")[0]);
+        product.image = product.image.filter((img) => img !== url);
+      }
+
+      await product.save();
+      console.log(`✅ Background images deleted for product: ${product._id}`);
+    } catch (error) {
+      console.error(
+        `❌ Background image deletion failed for product: ${product._id}`,
+        error.message
+      );
     }
-
-    await deleteCloudinaryFile(publicId.split("?")[0]);
-    product.image = product.image.filter((img) => img !== url);
-  }
-
-  await product.save();
-
-  apiResponse.sendSuccess(res, 200, "Image(s) deleted successfully", product);
+  })();
 });
 
 //@desc  get products with pagination and sorting
@@ -357,21 +394,44 @@ exports.deleteProductBySlug = asynchandeler(async (req, res) => {
   if (!product) {
     return apiResponse.sendError(res, 404, "Product not found");
   }
-  // Delete all images from Cloudinary
-  if (product.image && product.image.length > 0) {
-    await Promise.all(
-      product.image.map(async (imgUrl) => {
-        const match = imgUrl.split("/");
-        const publicId = match[match.length - 1].split(".")[0]; // Extract public ID from URL
-        if (publicId) {
-          await deleteCloudinaryFile(publicId.split("?")[0]);
-        }
-      })
-    );
-  }
 
-  await Product.deleteOne({ slug });
-  apiResponse.sendSuccess(res, 200, "Product deleted successfully");
+  // ✅ Step 1: Send immediate response
+  apiResponse.sendSuccess(
+    res,
+    202,
+    "Product deletion is being processed in the background",
+    { slug }
+  );
+
+  // ✅ Step 2: Background processing
+  (async () => {
+    try {
+      // Delete all images from Cloudinary
+      if (product.image && product.image.length > 0) {
+        await Promise.all(
+          product.image.map(async (imgUrl) => {
+            const match = imgUrl.split("/");
+            const publicId = match[match.length - 1].split(".")[0];
+            if (publicId) {
+              await deleteCloudinaryFile(publicId.split("?")[0]);
+              console.log(`🗑️ Deleted Cloudinary image: ${publicId}`);
+            } else {
+              console.warn(`⚠️ Invalid image URL for product: ${product._id}`);
+            }
+          })
+        );
+      }
+
+      // Delete product document from DB
+      await Product.deleteOne({ slug });
+      console.log(`✅ Background product deletion completed: ${slug}`);
+    } catch (error) {
+      console.error(
+        `❌ Background product deletion failed: ${slug}`,
+        error.message
+      );
+    }
+  })();
 });
 
 // @desc get product review by slug

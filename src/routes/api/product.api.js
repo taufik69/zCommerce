@@ -7,8 +7,8 @@ const {
 const { authGuard } = require("../../middleware/authMiddleware");
 const { authorize } = require("../../middleware/checkPermission.middleware");
 _.route("/createproduct").post(
-  // authGuard,
-  // authorize("product", "add"),
+  authGuard,
+  authorize("product", "add"),
   multipleFileUploadWithFields([
     { name: "image", maxCount: 10 },
     { name: "thumbnail", maxCount: 1 },
@@ -16,59 +16,51 @@ _.route("/createproduct").post(
   Product.createProduct
 );
 
-_.route("/getproduct").get(
-  // authGuard,
-  // authorize("product", "view"),
-  Product.getAllProducts
-);
+_.route("/getproduct").get(Product.getAllProducts);
 
-_.route("/getproduct/:slug").get(
-  // authGuard,
-  // authorize("product", "view"),
-  Product.getProductBySlug
-);
+_.route("/getproduct/:slug").get(Product.getProductBySlug);
 _.route("/updateproductinfo/:slug").put(
-  // authGuard,
-  // authorize("product", "edit"),
+  authGuard,
+  authorize("product", "edit"),
   Product.updateProductInfoBySlug
 );
 _.route("/addproductimage/:slug").post(
-  // authGuard,
-  // authorize("product", "edit"),
+  authGuard,
+  authorize("product", "edit"),
   multipleFileUploadWithFields([{ name: "image", maxCount: 10 }]),
   Product.addProductImage
 );
 
 _.route("/deleteproductimage/:slug").delete(
-  // authGuard,
-  // authorize("product", "edit"),
+  authGuard,
+  authorize("product", "edit"),
   Product.deleteProductImage
 );
 
 _.route("/productperpage").get(
-  // authGuard,
-  // authorize("product", "view"),
+  authGuard,
+  authorize("product", "view"),
   Product.getProductsWithPagination
 );
 _.route("/deleteproduct/:slug").delete(
-  // authGuard,
-  // authorize("product", "delete"),
+  authGuard,
+  authorize("product", "delete"),
   Product.deleteProductBySlug
 );
 _.route("/product-review/:slug").get(
-  // authGuard,
+  authGuard,
   // authorize("product", "view"),
   Product.getProductReviewBySlug
 );
 
 _.route("/product-comment/:slug").post(
-  // authGuard,
+  authGuard,
   // authorize("product", "edit"),
   Product.updateProductReviewBySlug
 );
 
 _.route("/remove-comment/:slug").delete(
-  // authGuard,
+  authGuard,
   // authorize("product", "edit"),
   Product.removeProductReviewBySlug
 );
