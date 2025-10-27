@@ -3,6 +3,7 @@ const User = require("../models/user.model");
 const Permission = require("../models/permisson.model");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
+require("../models/role.model");
 
 // get all permissions
 exports.getAllPermissions = asynchandeler(async (req, res) => {
@@ -19,11 +20,13 @@ exports.getAllPermissions = asynchandeler(async (req, res) => {
 });
 
 // ===============================
-// 2. Get all users (User dropdown এর জন্য)
+// 2. Get all users
 // ===============================
 exports.getAllUsers = asynchandeler(async (req, res) => {
   const users = await User.find({ isActive: true })
-    .select("name email phone")
+    .select("name email phone roles permissions")
+    .populate("roles")
+    .populate("permissions.permission")
     .sort({ name: 1 });
 
   if (!users || users.length === 0) {
