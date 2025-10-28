@@ -2,6 +2,7 @@ require("dotenv").config();
 const bwipjs = require("bwip-js");
 const QRCode = require("qrcode");
 const Product = require("../models/product.model");
+const variant = require("../models/variant.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { apiResponse } = require("../utils/apiResponse");
@@ -607,6 +608,24 @@ exports.getBestSellingProducts = asynchandeler(async (_, res) => {
       populate: "discount",
     })
     .limit(10);
+
+  // now find the variant products which are best selling
+  const variantBestSellingProducts = await variant
+    .find({
+      "variant.totalSales": { $gt: 5 },
+    })
+    .sort({ "variant.totalSales": -1 })
+    .populate("brand variant discount")
+    .populate({
+      path: "category",
+      populate: "discount",
+    })
+    .populate({
+      path: "subcategory",
+      populate: "discount",
+    })
+    .limit(10);
+  products.push(...variantBestSellingProducts);
 
   apiResponse.sendSuccess(
     res,
