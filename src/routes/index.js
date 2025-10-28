@@ -55,6 +55,7 @@ _.use("/siteinformation", require("./api/siteinformation.api"));
 _.use("/invoice", require("./api/invoice.api"));
 _.use("/userpermission", require("./api/userpermission.api"));
 _.use("/banner", require("./api/banner.api"));
+_.use("/outletinformation", require("./api/outletinformation.api"));
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });
