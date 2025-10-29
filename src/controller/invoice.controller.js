@@ -1014,6 +1014,12 @@ exports.getCashLedgerReport = asynchandeler(async (req, res) => {
     }
   });
 
+  // ✅ Add serial numbers (TRXID-00001, TRXID-00002 ...)
+  const transactionsWithSerial = report.map((transaction, index) => ({
+    serialNumber: `TRXID-${String(index + 1).padStart(5, "0")}`, // -> TRXID-00001
+    ...transaction.toObject(),
+  }));
+
   // ✅ Calculate balance
   const balance = totalCashReceived - totalCashPayment;
 
@@ -1022,7 +1028,7 @@ exports.getCashLedgerReport = asynchandeler(async (req, res) => {
     totalCashReceived,
     totalCashPayment,
     balance,
-    transactions: report,
+    transactions: transactionsWithSerial,
   };
 
   apiResponse.sendSuccess(
