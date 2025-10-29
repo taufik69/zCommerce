@@ -64,6 +64,10 @@ const productSchema = joi
         "string.empty": "Variant type is required.",
         "any.required": "Variant type is required.",
       }),
+    specifications: joi.string().trim().messages({
+      "string.empty": "Specifications is required.",
+      "any.required": "Specifications is required.",
+    }),
   })
   .options({ abortEarly: false, allowUnknown: true }); // Allow extra fields, only validate required
 

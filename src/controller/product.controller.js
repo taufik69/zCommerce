@@ -36,9 +36,10 @@ exports.createProduct = asynchandeler(async (req, res) => {
     color,
     barCode,
     variantType,
+    specifications,
   } = value;
 
-  // ✅ Step 2: Create basic product first (without images & QR)
+  //  Create basic product first (without images & QR)
   const product = new Product({
     name,
     barCode: barCode || `${Date.now()}`.toLocaleUpperCase().slice(0, 13),
@@ -56,6 +57,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
     manufactureCountry,
     stock,
     variantType,
+    specifications,
     ...req.body,
   });
 
@@ -577,7 +579,11 @@ exports.getRelatedProducts = asynchandeler(async (req, res) => {
 });
 
 //@desc   discount product
+// ✅ Get all Discounted Products (Product + Variant)
 exports.getDiscountProducts = asynchandeler(async (req, res) => {
+  // ==============================
+  // 1️⃣ Find discounted main products
+  // ==============================
   const products = await Product.find({ discount: { $ne: null } })
     .populate("brand variant discount")
     .populate({
@@ -589,7 +595,37 @@ exports.getDiscountProducts = asynchandeler(async (req, res) => {
       populate: "discount",
     })
     .sort({ createdAt: -1 });
-  apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
+
+  // ==============================
+  // 2️⃣ Find discounted variant products
+  // ==============================
+  const variantDiscountedProducts = await variant
+    .find({ discount: { $ne: null } })
+    .sort({ createdAt: -1 })
+    .populate({
+      path: "product",
+      populate: [
+        { path: "category", populate: "discount" },
+        { path: "subcategory", populate: "discount" },
+        { path: "brand", populate: "discount" },
+      ],
+      select: "-variant",
+    });
+
+  // ==============================
+  // 3️⃣ Merge both product lists
+  // ==============================
+  const allDiscountedProducts = [...products, ...variantDiscountedProducts];
+
+  // ==============================
+  // 4️⃣ Send success response
+  // ==============================
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Discounted products fetched successfully",
+    allDiscountedProducts
+  );
 });
 
 //@desc get bestSellig product
