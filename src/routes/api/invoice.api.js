@@ -18,6 +18,7 @@ _.route("/transaction-report").post(invoiceController.getTransactionReport);
 _.route("/transaction-summary").post(
   invoiceController.getTransactionSummaryByDate
 );
+_.route("/cash-ledger-report").post(invoiceController.getCashLedgerReport);
 _.route("/transaction-accountwise").post(
   invoiceController.getTransactionSummaryByDateAndAccount
 );

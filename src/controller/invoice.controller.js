@@ -981,6 +981,58 @@ exports.getTransactionSummaryByDate = asynchandeler(async (req, res) => {
   );
 });
 
+// getCashLedgerReport
+exports.getCashLedgerReport = asynchandeler(async (req, res) => {
+  const { startDate, endDate } = req.body;
+
+  const match = {};
+
+  // ✅ Filter by date range (if provided)
+  if (startDate && endDate) {
+    match.date = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
+
+  // ✅ Fetch all transactions within range
+  const report = await createTransactionModel
+    .find(match)
+    .populate("transactionCategory")
+    .populate("account")
+    .sort({ date: -1 });
+
+  // ✅ Calculate totals
+  let totalCashReceived = 0;
+  let totalCashPayment = 0;
+
+  report.forEach((transaction) => {
+    if (transaction.transactionType === "cash recived") {
+      totalCashReceived += transaction.amount;
+    } else if (transaction.transactionType === "cash payment") {
+      totalCashPayment += transaction.amount;
+    }
+  });
+
+  // ✅ Calculate balance
+  const balance = totalCashReceived - totalCashPayment;
+
+  // ✅ Final response
+  const result = {
+    totalCashReceived,
+    totalCashPayment,
+    balance,
+    transactions: report,
+  };
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Cash ledger report fetched successfully",
+    result
+  );
+});
+
 // account wise transaction summary
 exports.getTransactionSummaryByDateAndAccount = asynchandeler(
   async (req, res) => {
