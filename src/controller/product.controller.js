@@ -612,18 +612,28 @@ exports.getBestSellingProducts = asynchandeler(async (_, res) => {
   // now find the variant products which are best selling
   const variantBestSellingProducts = await variant
     .find({
-      "variant.totalSales": { $gt: 5 },
+      totalSales: { $gt: 5 },
     })
-    .sort({ "variant.totalSales": -1 })
-    .populate("brand variant discount")
+    .sort({ totalSales: -1 })
     .populate({
-      path: "category",
-      populate: "discount",
+      path: "product",
+      populate: [
+        {
+          path: "category",
+          populate: "discount",
+        },
+        {
+          path: "subcategory",
+          populate: "discount",
+        },
+        {
+          path: "brand",
+          populate: "discount",
+        },
+      ],
+      select: "-variant",
     })
-    .populate({
-      path: "subcategory",
-      populate: "discount",
-    })
+
     .limit(10);
   products.push(...variantBestSellingProducts);
 
