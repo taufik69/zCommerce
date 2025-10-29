@@ -121,42 +121,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
   })();
 });
 
-//@desc Get all porducts using pipeline aggregation
-// exports.getAllProducts = asynchandeler(async (req, res) => {
-//   const { category, subcategory, brand, minPrice, maxPrice } = req.query;
-
-//   // please do not delete this code
-//   // if (minPrice) query.retailPrice = { $gte: minPrice };
-//   // if (maxPrice) query.retailPrice = { $lte: maxPrice };
-//   // if (minPrice && maxPrice) {
-//   //   query.retailPrice = { $gte: minPrice, $lte: maxPrice };
-//   // }
-
-//   const query = {};
-//   if (category) query.category = category;
-//   if (subcategory) query.subcategory = subcategory;
-//   if (brand) query.brand = brand;
-
-//   const products = await Product.find(query)
-
-//     .populate({
-//       path: "variant",
-//       populate: "stockVariantAdjust product",
-//     })
-//     .populate({
-//       path: "byReturn",
-//       populate: "product variant",
-//     })
-//     .populate({
-//       path: "salesReturn",
-//       populate: "product variant",
-//     })
-//     .populate("category brand  subcategory discount  stockAdjustment")
-//     .select("-updatedAt -createdAt");
-
-//   apiResponse.sendSuccess(res, 200, "Products fetched  successfully", products);
-// });
-
+// @desc Get all products with optional filters
 exports.getAllProducts = asynchandeler(async (req, res) => {
   const { category, subcategory, brand, minPrice, maxPrice } = req.query;
 

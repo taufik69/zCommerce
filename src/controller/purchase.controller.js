@@ -14,6 +14,9 @@ exports.createPurchase = asynchandeler(async (req, res) => {
     commission = 0,
     shipping = 0,
     paid = 0,
+    category,
+    subCategory,
+    brand,
   } = req.body;
 
   // Validate request
@@ -113,6 +116,9 @@ exports.createPurchase = asynchandeler(async (req, res) => {
     payable,
     paid,
     dueamount,
+    category,
+    subCategory,
+    brand,
     ...req.body,
   });
 
@@ -130,6 +136,7 @@ exports.getAllPurchases = asynchandeler(async (req, res) => {
     .populate({
       path: "allproduct.variant",
     })
+    .populate("category subCategory brand")
     .sort({ createdAt: -1 });
 
   // serial যোগ করা হলো
@@ -161,7 +168,8 @@ exports.getSinglePurchase = asynchandeler(async (req, res) => {
     })
     .populate({
       path: "allproduct.variant",
-    });
+    })
+    .populate("category subCategory brand");
   if (!purchase) {
     throw new customError("Purchase not found", 404);
   }
@@ -179,6 +187,9 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
     commission = 0,
     shipping = 0,
     paid = 0,
+    category,
+    subCategory,
+    brand,
   } = req.body;
 
   // Find existing purchase
@@ -303,6 +314,9 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
   existingPurchase.payable = payable;
   existingPurchase.paid = paid;
   existingPurchase.dueamount = dueamount;
+  existingPurchase.category = category || existingPurchase.category;
+  existingPurchase.subCategory = subCategory || existingPurchase.subCategory;
+  existingPurchase.brand = brand || existingPurchase.brand;
 
   await existingPurchase.save();
 

@@ -85,6 +85,18 @@ const purchaseSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+    },
+    subCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Subcategory",
+    },
+    brand: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Brand",
+    },
   },
   { timestamps: true }
 );
