@@ -47,14 +47,30 @@ exports.getAllTransaction = asynchandeler(async (req, res) => {
   const transactions = await CreateTransaction.find()
     .populate("account transactionCategory")
     .sort({ createdAt: -1 });
+
   if (!transactions.length) {
     throw new customError("Transactions not found", 404);
   }
+
+  // ✅ Generate serial numbers dynamically
+  const formattedTransactions = transactions.map((tx, index) => {
+    // Convert index (0-based) to serial (1-based)
+    const serial = index + 1;
+
+    // Pad with zeros up to 6 digits → e.g., 1 → 000001
+    const serialNumber = `TRXID-${serial.toString().padStart(6, "0")}`;
+
+    return {
+      ...tx.toObject(),
+      serialNumber, // ✅ Add new field
+    };
+  });
+
   apiResponse.sendSuccess(
     res,
     200,
     "Transactions fetched successfully",
-    transactions
+    formattedTransactions
   );
 });
 
