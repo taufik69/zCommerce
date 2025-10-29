@@ -1016,7 +1016,7 @@ exports.getCashLedgerReport = asynchandeler(async (req, res) => {
 
   // ✅ Add serial numbers (TRXID-00001, TRXID-00002 ...)
   const transactionsWithSerial = report.map((transaction, index) => ({
-    serialNumber: `TRXID-${String(index + 1).padStart(5, "0")}`, // -> TRXID-00001
+    transactionId: `TRXID-${String(index + 1).padStart(6, "0")}`, // -> TRXID-000001
     ...transaction.toObject(),
   }));
 
