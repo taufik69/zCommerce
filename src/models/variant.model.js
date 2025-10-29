@@ -141,6 +141,31 @@ const variantSchema = new mongoose.Schema(
         ref: "ByReturn",
       },
     ],
+    courierReturn: {
+      orderId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Order",
+      },
+      product: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+        default: null,
+      },
+      variant: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Variant",
+        default: null,
+      },
+      recivedQuantity: {
+        type: Number,
+        default: 0,
+      },
+      courierName: {
+        type: String,
+        trim: true,
+        default: "N/A",
+      },
+    },
   },
   {
     timestamps: true,

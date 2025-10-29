@@ -57,6 +57,7 @@ _.use("/userpermission", require("./api/userpermission.api"));
 _.use("/banner", require("./api/banner.api"));
 _.use("/outletinformation", require("./api/outletinformation.api"));
 _.use("/discount-banner", require("./api/discountbanner.api"));
+_.use("/courier-return", require("./api/courierReturn.api"));
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });
