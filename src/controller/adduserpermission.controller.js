@@ -101,7 +101,7 @@ exports.getUserPermissions = asynchandeler(async (req, res) => {
 // ===============================
 exports.updateUserPermissions = asynchandeler(async (req, res) => {
   const { userId } = req.params;
-  const { permissions } = req.body;
+  const { permissions, Options, Reports } = req.body;
 
   if (!permissions || !Array.isArray(permissions)) {
     throw new customError("Permissions array is required", 400);
@@ -124,12 +124,12 @@ exports.updateUserPermissions = asynchandeler(async (req, res) => {
     userPermissions.push({
       permission: permission._id,
       actions: perm.actions,
-      Options: perm.Options || [],
-      Reports: perm.Reports || [],
     });
   }
 
   user.permissions = userPermissions;
+  user.Options = Options || [];
+  user.Reports = Reports || [];
   user.createdBy = req.user?.id;
   await user.save();
 
