@@ -25,6 +25,7 @@ app.use(
       "https://smartsoftnextjs-ecommerce-git-main-wasim-mahamods-projects.vercel.app",
       "https://smartsoftnextjs-ecommerce.vercel.app",
       "https://z-ecommerce-seven.vercel.app",
+      "https://ecommercenext-baig.vercel.app",
     ],
     credentials: true,
   })
