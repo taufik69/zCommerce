@@ -14,22 +14,46 @@ const {
 // create siteinformation
 exports.createSiteInformation = asynchandeler(async (req, res) => {
   const value = await validateSiteInformation(req);
-  //   upload image to cloudinary
-  const { optimizeUrl } = await cloudinaryFileUpload(value.image.path);
 
+  // ✅ Create doc first with image = null
   const siteInformation = await SiteInformation.create({
     ...value,
-    image: optimizeUrl,
+    image: null,
   });
+
   if (!siteInformation) {
     throw new customError("SiteInformation not created", 400);
   }
+
+  // ✅ Send response immediately
   apiResponse.sendSuccess(
     res,
-    200,
-    "SiteInformation created successfully",
-    siteInformation
+    202,
+    "SiteInformation is being processed in background..."
   );
+
+  // ✅ Background Upload + Update
+  (async () => {
+    try {
+      const { optimizeUrl } = await cloudinaryFileUpload(value.image.path);
+
+      const updatedInfo = await SiteInformation.findByIdAndUpdate(
+        siteInformation._id,
+        { image: optimizeUrl },
+        { new: true }
+      );
+
+      console.log(
+        "✅ Background SiteInformation Update Completed:",
+        updatedInfo
+      );
+    } catch (error) {
+      console.error(
+        "❌ Background SiteInformation image upload failed:",
+        error.message
+      );
+    }
+  })();
 });
 
 // get all siteinformation
@@ -63,38 +87,12 @@ exports.getSingleSiteInformation = asynchandeler(async (req, res) => {
 exports.updateSiteInformationWithImage = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
-  // Find existing SiteInformation
   const siteInformation = await SiteInformation.findOne({ slug });
   if (!siteInformation) {
     throw new customError("SiteInformation not found", 404);
   }
 
-  // ✅ If new image is uploaded
-  if (req.file) {
-    try {
-      if (siteInformation.image) {
-        // Extract publicId from Cloudinary URL
-        const imageUrl = siteInformation.image;
-        const parts = imageUrl.split("/");
-        const fileName = parts[parts.length - 1];
-        const publicId = fileName.split(".")[0].split("?")[0];
-
-        // Delete old image from Cloudinary
-        await deleteCloudinaryFile(publicId);
-      }
-
-      // Upload new image
-      const { optimizeUrl } = await cloudinaryFileUpload(req.file.path);
-      siteInformation.image = optimizeUrl;
-    } catch (error) {
-      throw new customError(
-        "Error while updating image: " + error.message,
-        400
-      );
-    }
-  }
-
-  // ✅ Update other fields dynamically (only if provided)
+  // ✅ Update other fields immediately
   const updatableFields = [
     "storeName",
     "propiterSlogan",
@@ -109,20 +107,41 @@ exports.updateSiteInformationWithImage = asynchandeler(async (req, res) => {
   ];
 
   updatableFields.forEach((field) => {
-    if (req.body[field]) {
-      siteInformation[field] = req.body[field];
-    }
+    if (req.body[field]) siteInformation[field] = req.body[field];
   });
 
-  // Save updated data
   await siteInformation.save();
 
   apiResponse.sendSuccess(
     res,
-    200,
-    "SiteInformation updated successfully",
+    202,
+    "SiteInformation update started",
     siteInformation
   );
+
+  // ✅ Background image upload/delete
+  if (req.file) {
+    (async () => {
+      try {
+        if (siteInformation.image) {
+          const imageUrl = siteInformation.image;
+          const parts = imageUrl.split("/");
+          const fileName = parts[parts.length - 1];
+          const publicId = fileName.split(".")[0].split("?")[0];
+
+          await deleteCloudinaryFile(publicId);
+          console.log("✅ Old image deleted:", publicId);
+        }
+
+        const { optimizeUrl } = await cloudinaryFileUpload(req.file.path);
+        siteInformation.image = optimizeUrl;
+        await siteInformation.save();
+        console.log("✅ New image uploaded:", optimizeUrl);
+      } catch (error) {
+        console.error("❌ Background image update failed:", error.message);
+      }
+    })();
+  }
 });
 
 exports.deleteSiteInformation = asynchandeler(async (req, res) => {
@@ -134,26 +153,33 @@ exports.deleteSiteInformation = asynchandeler(async (req, res) => {
     throw new customError("SiteInformation not found", 404);
   }
 
-  // ✅ Delete image from Cloudinary if exists
-  if (siteInformation.image) {
-    try {
-      const imageUrl = siteInformation.image;
-      const parts = imageUrl.split("/");
-      const fileName = parts[parts.length - 1];
-      const publicId = fileName.split(".")[0].split("?")[0];
-      await deleteCloudinaryFile(publicId);
-    } catch (error) {
-      throw new customError("Error deleting image from Cloudinary", 400);
-    }
-  }
-
-  // ✅ Delete the document from DB
-  await SiteInformation.deleteOne({ slug });
-
+  // ✅ Send immediate response to client
   apiResponse.sendSuccess(
     res,
-    200,
-    "SiteInformation deleted successfully",
+    202,
+    "SiteInformation deletion started",
     siteInformation
   );
+
+  // ✅ Background delete
+  (async () => {
+    try {
+      // Delete image from Cloudinary if exists
+      if (siteInformation.image) {
+        const imageUrl = siteInformation.image;
+        const parts = imageUrl.split("/");
+        const fileName = parts[parts.length - 1];
+        const publicId = fileName.split(".")[0].split("?")[0];
+
+        await deleteCloudinaryFile(publicId);
+        console.log("✅ Cloudinary image deleted:", publicId);
+      }
+
+      // Delete the document from DB
+      await SiteInformation.deleteOne({ slug });
+      console.log("✅ SiteInformation document deleted:", slug);
+    } catch (error) {
+      console.error("❌ Background deletion failed:", error.message);
+    }
+  })();
 });
