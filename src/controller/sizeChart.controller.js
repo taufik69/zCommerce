@@ -13,23 +13,42 @@ exports.createSizeChart = asynchandeler(async (req, res, next) => {
   if (!name) {
     throw new customError("Name is required", 400);
   }
-  const image = req.files.image;
-  const sizeChart = await cloudinaryFileUpload(image[0]?.path);
-  if (!sizeChart) {
-    throw new customError("Image is required", 400);
-  }
 
+  // Save SizeChart first without image
   const newSizeChart = await SizeChart.create({
     name,
-    image: {
-      public_id: sizeChart.result.public_id,
-      url: sizeChart.result.url,
-    },
+    image: null,
   });
 
-  return apiResponse.sendSuccess(res, 200, "Size chart created successfully", {
+  // Send immediate response
+  apiResponse.sendSuccess(res, 202, "Size chart creation started", {
     newSizeChart,
   });
+
+  // Background image upload
+  const image = req.files?.image;
+  if (image && image.length > 0) {
+    (async () => {
+      try {
+        const sizeChartUpload = await cloudinaryFileUpload(image[0].path);
+
+        newSizeChart.image = {
+          public_id: sizeChartUpload.result.public_id,
+          url: sizeChartUpload.result.url,
+        };
+        await newSizeChart.save();
+        console.log(
+          "✅ Size chart image uploaded successfully:",
+          newSizeChart._id
+        );
+      } catch (error) {
+        console.error(
+          "❌ Background size chart image upload failed:",
+          error.message
+        );
+      }
+    })();
+  }
 });
 
 // get all size chart
@@ -56,58 +75,80 @@ exports.getSizeChartBySlug = asynchandeler(async (req, res, next) => {
 exports.updateSizeChart = asynchandeler(async (req, res, next) => {
   const { name } = req.body;
   const { slug } = req.params;
+
   const sizeChart = await SizeChart.findOne({ slug });
   if (!sizeChart) {
     throw new customError("Size chart not found", 404);
   }
-  if (req.files.image) {
-    // remove old image
-    const imageUrl = sizeChart?.image?.public_id;
-    const confirm = await deleteCloudinaryFile(imageUrl);
-    if (!confirm) {
-      throw new customError("Image not deleted", 400);
-    }
-    // upload new image
-    const image = req.files.image;
-    const sizeChartImage = await cloudinaryFileUpload(image[0]?.path);
-    if (!sizeChartImage) {
-      throw new customError("Image is required", 400);
-    }
 
-    sizeChart.image = {
-      public_id: sizeChartImage.result.public_id,
-      url: sizeChartImage.result.url,
-    };
-  }
-
-  // update size chart
+  // Update name immediately
   sizeChart.name = name || sizeChart.name;
-
   await sizeChart.save();
 
-  return apiResponse.sendSuccess(res, 200, "Size chart updated successfully", {
-    sizeChart,
-  });
+  // Send immediate response
+  apiResponse.sendSuccess(res, 202, "Size chart update started", { sizeChart });
+
+  // Background image delete/upload
+  if (req.files?.image && req.files.image.length > 0) {
+    (async () => {
+      try {
+        // Delete old image
+        if (sizeChart.image?.public_id) {
+          await deleteCloudinaryFile(sizeChart.image.public_id);
+          console.log(
+            "✅ Old size chart image deleted:",
+            sizeChart.image.public_id
+          );
+        }
+
+        // Upload new image
+        const image = req.files.image[0];
+        const sizeChartImage = await cloudinaryFileUpload(image.path);
+        sizeChart.image = {
+          public_id: sizeChartImage.result.public_id,
+          url: sizeChartImage.result.url,
+        };
+        await sizeChart.save();
+        console.log(
+          "✅ Size chart image uploaded successfully:",
+          sizeChart._id
+        );
+      } catch (error) {
+        console.error(
+          "❌ Background size chart image update failed:",
+          error.message
+        );
+      }
+    })();
+  }
 });
 
 //@desc delete size chart by slug
 exports.deleteSizeChartBySlug = asynchandeler(async (req, res) => {
   const { slug } = req.params;
+
   const sizeChart = await SizeChart.findOne({ slug });
   if (!sizeChart) {
     throw new customError("Size chart not found", 404);
   }
-  // remove old image
-  const imageUrl = sizeChart?.image?.public_id;
-  const confirm = await deleteCloudinaryFile(imageUrl);
-  if (!confirm) {
-    throw new customError("Image not deleted", 400);
-  }
-  await SizeChart.deleteOne({ slug });
-  apiResponse.sendSuccess(
-    res,
-    200,
-    "Size chart deleted successfully",
-    sizeChart
-  );
+
+  // ✅ Send immediate response
+  apiResponse.sendSuccess(res, 202, "Size chart deletion started", sizeChart);
+
+  // ✅ Background delete
+  (async () => {
+    try {
+      // Delete image from Cloudinary if exists
+      if (sizeChart.image?.public_id) {
+        await deleteCloudinaryFile(sizeChart.image.public_id);
+        console.log("✅ Size chart image deleted:", sizeChart.image.public_id);
+      }
+
+      // Delete the document from DB
+      await SizeChart.deleteOne({ slug });
+      console.log("✅ Size chart document deleted:", slug);
+    } catch (error) {
+      console.error("❌ Background size chart deletion failed:", error.message);
+    }
+  })();
 });
