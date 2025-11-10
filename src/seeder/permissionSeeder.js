@@ -3,70 +3,72 @@ const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 dotenv.config();
 
-const permission = [
+// ✅ Client Required Permissions (Final)
+const permissionList = [
   { permissionName: "Product" },
   { permissionName: "Category" },
-  { permissionName: "Order" },
-  { permissionName: "Discount" },
-  { permissionName: "Variant" },
-  { permissionName: "SubCategory" },
+  { permissionName: "Sub Category" },
   { permissionName: "Brand" },
-  { permissionName: "productInventory" },
-  { permissionName: "RawProduct" },
-  { permissionName: "ProductionStuff" },
+  { permissionName: "Create Banner" },
+  { permissionName: "Size Chart" },
+  { permissionName: "Variant" },
   { permissionName: "Purchase" },
-  { permissionName: "Sales" },
-  { permissionName: "Stock" },
-  { permissionName: "user" },
-  { permissionName: "Supplier" },
-  { permissionName: "Employee" },
-  { permissionName: "Attendance" },
-  { permissionName: "Sms" },
-  { permissionName: "UserRoleAndPermission" },
-  { permissionName: "Settings" },
-  { permissionName: "Notification" },
-  { permissionName: "Report" },
+  { permissionName: "Purchase Return" },
+  { permissionName: "Discount" },
+  { permissionName: "Discount Banner" },
+  { permissionName: "Coupon" },
+  { permissionName: "Order" },
+  { permissionName: "Incomplete Order" },
+  { permissionName: "Courier Delivery" },
+  { permissionName: "Courier Merchant" },
+  { permissionName: "Courier Return" },
+  { permissionName: "Delivery Charge" },
+  { permissionName: "View All Stock" },
+  { permissionName: "Category Stock Details" },
+  { permissionName: "Size & Color Wise Stock" },
+  { permissionName: "Size Wise Stock" },
+  { permissionName: "Low Stock" },
+  { permissionName: "Stock Adjustment" },
+  { permissionName: "Add Transaction" },
+  { permissionName: "Transaction Category" },
+  { permissionName: "Add Account" },
+  { permissionName: "Money Transfer" },
+  { permissionName: "Money Handover" },
+  { permissionName: "Send SMS" },
+  { permissionName: "Send Bulk SMS" },
+  { permissionName: "SMS Info" },
+  { permissionName: "Create User" },
+  { permissionName: "Create Role" },
+  { permissionName: "Create Permission" },
+  { permissionName: "Site Information" },
+  { permissionName: "Outlet Information" },
 ];
 
-async function seedPermisson() {
+async function seedPermission() {
   try {
-    console.log("Cleared existing permissions.");
-    // Check existing permissions
-    const existingPermissions = await Permission.find({});
-    if (existingPermissions?.length > 0) {
-      console.log("Permissions already seeded.");
-      return;
-    }
+    console.log("🔄 Removing all existing permissions...");
+    // await Permission.deleteMany({}); // ✅ Clear the old permissions
 
-    for (const perm of permission) {
-      const existingPermission = await Permission.findOne({
-        permissionName: perm.permissionName,
-      });
+    console.log("🌱 Seeding new permissions...");
+    await Permission.insertMany(permissionList);
 
-      if (!existingPermission) {
-        const newPermission = new Permission(perm);
-        await newPermission.save();
-        console.log(`Permission ${perm.permissionName} seeded successfully.`);
-      } else {
-        console.log(`Permission ${perm.permissionName} already exists.`);
-      }
-    }
+    console.log("✅ Permission seeding completed successfully.");
   } catch (error) {
-    console.error("Error seeding permissions:", error);
+    console.error("❌ Error while seeding permissions:", error);
   }
 }
 
 mongoose
   .connect(process.env.DATABASE_URL)
   .then(() => {
-    console.log("Connected to MongoDB");
-    return seedPermisson();
+    console.log("✅ Connected to MongoDB");
+    return seedPermission();
   })
   .then(() => {
-    console.log("Permission seeding completed successfully.");
-    return mongoose.disconnect();
+    mongoose.disconnect();
+    console.log("🔌 MongoDB disconnected.");
   })
   .catch((err) => {
-    console.error("Error connecting to MongoDB or seeding permissions:", err);
+    console.error("❌ Error:", err);
     process.exit(1);
   });
