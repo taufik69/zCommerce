@@ -6,8 +6,8 @@ const { authGuard } = require("../../middleware/authMiddleware");
 const { authorize } = require("../../middleware/checkPermission.middleware");
 _.route("/brand")
   .post(
-    authGuard,
-    authorize("brand", "add"),
+    // authGuard,
+    // authorize("brand", "add"),
     multipleFileUpload("image", 10),
     Brand.createBrand
   )
@@ -19,8 +19,8 @@ _.route("/brand/:slug")
     Brand.getBrandBySlug
   )
   .put(
-    authGuard,
-    authorize("brand", "edit"),
+    // authGuard,
+    // authorize("brand", "edit"),
     multipleFileUpload("image", 10),
     Brand.updateBrand
   )
