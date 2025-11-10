@@ -10,52 +10,35 @@ const {
 // @desc    Create a new brand
 // @route   POST /api/v1/brand
 exports.createBrand = asynchandeler(async (req, res) => {
-  const { name } = req.body;
-  const files = req.files;
+  const value = await validateBrand(req);
 
-  // ✅ Validation
-  if (!Array.isArray(name) || name.length === 0) {
-    throw new customError("At least one brand name is required", 400);
-  }
+  const brand = await Brand.create({
+    name: value.name,
+    image: null,
+  });
 
-  if (!files || files.length === 0) {
-    throw new customError("At least one brand image is required", 400);
-  }
-
-  if (name.length !== files.length) {
-    throw new customError("Each brand must have an image", 400);
-  }
-
-  // ✅ Send immediate response (non-blocking)
+  // ✅ Send Immediate Response (Client doesn't wait)
   apiResponse.sendSuccess(
     res,
     202,
-    "Brands created successfully. Processing in background."
+    "Brand creation started. Processing in background...",
+    brand
   );
 
-  // ✅ Background processing (fire-and-forget)
+  // ✅ Background Async Task
   (async () => {
     try {
-      let savedBrands = [];
+      // Upload Image in background
+      const { optimizeUrl } = await cloudinaryFileUpload(value.image.path);
 
-      for (let i = 0; i < name.length; i++) {
-        const imageUpload = await cloudinaryFileUpload(files[i].path);
+      // now push the image url into the database
+      await Brand.findByIdAndUpdate(brand._id, {
+        image: optimizeUrl,
+      });
 
-        const brand = new Brand({
-          name: name[i],
-          image: imageUpload.optimizeUrl,
-        });
-
-        await brand.save();
-        savedBrands.push(brand);
-      }
-
-      console.log(
-        "✅ Background Brand Creation Completed:",
-        savedBrands.length
-      );
+      console.log("✅ Brand Created (BG Task):", brand.name);
     } catch (error) {
-      console.error("❌ Background brand creation failed:", error.message);
+      console.error("❌ Background Brand Creation Failed:", error.message);
     }
   })();
 });

@@ -11,21 +11,12 @@ const {
 // @desc    Create a new category
 
 exports.createCategory = asynchandeler(async (req, res) => {
-  const { name } = req.body; // Expect array of names
-  const files = req.files; // Expect array of images
+  const { name, image } = await validateCategory(req);
 
-  // ✅ Validation
-  if (!Array.isArray(name) || name.length === 0) {
-    throw new customError("At least one category name is required", 400);
-  }
-
-  if (!files || files.length === 0) {
-    throw new customError("At least one category image is required", 400);
-  }
-
-  if (name.length !== files.length) {
-    throw new customError("Each category must have an image", 400);
-  }
+  const category = Category.create({
+    name,
+    image: null,
+  });
 
   // ✅ Send response immediately (non-blocking)
   apiResponse.sendSuccess(res, 202, "Categories are being created ");
@@ -33,24 +24,11 @@ exports.createCategory = asynchandeler(async (req, res) => {
   // ✅ Handle upload & DB insert in background (fire and forget)
   (async () => {
     try {
-      let savedCategories = [];
+      const { optimizeUrl } = await cloudinaryFileUpload(image.path);
 
-      for (let i = 0; i < name.length; i++) {
-        const imageUpload = await cloudinaryFileUpload(files[i].path);
+      await Category.findByIdAndUpdate(category._id, { image: optimizeUrl });
 
-        const category = new Category({
-          name: name[i],
-          image: imageUpload.optimizeUrl,
-        });
-
-        await category.save();
-        savedCategories.push(category);
-      }
-
-      console.log(
-        "✅ Background Category Creation Completed:",
-        savedCategories
-      );
+      console.log("✅ Background Category Creation Completed:");
     } catch (error) {
       console.error("❌ Background category creation failed:", error.message);
     }

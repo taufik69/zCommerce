@@ -8,7 +8,7 @@ _.route("/brand")
   .post(
     // authGuard,
     // authorize("brand", "add"),
-    multipleFileUpload("image", 10),
+    multipleFileUpload("image", 1),
     Brand.createBrand
   )
   .get(Brand.getAllBrands);
@@ -21,7 +21,7 @@ _.route("/brand/:slug")
   .put(
     // authGuard,
     // authorize("brand", "edit"),
-    multipleFileUpload("image", 10),
+    multipleFileUpload("image", 1),
     Brand.updateBrand
   )
   .delete(authGuard, authorize("brand", "delete"), Brand.deleteBrand);

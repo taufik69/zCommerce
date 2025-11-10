@@ -24,14 +24,14 @@ const validateCategory = async (req) => {
         400
       );
     }
-    if (req.files[0].size > 1 * 1024 * 1024) {
+    if (req.files[0].size > 5 * 1024 * 1024) {
       throw new customError("Image size should be less than 15MB", 400);
     }
 
     if (req.files.length > 1) {
       throw new customError("You can upload a maximum of 1 images", 400);
     }
-    return value;
+    return { ...value, image: req.files[0] };
   } catch (error) {
     throw new customError(
       "Validation error " + error.details.map((err) => err.message),
