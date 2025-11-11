@@ -9,7 +9,7 @@ _.route("/subcategories")
   .post(
     // authGuard,
     // authorize("subcategory", "add"),
-    subCategory.createSubCategories
+    subCategory.createSubCategory
   )
   .get(subCategory.getAllSubCategory);
 

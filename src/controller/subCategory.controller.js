@@ -8,51 +8,35 @@ const {
 } = require("../validation/subCatgegory.validation");
 
 // @desc    Create a new subcategory
-exports.createSubCategories = asynchandeler(async (req, res) => {
-  const subcategoriesData = req.body; // Expecting an array of { name, category }
+exports.createSubCategory = asynchandeler(async (req, res) => {
+  const { name, category } = req.body;
 
-  if (!Array.isArray(subcategoriesData) || subcategoriesData.length === 0) {
-    throw new customError("At least one subcategory is required", 400);
+  // ✅ Validation
+  if (!name || !category) {
+    throw new customError("Subcategory name and category are required", 400);
   }
 
-  let savedSubcategories = [];
-
-  for (let i = 0; i < subcategoriesData.length; i++) {
-    const { name, category } = subcategoriesData[i];
-
-    if (!name || !category) {
-      throw new customError(
-        `Subcategory name and category are required at index ${i}`,
-        400
-      );
-    }
-
-    // Validate category exists
-    const parentCategory = await Category.findById(category);
-    if (!parentCategory) {
-      throw new customError(`Category not found for index ${i}`, 404);
-    }
-
-    // Create subcategory
-    const subcategory = new Subcategory({
-      name,
-      category,
-    });
-
-    await subcategory.save();
-
-    // Add subcategory to parent category
-    parentCategory.subcategories.push(subcategory._id);
-    await parentCategory.save();
-
-    savedSubcategories.push(subcategory);
+  // ✅ Check category exists
+  const parentCategory = await Category.findById(category);
+  if (!parentCategory) {
+    throw new customError("Parent category not found", 404);
   }
 
-  apiResponse.sendSuccess(
+  // ✅ Create subcategory
+  const subcategory = await Subcategory.create({
+    name,
+    category,
+  });
+
+  // ✅ Push subcategory reference to parent category
+  parentCategory.subcategories.push(subcategory._id);
+  await parentCategory.save();
+
+  return apiResponse.sendSuccess(
     res,
     201,
-    "Subcategories created successfully",
-    savedSubcategories
+    "Subcategory created successfully",
+    subcategory
   );
 });
 
