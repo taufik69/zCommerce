@@ -358,7 +358,7 @@ exports.getProductsWithPagination = asynchandeler(async (req, res) => {
 exports.deleteProductBySlug = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
-  const product = await Product.findOne({ slug });
+  const product = await Product.findOneAndDelete({ slug });
   if (!product) {
     return apiResponse.sendError(res, 404, "Product not found");
   }
@@ -390,8 +390,6 @@ exports.deleteProductBySlug = asynchandeler(async (req, res) => {
         );
       }
 
-      // Delete product document from DB
-      await Product.deleteOne({ slug });
       console.log(`✅ Background product deletion completed: ${slug}`);
     } catch (error) {
       console.error(
