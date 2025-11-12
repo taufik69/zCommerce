@@ -129,7 +129,7 @@ exports.deleteCategory = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
   // ✅ Step 1: Find the category
-  const category = await Category.findOne({ slug, isActive: true });
+  const category = await Category.findOneAndDelete({ slug });
   if (!category) {
     throw new customError("Category not found", 404);
   }
@@ -158,9 +158,6 @@ exports.deleteCategory = asynchandeler(async (req, res) => {
       } else {
         console.warn(`⚠️ Invalid image URL for category: ${slug}`);
       }
-
-      // ✅ Delete category document from DB
-      await Category.findOneAndDelete({ slug, isActive: true });
 
       console.log(`✅ Background category deletion completed: ${slug}`);
     } catch (error) {
