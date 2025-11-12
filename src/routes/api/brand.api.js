@@ -24,6 +24,10 @@ _.route("/brand/:slug")
     multipleFileUpload("image", 1),
     Brand.updateBrand
   )
-  .delete(authGuard, authorize("brand", "delete"), Brand.deleteBrand);
+  .delete(
+    // authGuard,
+    // authorize("brand", "delete"),
+    Brand.deleteBrand
+  );
 
 module.exports = _;

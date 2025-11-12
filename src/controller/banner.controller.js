@@ -164,7 +164,7 @@ exports.deleteBanner = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
   // ✅ Step 1: Find banner by slug
-  const banner = await Banner.findOne({ slug, isActive: true });
+  const banner = await Banner.findOneAndDelete({ slug });
   if (!banner) {
     throw new customError("Banner not found", 404);
   }
@@ -202,8 +202,6 @@ exports.deleteBanner = asynchandeler(async (req, res) => {
         }
       }
 
-      // --- Delete banner from DB ---
-      await Banner.findByIdAndDelete(banner._id);
       console.log(`✅ Banner permanently deleted: ${banner._id}`);
     } catch (error) {
       console.error(`❌ Background banner delete failed: ${error.message}`);

@@ -131,7 +131,7 @@ exports.deleteBrand = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
   // ✅ Step 1: Find the brand
-  const brand = await Brand.findOne({ slug, isActive: true });
+  const brand = await Brand.findOneAndDelete({ slug });
   if (!brand) {
     throw new customError("Brand not found", 404);
   }
@@ -163,8 +163,6 @@ exports.deleteBrand = asynchandeler(async (req, res) => {
         await Promise.all(deletePromises);
       }
 
-      // Delete the brand document from DB
-      await Brand.deleteOne({ slug });
       console.log(`✅ Background brand deletion completed: ${slug}`);
     } catch (error) {
       console.error(
