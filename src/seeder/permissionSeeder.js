@@ -47,12 +47,16 @@ const permissionList = [
 async function seedPermission() {
   try {
     console.log("🔄 Removing all existing permissions...");
-    // await Permission.deleteMany({}); // ✅ Clear the old permissions
+    // await Permission.deleteMany({}); // clear previous permissions
 
-    console.log("🌱 Seeding new permissions...");
-    await Permission.insertMany(permissionList);
+    console.log("🌱 Seeding permissions one by one...");
 
-    console.log("✅ Permission seeding completed successfully.");
+    for (const item of permissionList) {
+      await Permission.create(item);
+      console.log(`✔ Inserted: ${permissionList[item]}`);
+    }
+
+    console.log("🎉 All permissions inserted successfully!");
   } catch (error) {
     console.error("❌ Error while seeding permissions:", error);
   }
