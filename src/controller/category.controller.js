@@ -13,7 +13,7 @@ const {
 exports.createCategory = asynchandeler(async (req, res) => {
   const { name, image } = await validateCategory(req);
 
-  const category = Category.create({
+  const category = await Category.create({
     name,
     image: null,
   });
