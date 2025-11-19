@@ -49,7 +49,6 @@ const siteInformationSchema = new mongoose.Schema(
     },
     facebookLink: {
       type: String,
-
       trim: true,
     },
     youtubeLink: {
@@ -60,6 +59,31 @@ const siteInformationSchema = new mongoose.Schema(
     instagramLink: {
       type: String,
 
+      trim: true,
+    },
+    whatsappLink: {
+      type: String,
+
+      trim: true,
+    },
+    twitterLink: {
+      type: String,
+      trim: true,
+    },
+    messengerLink: {
+      type: String,
+      trim: true,
+    },
+    linkedinLink: {
+      type: String,
+      trim: true,
+    },
+    googleMapLink: {
+      type: String,
+      trim: true,
+    },
+    qrCode: {
+      type: String,
       trim: true,
     },
   },

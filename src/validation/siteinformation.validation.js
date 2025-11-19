@@ -8,56 +8,56 @@ const siteInformationSchema = joi
       "string.empty": "Store name is required.",
       "any.required": "Store name is required.",
     }),
-    propiterSlogan: joi.string().trim().optional().messages({
-      "string.base": "Propiter slogan must be a string.",
-    }),
+
+    propiterSlogan: joi.string().trim().allow("").optional(),
+
     adress: joi.string().trim().required().messages({
       "string.empty": "Address is required.",
       "any.required": "Address is required.",
     }),
+
     phone: joi.string().trim().required().messages({
       "string.empty": "Phone number is required.",
       "any.required": "Phone number is required.",
     }),
-    email: joi.string().email().trim().optional().messages({
+
+    email: joi.string().email().trim().allow("").optional().messages({
       "string.email": "Please provide a valid email address.",
     }),
-    businessHours: joi.string().trim().optional().messages({
-      "string.base": "Business hours must be a valid string.",
-    }),
-    footer: joi.string().trim().optional().messages({
-      "string.base": "Footer must be a valid string.",
-    }),
-    facebookLink: joi.string().uri().trim().optional().messages({
-      "string.uri": "Facebook link must be a valid URL.",
-    }),
-    youtubeLink: joi.string().uri().trim().optional().messages({
-      "string.uri": "YouTube link must be a valid URL.",
-    }),
-    instagramLink: joi.string().uri().trim().optional().messages({
-      "string.uri": "Instagram link must be a valid URL.",
-    }),
+
+    businessHours: joi.string().trim().allow("").optional(),
+    footer: joi.string().trim().allow("").optional(),
+
+    // facebookLink: joi.string().uri().trim().allow("").optional(),
+    // youtubeLink: joi.string().uri().trim().allow("").optional(),
+    // instagramLink: joi.string().uri().trim().allow("").optional(),
+    // whatsappLink: joi.string().uri().trim().allow("").optional(),
+    // twitterLink: joi.string().uri().trim().allow("").optional(),
+    // messengerLink: joi.string().uri().trim().allow("").optional(),
+    // linkedinLink: joi.string().uri().trim().allow("").optional(),
+    // googleMapLink: joi.string().uri().trim().allow("").optional(),
+    qrCode: joi.string().uri().trim().allow("").optional(),
   })
-  .options({ abortEarly: false });
+  .options({ abortEarly: false, allowUnknown: true });
 
 // Middleware validation function
 async function validateSiteInformation(req) {
   try {
-    // Joi validation for text fields
+    // Validate text fields
     const value = await siteInformationSchema.validateAsync(req.body);
 
-    // ✅ Image validation
+    // Validate file
     const file = req.file;
     if (!file) {
       throw new customError("Please provide a logo image", 400);
     }
 
-    // Check image size (max 2MB)
+    // Max size 2MB
     if (file.size > 2 * 1024 * 1024) {
       throw new customError("Image size must be less than 2MB", 400);
     }
 
-    // Check image type
+    // Allowed types
     const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
     if (!allowedTypes.includes(file.mimetype)) {
       throw new customError(
