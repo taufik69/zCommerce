@@ -100,6 +100,15 @@ siteInformationSchema.pre("save", function (next) {
   next();
 });
 
+// did not put double siteinformation only take one siteinformation
+siteInformationSchema.pre("save", async function (next) {
+  const siteInformationCount = await this.constructor.countDocuments();
+  if (siteInformationCount >= 1 && this.isNew) {
+    throw new customError("Only one SiteInformation document is allowed.", 400);
+  }
+  next();
+});
+
 // if slug already exist
 siteInformationSchema.pre("save", async function (next) {
   const existSiteInformation = await this.constructor.findOne({
