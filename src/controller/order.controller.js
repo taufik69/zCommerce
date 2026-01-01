@@ -197,7 +197,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
           );
         }
         stockUpdatePromises.push(
-          Product.updateOne(
+          Product.findOneAndUpdate(
             { _id: item.product },
             {
               $inc: { stock: -item.quantity, totalSales: item.quantity },
@@ -214,7 +214,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
           );
         }
         stockUpdatePromises.push(
-          Variant.updateOne(
+          Variant.findOneAndUpdate(
             { _id: item.variant },
             {
               $inc: { stockVariant: -item.quantity, totalSales: item.quantity },
