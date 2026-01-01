@@ -20,20 +20,20 @@ _.route("/get-sizechart").get(
   sizeChartController.getAllSizeChart
 );
 
-_.route("/get-sizechart/:slug").get(
+_.route("/get-sizechart/:subCategory").get(
   // authGuard,
   // authorize("sizechart", "view"),
   sizeChartController.getSizeChartBySlug
 );
 
-_.route("/update-sizechart/:slug").put(
+_.route("/update-sizechart/:subcid").put(
   // authGuard,
   // authorize("sizechart", "update"),
   multipleFileUploadWithFields([{ name: "image", maxCount: 3 }]),
   sizeChartController.updateSizeChart
 );
 
-_.route("/delete-sizechart/:slug").delete(
+_.route("/delete-sizechart/:subCategory").delete(
   // authGuard,
   // authorize("sizechart", "delete"),
   sizeChartController.deleteSizeChartBySlug

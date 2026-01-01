@@ -8,15 +8,15 @@ const {
 } = require("../helpers/cloudinary");
 // create size chart
 exports.createSizeChart = asynchandeler(async (req, res, next) => {
-  const { name } = req.body;
+  const { subCategory } = req.body;
 
-  if (!name) {
-    throw new customError("Name is required", 400);
+  if (!subCategory) {
+    throw new customError("subCategory id is required", 400);
   }
 
   // Save SizeChart first without image
   const newSizeChart = await SizeChart.create({
-    name,
+    subCategory,
     image: null,
   });
 
@@ -52,17 +52,19 @@ exports.createSizeChart = asynchandeler(async (req, res, next) => {
 });
 
 // get all size chart
-exports.getAllSizeChart = asynchandeler(async (req, res, next) => {
-  const sizeChart = await SizeChart.find();
+exports.getAllSizeChart = asynchandeler(async (req, res) => {
+  const sizeChart = await SizeChart.find().sort({ createdAt: -1 });
   return apiResponse.sendSuccess(res, 200, "Size chart fetched successfully", {
     sizeChart,
   });
 });
 
 // get single size chart
-exports.getSizeChartBySlug = asynchandeler(async (req, res, next) => {
-  const { slug } = req.params;
-  const sizeChart = await SizeChart.findOne({ slug });
+exports.getSizeChartBySlug = asynchandeler(async (req, res) => {
+  const { subCategory } = req.params;
+  const sizeChart = await SizeChart.findOne({
+    subCategory: subCategory,
+  }).populate("subCategory");
   if (!sizeChart) {
     throw new customError("Size chart not found", 404);
   }
@@ -73,16 +75,16 @@ exports.getSizeChartBySlug = asynchandeler(async (req, res, next) => {
 
 // update size chart
 exports.updateSizeChart = asynchandeler(async (req, res, next) => {
-  const { name } = req.body;
-  const { slug } = req.params;
+  const { subCategoryId } = req.body;
+  const { subcid } = req.params;
 
-  const sizeChart = await SizeChart.findOne({ slug });
+  const sizeChart = await SizeChart.findOne({ subCategory: subcid });
   if (!sizeChart) {
     throw new customError("Size chart not found", 404);
   }
 
   // Update name immediately
-  sizeChart.name = name || sizeChart.name;
+  sizeChart.subCategory = subCategoryId || sizeChart.subCategoryId;
   await sizeChart.save();
 
   // Send immediate response
@@ -125,15 +127,15 @@ exports.updateSizeChart = asynchandeler(async (req, res, next) => {
 
 //@desc delete size chart by slug
 exports.deleteSizeChartBySlug = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
+  const { subCategory } = req.params;
 
-  const sizeChart = await SizeChart.findOne({ slug });
+  const sizeChart = await SizeChart.findOne({ subCategory });
   if (!sizeChart) {
     throw new customError("Size chart not found", 404);
   }
 
   // ✅ Send immediate response
-  apiResponse.sendSuccess(res, 202, "Size chart deletion started", sizeChart);
+  apiResponse.sendSuccess(res, 200, "Size chart deletion started", sizeChart);
 
   // ✅ Background delete
   (async () => {
@@ -145,7 +147,7 @@ exports.deleteSizeChartBySlug = asynchandeler(async (req, res) => {
       }
 
       // Delete the document from DB
-      await SizeChart.deleteOne({ slug });
+      await SizeChart.deleteOne({ subCategory: sizeChart.subCategory });
       console.log("✅ Size chart document deleted:", slug);
     } catch (error) {
       console.error("❌ Background size chart deletion failed:", error.message);
