@@ -8,6 +8,9 @@ const apiResponse = class apiResponse {
   static sendSuccess(res, status, message, data) {
     return res.status(status).json(new apiResponse(status, message, data));
   }
+  static sendError(res, status, message, data = null) {
+    return res.status(status).json(new apiResponse(status, message, data));
+  }
 };
 
 module.exports = { apiResponse };
