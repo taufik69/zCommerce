@@ -11,4 +11,9 @@ _.route("/update-employee/:id").put(
   multipleFileUpload("image", 1),
   employeeController.updateEmployee,
 );
+_.route("/delete-employee/:id").delete(employeeController.deleteEmployeeHard);
+_.route("/delete-employee-soft/:id").delete(
+  employeeController.deleteEmployeeSoft,
+);
+_.route("/restore-employee/:id").put(employeeController.restoreEmployee);
 module.exports = _;

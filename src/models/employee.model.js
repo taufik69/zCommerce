@@ -96,6 +96,7 @@ const employeeSchema = new mongoose.Schema(
 
     isActive: { type: Boolean, default: true },
     deletedAt: { type: Date, default: null },
+    isDeleted: { type: Boolean, default: false },
     department: { type: String, trim: true },
     section: { type: String, trim: true },
   },
