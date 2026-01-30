@@ -59,6 +59,7 @@ exports.getEmployeeList = asynchandeler(async (req, res) => {
   });
 });
 
+// UPDATE EMPLOYEE
 exports.updateEmployee = asynchandeler(async (req, res) => {
   // 1) Validate request
   const value = await validateEmployeeUpdate(req);
@@ -124,4 +125,80 @@ exports.updateEmployee = asynchandeler(async (req, res) => {
       }
     })();
   }
+});
+
+// hard delete employee
+
+exports.deleteEmployeeHard = asynchandeler(async (req, res) => {
+  const employee = await employeeModel.findOne({ employeeId: req.params.id });
+
+  if (!employee) {
+    return apiResponse.sendError(res, 404, "Employee not found");
+  }
+
+  if (employee.image) {
+    try {
+      // Delete old image only AFTER DB updated
+      const parts = employee.image.split("/");
+      const publicId = parts[parts.length - 1].split("?")[0];
+
+      // If no old image, skip delete
+      if (publicId) {
+        await deleteCloudinaryFile(publicId);
+      }
+    } catch (error) {
+      console.error("Cloudinary delete failed:", error.message);
+    }
+  }
+
+  await employeeModel.deleteOne({ _id: employee._id });
+
+  apiResponse.sendSuccess(res, 200, "Employee deleted successfully", {
+    employeeId: employee.employeeId,
+  });
+});
+
+// soft delete employee
+exports.deleteEmployeeSoft = asynchandeler(async (req, res) => {
+  const employee = await employeeModel.findOne({ employeeId: req.params.id });
+
+  if (!employee) {
+    return apiResponse.sendError(res, 404, "Employee not found");
+  }
+
+  employee.deletedAt = new Date();
+  employee.isDeleted = true;
+  employee.isActive = false;
+  await employee.save();
+
+  apiResponse.sendSuccess(res, 200, "Employee soft deleted successfully", {
+    employeeId: employee.employeeId,
+  });
+});
+
+//restor employee
+exports.restoreEmployee = asynchandeler(async (req, res) => {
+  const employee = await employeeModel.findOne({
+    employeeId: req.params.id,
+  });
+
+  if (!employee) {
+    return apiResponse.sendError(res, 404, "Employee not found");
+  }
+
+  if (!employee.isDeleted) {
+    return apiResponse.sendSuccess(res, 200, "Employee is already active", {
+      employeeId: employee.employeeId,
+    });
+  }
+
+  employee.deletedAt = null;
+  employee.isDeleted = false;
+  employee.isActive = true;
+
+  await employee.save();
+
+  apiResponse.sendSuccess(res, 200, "Employee restored successfully", {
+    employeeId: employee.employeeId,
+  });
 });
