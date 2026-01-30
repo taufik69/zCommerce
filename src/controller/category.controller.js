@@ -75,16 +75,16 @@ exports.getCategoryBySlug = asynchandeler(async (req, res) => {
 exports.updateCategory = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
-  // ✅ Step 1: Find the existing category
+  // Step 1: Find the existing category
   const category = await Category.findOne({ slug, isActive: true });
   if (!category) {
     throw new customError("Category not found", 404);
   }
 
-  // ✅ Step 2: Send immediate response (non-blocking)
+  // Step 2: Send immediate response (non-blocking)
   apiResponse.sendSuccess(res, 202, "Category update is successfully ");
 
-  // ✅ Step 3: Handle background update (fire and forget)
+  // Step 3: Handle background update (fire and forget)
   (async () => {
     try {
       let optimizeUrlCloudinary = null;
@@ -100,14 +100,14 @@ exports.updateCategory = asynchandeler(async (req, res) => {
         if (!publicId) {
           console.error(
             "⚠️ Invalid Cloudinary image URL for category:",
-            category._id
+            category._id,
           );
         } else {
-          // ✅ Delete old image from Cloudinary
+          //  Delete old image from Cloudinary
           await deleteCloudinaryFile(publicId.split("?")[0]);
         }
 
-        // ✅ Upload new image to Cloudinary
+        // ✅Upload new image to Cloudinary
         const { optimizeUrl } = await cloudinaryFileUpload(req.files[0].path);
         optimizeUrlCloudinary = optimizeUrl;
       }
@@ -139,7 +139,7 @@ exports.deleteCategory = asynchandeler(async (req, res) => {
     res,
     202,
     "Category deletion is being processed in the background",
-    { slug }
+    { slug },
   );
 
   // ✅ Step 3: Run deletion process in background
@@ -163,7 +163,7 @@ exports.deleteCategory = asynchandeler(async (req, res) => {
     } catch (error) {
       console.error(
         `❌ Background deletion failed for ${slug}:`,
-        error.message
+        error.message,
       );
     }
   })();

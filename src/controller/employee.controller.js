@@ -1,9 +1,15 @@
 const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
-const { validateEmployeeCreate } = require("../validation/employee.validation");
+const {
+  validateEmployeeCreate,
+  validateEmployeeUpdate,
+} = require("../validation/employee.validation");
 const employeeModel = require("../models/employee.model");
-const { cloudinaryFileUpload } = require("../helpers/cloudinary");
+const {
+  cloudinaryFileUpload,
+  deleteCloudinaryFile,
+} = require("../helpers/cloudinary");
 
 //  CREATE EMPLOYEE
 exports.createEmployee = asynchandeler(async (req, res) => {
@@ -51,4 +57,71 @@ exports.getEmployeeList = asynchandeler(async (req, res) => {
     count: employeeList.length,
     employees: employeeList,
   });
+});
+
+exports.updateEmployee = asynchandeler(async (req, res) => {
+  // 1) Validate request
+  const value = await validateEmployeeUpdate(req);
+
+  // 2) Prevent forbidden updates
+  delete value.employeeId;
+  delete value.createdAt;
+  delete value.updatedAt;
+
+  // 3) Fetch current employee first (need previous image)
+  const employee = await employeeModel.findOne({
+    employeeId: req.params.id,
+  });
+
+  if (!employee) {
+    return apiResponse.sendError(res, 404, "Employee not found");
+  }
+
+  // keep old image url for later delete
+  const oldImageUrl = employee.image;
+
+  // 4) Update non-image fields immediately
+  // (Don't include value.image here because it's file object)
+  const { image, ...rest } = value;
+
+  const updatedEmployee = await employeeModel.findByIdAndUpdate(
+    employee._id,
+    { $set: rest },
+    { new: true, runValidators: true },
+  );
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Employee updated successfully",
+    updatedEmployee,
+  );
+
+  // 5) Background image flow (safe order)
+  if (image) {
+    (async () => {
+      try {
+        //  Upload new image first
+        const { optimizeUrl } = await cloudinaryFileUpload(image.path);
+
+        // Update DB with new image URL
+        await employeeModel.findByIdAndUpdate(employee._id, {
+          image: optimizeUrl,
+        });
+
+        // Delete old image only AFTER DB updated
+        const parts = oldImageUrl.split("/");
+        const publicId = parts[parts.length - 1].split("?")[0];
+
+        // If no old image, skip delete
+        if (publicId) {
+          await deleteCloudinaryFile(publicId);
+        }
+
+        console.log("Employee image updated (BG):", employee.fullName);
+      } catch (error) {
+        console.error("Image update failed (BG):", error.message);
+      }
+    })();
+  }
 });

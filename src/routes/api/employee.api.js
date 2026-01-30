@@ -7,4 +7,8 @@ _.route("/create-employee").post(
   employeeController.createEmployee,
 );
 _.route("/get-employee").get(employeeController.getEmployeeList);
+_.route("/update-employee/:id").put(
+  multipleFileUpload("image", 1),
+  employeeController.updateEmployee,
+);
 module.exports = _;
