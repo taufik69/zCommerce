@@ -70,4 +70,16 @@ _.route("/update-employee-department/:slug").put(
 _.route("/delete-employee-department/:slug").delete(
   employeeController.deleteEmployeeDepartment,
 );
+
+// section api
+_.route("/create-employee-section").post(
+  employeeController.createEmployeeSection,
+);
+_.route("/get-employee-section").get(employeeController.getEmployeeSection);
+_.route("/update-employee-section/:slug").put(
+  employeeController.updateEmployeeSection,
+);
+_.route("/delete-employee-section/:slug").delete(
+  employeeController.deleteEmployeeSection,
+);
 module.exports = _;

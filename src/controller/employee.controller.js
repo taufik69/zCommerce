@@ -11,6 +11,7 @@ const {
   employeeAdvancePayment,
   employeeDesignationModel,
   departmentModel,
+  sectionModel,
 } = require("../models/advancePayment.model");
 const {
   cloudinaryFileUpload,
@@ -434,5 +435,79 @@ exports.deleteEmployeeDepartment = asynchandeler(async (req, res) => {
     200,
     "Department deleted successfully",
     employeeDepartmentDTO(department),
+  );
+});
+
+// ------ section controller ------
+exports.createEmployeeSection = asynchandeler(async (req, res) => {
+  const { name } = req.body;
+  if (!name) {
+    throw new customError(401, "Section name is required");
+  }
+  const employeeSection = await sectionModel.create(req.body);
+  if (!employeeSection) {
+    return apiResponse.sendError(res, 404, "Section not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    201,
+    "Section created successfully",
+    employeeDepartmentDTO(employeeSection),
+  );
+});
+
+// get all section list or get section using slug by req.query
+exports.getEmployeeSection = asynchandeler(async (req, res) => {
+  const { slug } = req.query;
+  let filterQuery = {};
+  if (slug) {
+    filterQuery.slug = slug;
+  } else {
+    filterQuery = {};
+  }
+
+  const employeeSection = await sectionModel.find(filterQuery);
+  if (employeeSection.length == 0) {
+    return apiResponse.sendError(res, 404, "Section not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Section fetch successfully",
+    employeeSection.map((section) => employeeDepartmentDTO(section)),
+  );
+});
+
+// update section using slug
+exports.updateEmployeeSection = asynchandeler(async (req, res) => {
+  const section = await sectionModel.findOneAndUpdate(
+    { slug: req.params.slug },
+    req.body,
+    { new: true },
+  );
+  if (!section) {
+    return apiResponse.sendError(res, 404, "Section not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Section updated successfully",
+    employeeDepartmentDTO(section),
+  );
+});
+
+// delete section using slug
+exports.deleteEmployeeSection = asynchandeler(async (req, res) => {
+  const section = await sectionModel.findOneAndDelete({
+    slug: req.params.slug,
+  });
+  if (!section) {
+    return apiResponse.sendError(res, 404, "Section not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Section deleted successfully",
+    employeeDepartmentDTO(section),
   );
 });

@@ -205,8 +205,62 @@ departmentSchema.pre("findOneAndUpdate", async function (next) {
 const departmentModel =
   mongoose.models.Department || mongoose.model("Department", departmentSchema);
 
+// same to same  make a model section model like department model
+const sectionSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: [true, "Section name is required"],
+      trim: true,
+    },
+    slug: {
+      type: String,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
+
+// make a slug using name
+sectionSchema.pre("save", function (next) {
+  this.slug = slugify(this.name, { lower: true });
+  next();
+});
+
+// check this slug is alreay exist
+sectionSchema.pre("save", async function (next) {
+  const existingSection = await this.constructor.findOne({
+    slug: this.slug,
+  });
+  if (
+    existingSection &&
+    existingSection._id.toString() !== this._id.toString()
+  ) {
+    console.log(`Section with slug ${this.slug} already exists`);
+    throw new customError(`Section with slug ${this.slug} already exists`, 400);
+  }
+  next();
+});
+
+// when update name then update slug also
+sectionSchema.pre("findOneAndUpdate", async function (next) {
+  const update = this.getUpdate();
+  if (update.name) {
+    update.slug = slugify(update.name, { lower: true });
+  }
+  next();
+});
+
+const sectionModel =
+  mongoose.models.Section || mongoose.model("Section", sectionSchema);
+
 module.exports = {
   employeeDesignationModel,
   employeeAdvancePayment,
   departmentModel,
+  sectionModel,
 };
