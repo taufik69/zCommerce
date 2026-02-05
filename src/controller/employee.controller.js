@@ -6,10 +6,12 @@ const {
   validateEmployeeUpdate,
 } = require("../validation/employee.validation");
 const employeeModel = require("../models/employee.model");
+const employeeAdvancePaymentModel = require("../models/advancePayment.model");
 const {
   cloudinaryFileUpload,
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
+const { employeeAdvancePaymentDTO } = require("../dtos/all.dto");
 
 //  CREATE EMPLOYEE
 exports.createEmployee = asynchandeler(async (req, res) => {
@@ -201,4 +203,77 @@ exports.restoreEmployee = asynchandeler(async (req, res) => {
   apiResponse.sendSuccess(res, 200, "Employee restored successfully", {
     employeeId: employee.employeeId,
   });
+});
+
+// create employee AdvancePayment
+exports.createEmployeeAdvancePayment = asynchandeler(async (req, res) => {
+  const advancePayment = await employeeAdvancePaymentModel.create(req.body);
+  if (!advancePayment) {
+    return apiResponse.sendError(res, 404, "Advance Payment not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    201,
+    "Advance Payment created successfully",
+    employeeAdvancePaymentDTO(advancePayment),
+  );
+});
+
+// get all employe advance pyament or get single advance payment by employee id
+exports.getEmployeeAdvancePayment = asynchandeler(async (req, res) => {
+  const { employeeId } = req.query;
+  let filterQuery = {};
+  if (employeeId) {
+    filterQuery.employeeId = employeeId;
+  } else {
+    filterQuery = {};
+  }
+
+  const employeeAdvancePayment =
+    await employeeAdvancePaymentModel.find(filterQuery);
+  if (employeeAdvancePayment.length == 0) {
+    return apiResponse.sendError(res, 404, "Advance Payment not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Advance Payment fetch successfully",
+    employeeAdvancePayment.map((advancePayment) =>
+      employeeAdvancePaymentDTO(advancePayment),
+    ),
+  );
+});
+
+// update advance payemnt
+exports.updateEmployeeAdvancePayment = asynchandeler(async (req, res) => {
+  const advancePayment = await employeeAdvancePaymentModel.findOneAndUpdate(
+    { employeeId: req.params.id },
+    req.body,
+    { new: true },
+  );
+  if (!advancePayment) {
+    return apiResponse.sendError(res, 404, "Advance Payment not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Advance Payment updated successfully",
+    employeeAdvancePaymentDTO(advancePayment),
+  );
+});
+
+// delete advance payment
+exports.deleteEmployeeAdvancePayment = asynchandeler(async (req, res) => {
+  const advancePayment = await employeeAdvancePaymentModel.findOneAndDelete({
+    employeeId: req.params.id,
+  });
+  if (!advancePayment) {
+    return apiResponse.sendError(res, 404, "Advance Payment not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Advance Payment deleted successfully",
+    employeeAdvancePaymentDTO(advancePayment),
+  );
 });

@@ -73,6 +73,17 @@ const employeeAdvancePaymentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// check  same emplyee take advancew payment in same month prevent before save the save
+// employeeAdvancePaymentSchema.pre("save", async function (next) {
+//   const existingAdvancePayment = await this.constructor.findOne({
+//     employeeId: this.employeeId,
+//     month: this.month,
+//   });
+//   if (existingAdvancePayment) {
+//     throw new Error("Employee already took advance payment in this month");
+//   }
+//   next();
+// });
 module.exports =
   mongoose.models.EmployeeAdvancePayment ||
   mongoose.model("EmployeeAdvancePayment", employeeAdvancePaymentSchema);
