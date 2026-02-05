@@ -6,12 +6,21 @@ const {
   validateEmployeeUpdate,
 } = require("../validation/employee.validation");
 const employeeModel = require("../models/employee.model");
-const employeeAdvancePaymentModel = require("../models/advancePayment.model");
+const {} = require("../models/advancePayment.model");
+const {
+  employeeAdvancePayment,
+  employeeDesignationModel,
+  departmentModel,
+} = require("../models/advancePayment.model");
 const {
   cloudinaryFileUpload,
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
-const { employeeAdvancePaymentDTO } = require("../dtos/all.dto");
+const {
+  employeeAdvancePaymentDTO,
+  employeeDesignationDTO,
+  employeeDepartmentDTO,
+} = require("../dtos/all.dto");
 
 //  CREATE EMPLOYEE
 exports.createEmployee = asynchandeler(async (req, res) => {
@@ -205,9 +214,9 @@ exports.restoreEmployee = asynchandeler(async (req, res) => {
   });
 });
 
-// create employee AdvancePayment
+// --------------------> create employee AdvancePayment
 exports.createEmployeeAdvancePayment = asynchandeler(async (req, res) => {
-  const advancePayment = await employeeAdvancePaymentModel.create(req.body);
+  const advancePayment = await employeeAdvancePayment.create(req.body);
   if (!advancePayment) {
     return apiResponse.sendError(res, 404, "Advance Payment not found");
   }
@@ -229,8 +238,7 @@ exports.getEmployeeAdvancePayment = asynchandeler(async (req, res) => {
     filterQuery = {};
   }
 
-  const employeeAdvancePayment =
-    await employeeAdvancePaymentModel.find(filterQuery);
+  const employeeAdvancePayment = await employeeAdvancePayment.find(filterQuery);
   if (employeeAdvancePayment.length == 0) {
     return apiResponse.sendError(res, 404, "Advance Payment not found");
   }
@@ -246,7 +254,7 @@ exports.getEmployeeAdvancePayment = asynchandeler(async (req, res) => {
 
 // update advance payemnt
 exports.updateEmployeeAdvancePayment = asynchandeler(async (req, res) => {
-  const advancePayment = await employeeAdvancePaymentModel.findOneAndUpdate(
+  const advancePayment = await employeeAdvancePayment.findOneAndUpdate(
     { employeeId: req.params.id },
     req.body,
     { new: true },
@@ -264,7 +272,7 @@ exports.updateEmployeeAdvancePayment = asynchandeler(async (req, res) => {
 
 // delete advance payment
 exports.deleteEmployeeAdvancePayment = asynchandeler(async (req, res) => {
-  const advancePayment = await employeeAdvancePaymentModel.findOneAndDelete({
+  const advancePayment = await employeeAdvancePayment.findOneAndDelete({
     employeeId: req.params.id,
   });
   if (!advancePayment) {
@@ -275,5 +283,156 @@ exports.deleteEmployeeAdvancePayment = asynchandeler(async (req, res) => {
     200,
     "Advance Payment deleted successfully",
     employeeAdvancePaymentDTO(advancePayment),
+  );
+});
+
+// ---------------------- employee designation controller -----------------------
+
+// create employee designation
+exports.createEmployeeDesignation = asynchandeler(async (req, res) => {
+  const { name } = req.body;
+  if (!name) {
+    throw new customError(401, "Designation name is required");
+  }
+  const employeeDesignation = await employeeDesignationModel.create(req.body);
+  if (!employeeDesignation) {
+    return apiResponse.sendError(res, 404, "Designation not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    201,
+    "Designation created successfully",
+    employeeDesignationDTO(employeeDesignation),
+  );
+});
+
+//  get all employee designation or get designnation using slug by req.query
+exports.getEmployeeDesignation = asynchandeler(async (req, res) => {
+  const { slug } = req.query;
+  let filterQuery = {};
+  if (slug) {
+    filterQuery.slug = slug;
+  } else {
+    filterQuery = {};
+  }
+
+  const employeeDesignation = await employeeDesignationModel.find(filterQuery);
+  if (employeeDesignation.length == 0) {
+    return apiResponse.sendError(res, 404, "Designation not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Designation fetch successfully",
+    employeeDesignation.map((designation) =>
+      employeeDesignationDTO(designation),
+    ),
+  );
+});
+
+// update designation using slug
+exports.updateEmployeeDesignation = asynchandeler(async (req, res) => {
+  const designation = await employeeDesignationModel.findOneAndUpdate(
+    { slug: req.params.slug },
+    req.body,
+    { new: true },
+  );
+  if (!designation) {
+    return apiResponse.sendError(res, 404, "Designation not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Designation updated successfully",
+    employeeDesignationDTO(designation),
+  );
+});
+
+// delete designation using slug
+exports.deleteEmployeeDesignation = asynchandeler(async (req, res) => {
+  const designation = await employeeDesignationModel.findOneAndDelete({
+    slug: req.params.slug,
+  });
+  if (!designation) {
+    return apiResponse.sendError(res, 404, "Designation not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Designation deleted successfully",
+    employeeDesignationDTO(designation),
+  );
+});
+
+// ---------------------- employee department controller -----------------------
+exports.createEmployeeDepartment = asynchandeler(async (req, res) => {
+  const { name } = req.body;
+  if (!name) {
+    throw new customError(401, "Department name is required");
+  }
+  const employeeDepartment = await departmentModel.create(req.body);
+  if (!employeeDepartment) {
+    return apiResponse.sendError(res, 404, "Department not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    201,
+    "Department created successfully",
+    employeeDepartmentDTO(employeeDepartment),
+  );
+});
+
+// get all deapartment or get department using slug by req.query
+exports.getEmployeeDepartment = asynchandeler(async (req, res) => {
+  const { slug } = req.query;
+  let filterQuery = {};
+  if (slug) {
+    filterQuery.slug = slug;
+  } else {
+    filterQuery = {};
+  }
+
+  const employeeDepartment = await departmentModel.find(filterQuery);
+  if (employeeDepartment.length == 0) {
+    return apiResponse.sendError(res, 404, "Department not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Department fetch successfully",
+    employeeDepartment.map((department) => employeeDepartmentDTO(department)),
+  );
+});
+// update department using slug
+exports.updateEmployeeDepartment = asynchandeler(async (req, res) => {
+  const department = await departmentModel.findOneAndUpdate(
+    { slug: req.params.slug },
+    req.body,
+    { new: true },
+  );
+  if (!department) {
+    return apiResponse.sendError(res, 404, "Department not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Department updated successfully",
+    employeeDepartmentDTO(department),
+  );
+});
+
+// delete deparment using slug
+exports.deleteEmployeeDepartment = asynchandeler(async (req, res) => {
+  const department = await departmentModel.findOneAndDelete({
+    slug: req.params.slug,
+  });
+  if (!department) {
+    return apiResponse.sendError(res, 404, "Department not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Department deleted successfully",
+    employeeDepartmentDTO(department),
   );
 });

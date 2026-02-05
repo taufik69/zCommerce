@@ -1,4 +1,6 @@
 const mongoose = require("mongoose");
+const { default: slugify } = require("slugify");
+const { customError } = require("../lib/CustomError");
 
 const employeeAdvancePaymentSchema = new mongoose.Schema(
   {
@@ -84,6 +86,127 @@ const employeeAdvancePaymentSchema = new mongoose.Schema(
 //   }
 //   next();
 // });
-module.exports =
+const employeeAdvancePayment =
   mongoose.models.EmployeeAdvancePayment ||
   mongoose.model("EmployeeAdvancePayment", employeeAdvancePaymentSchema);
+
+// want to make employee designation model
+
+const employeeDesignationSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: [true, "Designation name is required"],
+      trim: true,
+    },
+    slug: {
+      type: String,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
+
+// make a slug using name
+employeeDesignationSchema.pre("save", function (next) {
+  this.slug = slugify(this.name, { lower: true });
+  next();
+});
+
+// check this slug is alreay exist
+employeeDesignationSchema.pre("save", async function (next) {
+  const existingDesignation = await this.constructor.findOne({
+    slug: this.slug,
+  });
+  if (
+    existingDesignation &&
+    existingDesignation._id.toString() !== this._id.toString()
+  ) {
+    console.log(`Designation with slug ${this.slug} already exists`);
+    throw new customError(
+      `Designation with slug ${this.slug} already exists`,
+      400,
+    );
+  }
+  next();
+});
+
+// when update name then update slug also
+employeeDesignationSchema.pre("findOneAndUpdate", async function (next) {
+  const update = this.getUpdate();
+  if (update.name) {
+    update.slug = slugify(update.name, { lower: true });
+  }
+  next();
+});
+
+const employeeDesignationModel =
+  mongoose.models.EmployeeDesignation ||
+  mongoose.model("EmployeeDesignation", employeeDesignationSchema);
+
+// department model
+
+const departmentSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: [true, "Department name is required"],
+      trim: true,
+    },
+    slug: {
+      type: String,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
+
+// make a slug using name
+departmentSchema.pre("save", function (next) {
+  this.slug = slugify(this.name, { lower: true });
+  next();
+});
+
+// check this slug is alreay exist
+departmentSchema.pre("save", async function (next) {
+  const existingDepartment = await this.constructor.findOne({
+    slug: this.slug,
+  });
+  if (
+    existingDepartment &&
+    existingDepartment._id.toString() !== this._id.toString()
+  ) {
+    console.log(`Department with slug ${this.slug} already exists`);
+    throw new customError(
+      `Department with slug ${this.slug} already exists`,
+      400,
+    );
+  }
+  next();
+});
+
+// when update name then update slug also
+departmentSchema.pre("findOneAndUpdate", async function (next) {
+  const update = this.getUpdate();
+  if (update.name) {
+    update.slug = slugify(update.name, { lower: true });
+  }
+  next();
+});
+
+const departmentModel =
+  mongoose.models.Department || mongoose.model("Department", departmentSchema);
+
+module.exports = {
+  employeeDesignationModel,
+  employeeAdvancePayment,
+  departmentModel,
+};

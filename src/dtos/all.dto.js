@@ -12,3 +12,19 @@ exports.employeeAdvancePaymentDTO = (doc) => {
     remarks: doc.remarks ?? "",
   };
 };
+
+// employee designation dto
+exports.employeeDesignationDTO = (doc) => {
+  if (!doc) return null;
+  return {
+    name: doc.name,
+    slug: doc.slug,
+  };
+};
+exports.employeeDepartmentDTO = (doc) => {
+  if (!doc) return null;
+  return {
+    name: doc.name,
+    slug: doc.slug,
+  };
+};

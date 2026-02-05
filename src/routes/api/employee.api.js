@@ -40,4 +40,34 @@ _.route("/update-employee-advance-payment/:id").put(
 _.route("/delete-employee-advance-payment/:id").delete(
   employeeController.deleteEmployeeAdvancePayment,
 );
+
+// designation api
+_.route("/create-employee-designation").post(
+  employeeController.createEmployeeDesignation,
+);
+_.route("/get-employee-designation").get(
+  employeeController.getEmployeeDesignation,
+);
+
+_.route("/update-employee-designation/:slug").put(
+  employeeController.updateEmployeeDesignation,
+);
+
+_.route("/delete-employee-designation/:slug").delete(
+  employeeController.deleteEmployeeDesignation,
+);
+
+// department api
+_.route("/create-employee-department").post(
+  employeeController.createEmployeeDepartment,
+);
+_.route("/get-employee-department").get(
+  employeeController.getEmployeeDepartment,
+);
+_.route("/update-employee-department/:slug").put(
+  employeeController.updateEmployeeDepartment,
+);
+_.route("/delete-employee-department/:slug").delete(
+  employeeController.deleteEmployeeDepartment,
+);
 module.exports = _;
