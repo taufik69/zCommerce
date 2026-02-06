@@ -32,4 +32,8 @@ _.route("/create-supplier-due-payment").post(
   validate(createSupplierDuePaymentSchema),
   supplierController.createSupplierDuePayment,
 );
+
+_.route("/get-supplier-due-payment").get(
+  supplierController.getAllSupplierDuePayment,
+);
 module.exports = _;

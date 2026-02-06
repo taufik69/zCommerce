@@ -156,53 +156,135 @@ exports.createSupplierDuePayment = asynchandeler(async (req, res) => {
     date,
   } = req.body;
 
-  //  basic guard
   const totalReduce = Number(paidAmount) + Number(lessAmount);
 
-  if (totalReduce <= 0)
+  if (totalReduce <= 0) {
     return apiResponse.sendError(
       res,
       400,
       "Paid amount or less amount must be greater than 0",
     );
+  }
 
-  //  find supplier first
+  // 1️Find supplier
   const supplier = await SupplierModel.findOne({ supplierId, isActive: true });
-  if (!supplier) return apiResponse.sendError(res, 404, "Supplier not found");
+  if (!supplier) {
+    return apiResponse.sendError(res, 404, "Supplier not found");
+  }
 
   const currentDue = Number(supplier.openingDues || 0);
 
-  // prevent negative due
   if (totalReduce > currentDue) {
     return apiResponse.sendError(
       res,
       400,
-      `Payment exceeds due. Current due: ${currentDue}, you tried: ${totalReduce}`,
+      `Payment exceeds due. Current due: ${currentDue}`,
     );
   }
 
-  // update supplier due
+  //  Update supplier due
   supplier.openingDues = currentDue - totalReduce;
   await supplier.save();
 
-  // create payment history
-  const paymentDoc = await SupplierDuePayment.create({
+  //  Find existing payment doc (ONE per supplier)
+  let paymentDoc = await SupplierDuePayment.findOne({
     supplierId,
-    date: date || new Date(),
-    paidAmount,
-    lessAmount,
-    paymentMode,
-    remarks,
-    remainingDue: supplier.openingDues,
+    isActive: true,
   });
+
+  if (paymentDoc) {
+    // UPDATE existing
+    paymentDoc.paidAmount += Number(paidAmount);
+    paymentDoc.lessAmount += Number(lessAmount);
+    paymentDoc.remainingDue = supplier.openingDues;
+    paymentDoc.paymentMode = paymentMode;
+    paymentDoc.remarks = remarks || paymentDoc.remarks;
+    paymentDoc.date = date || new Date();
+
+    await paymentDoc.save();
+  } else {
+    //  CREATE first time only
+    paymentDoc = await SupplierDuePayment.create({
+      supplierId,
+      date: date || new Date(),
+      paidAmount,
+      lessAmount,
+      paymentMode,
+      remarks,
+      remainingDue: supplier.openingDues,
+    });
+  }
 
   apiResponse.sendSuccess(
     res,
     201,
-    "Supplier due payment created successfully",
+    "Supplier due payment updated successfully",
     {
-      supplier: supplierDTO(supplier),
+      ...supplierDTO(supplier),
       payment: supplierDuePaymentDTO(paymentDoc),
     },
+  );
+});
+
+// get all supplier due payment or single supplier due amount
+exports.getAllSupplierDuePayment = asynchandeler(async (req, res) => {
+  const matchStage = {};
+
+  if (req.query.supplierId) {
+    matchStage.supplierId = req.query.supplierId;
+  }
+
+  const payments = await SupplierDuePayment.aggregate([
+    {
+      $match: matchStage,
+    },
+
+    {
+      $lookup: {
+        from: "suppliers",
+        localField: "supplierId",
+        foreignField: "supplierId",
+        as: "supplier",
+      },
+    },
+
+    {
+      $unwind: {
+        path: "$supplier",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
+    {
+      $project: {
+        transactionId: 1,
+        date: 1,
+        supplierId: 1,
+        paidAmount: 1,
+        lessAmount: 1,
+        paymentMode: 1,
+        remarks: 1,
+        remainingDue: 1,
+        isActive: 1,
+
+        supplier: {
+          supplierName: 1,
+          supplierId: 1,
+          mobile: 1,
+          supplierAddress: 1,
+          openingDues: 1,
+          isActive: 1,
+          contactPersonDesignation: 1,
+          contactPersonName: 1,
+        },
+      },
+    },
+  ]);
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Supplier due payment fetched successfully",
+    payments,
   );
 });
