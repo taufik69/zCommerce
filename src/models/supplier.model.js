@@ -177,6 +177,9 @@ const supplierDuePaymentSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    updatedAt: {
+      type: Date,
+    },
   },
   { timestamps: true },
 );

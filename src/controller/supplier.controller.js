@@ -288,3 +288,84 @@ exports.getAllSupplierDuePayment = asynchandeler(async (req, res) => {
     payments,
   );
 });
+
+exports.updateSupplierDuePayment = asynchandeler(async (req, res) => {
+  const { id } = req.params;
+
+  const { paidAmount, lessAmount, paymentMode, remarks, date } = req.body;
+
+  // 1) find payment doc
+  const paymentDoc = await SupplierDuePayment.findOne({ supplierId: id });
+  if (!paymentDoc) {
+    return apiResponse.sendError(res, 404, "Supplier due payment not found");
+  }
+
+  // 2) find supplier
+  const supplier = await SupplierModel.findOne({
+    supplierId: paymentDoc.supplierId,
+    isActive: true,
+  });
+  if (!supplier) {
+    return apiResponse.sendError(res, 404, "Supplier not found");
+  }
+
+  const currentDue = Number(supplier.openingDues || 0);
+
+  // old totals
+  const oldPaid = Number(paymentDoc.paidAmount || 0);
+  const oldLess = Number(paymentDoc.lessAmount || 0);
+  const oldTotal = oldPaid + oldLess;
+
+  // new totals (fallback to old if not provided)
+  const newPaid = paidAmount !== undefined ? Number(paidAmount) : oldPaid;
+  const newLess = lessAmount !== undefined ? Number(lessAmount) : oldLess;
+  const newTotal = newPaid + newLess;
+
+  if (newTotal <= 0) {
+    return apiResponse.sendError(
+      res,
+      400,
+      "Paid amount + less amount must be greater than 0",
+    );
+  }
+
+  // difference that impacts supplier due
+  const diff = newTotal - oldTotal;
+
+  // If diff > 0 => need to reduce due more
+  if (diff > 0 && diff > currentDue) {
+    return apiResponse.sendError(
+      res,
+      400,
+      `Update exceeds due. Current due: ${currentDue}, extra reduce needed: ${diff}`,
+    );
+  }
+
+  // 3) update supplier due
+  supplier.openingDues = currentDue - diff; // diff can be negative -> due increases
+  if (supplier.openingDues < 0) supplier.openingDues = 0; // safety
+  await supplier.save();
+
+  // 4) update payment doc
+  paymentDoc.paidAmount = newPaid;
+  paymentDoc.lessAmount = newLess;
+
+  if (paymentMode !== undefined) paymentDoc.paymentMode = paymentMode;
+  if (remarks !== undefined) paymentDoc.remarks = remarks;
+  if (date !== undefined) paymentDoc.date = date;
+
+  paymentDoc.remainingDue = supplier.openingDues;
+  paymentDoc.updatedAt = Date.now();
+
+  await paymentDoc.save();
+
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Supplier due payment updated successfully",
+    {
+      ...supplierDTO(supplier),
+      payment: supplierDuePaymentDTO(paymentDoc),
+    },
+  );
+});

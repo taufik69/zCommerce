@@ -4,6 +4,7 @@ const {
   createSupplierSchema,
   updateSupplierSchema,
   createSupplierDuePaymentSchema,
+  updateSupplierDuePaymentSchema,
 } = require("../../validation/supplier.validation");
 const _ = express.Router();
 const supplierController = require("../../controller/supplier.controller");
@@ -35,5 +36,10 @@ _.route("/create-supplier-due-payment").post(
 
 _.route("/get-supplier-due-payment").get(
   supplierController.getAllSupplierDuePayment,
+);
+
+_.route("/update-supplier-due-payment/:id").put(
+  validate(updateSupplierDuePaymentSchema),
+  supplierController.updateSupplierDuePayment,
 );
 module.exports = _;
