@@ -8,7 +8,7 @@ const { asynchandeler } = require("../lib/asyncHandeler");
 exports.createPurchase = asynchandeler(async (req, res) => {
   const {
     invoiceNumber,
-    supplierName,
+    supplierId,
     cashType,
     allproduct, // [{ product, variant, price, wholesalePrice, retailPrice, quantity, size, color }]
     commission = 0,
@@ -71,11 +71,11 @@ exports.createPurchase = asynchandeler(async (req, res) => {
 
         if (size)
           productInfo.size = Array.from(
-            new Set([...(productInfo.size || []), size])
+            new Set([...(productInfo.size || []), size]),
           );
         if (color)
           productInfo.color = Array.from(
-            new Set([...(productInfo.color || []), color])
+            new Set([...(productInfo.color || []), color]),
           );
         await productInfo.save();
       }
@@ -90,11 +90,11 @@ exports.createPurchase = asynchandeler(async (req, res) => {
         variantInfo.retailPrice = retailPrice;
         if (size)
           variantInfo.size = Array.from(
-            new Set([...(variantInfo.size || []), size])
+            new Set([...(variantInfo.size || []), size]),
           );
         if (color)
           variantInfo.color = Array.from(
-            new Set([...(variantInfo.color || []), color])
+            new Set([...(variantInfo.color || []), color]),
           );
         await variantInfo.save();
       }
@@ -107,7 +107,7 @@ exports.createPurchase = asynchandeler(async (req, res) => {
   // Create Purchase document
   const purchase = await Purchase.create({
     invoiceNumber,
-    supplierName,
+    supplierId,
     cashType,
     allproduct: purchaseProducts,
     subTotal,
@@ -152,7 +152,7 @@ exports.getAllPurchases = asynchandeler(async (req, res) => {
     res,
     200,
     "Purchases fetched successfully",
-    purchasesWithSerial
+    purchasesWithSerial,
   );
 });
 
@@ -266,11 +266,11 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
         productInfo.retailPrice = retailPrice;
         if (size)
           productInfo.size = Array.from(
-            new Set([...(productInfo.size || []), size])
+            new Set([...(productInfo.size || []), size]),
           );
         if (color)
           productInfo.color = Array.from(
-            new Set([...(productInfo.color || []), color])
+            new Set([...(productInfo.color || []), color]),
           );
         await productInfo.save();
       }
@@ -286,11 +286,11 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
         variantInfo.retailPrice = retailPrice;
         if (size)
           variantInfo.size = Array.from(
-            new Set([...(variantInfo.size || []), size])
+            new Set([...(variantInfo.size || []), size]),
           );
         if (color)
           variantInfo.color = Array.from(
-            new Set([...(variantInfo.color || []), color])
+            new Set([...(variantInfo.color || []), color]),
           );
         await variantInfo.save();
       }
@@ -324,7 +324,7 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
     res,
     200,
     "Purchase updated successfully",
-    existingPurchase
+    existingPurchase,
   );
 });
 
@@ -370,6 +370,6 @@ exports.deletePurchase = asynchandeler(async (req, res) => {
     res,
     200,
     "Purchase deleted successfully",
-    null
+    null,
   );
 });

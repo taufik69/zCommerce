@@ -59,6 +59,7 @@ _.use("/outletinformation", require("./api/outletinformation.api"));
 _.use("/discount-banner", require("./api/discountbanner.api"));
 _.use("/courier-return", require("./api/courierReturn.api"));
 _.use("/employee", require("./api/employee.api"));
+_.use("/supplier", require("./api/supplier.api"));
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });

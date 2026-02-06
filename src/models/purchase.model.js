@@ -12,11 +12,13 @@ const purchaseSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
-    supplierName: {
+
+    supplierId: {
       type: String,
       trim: true,
       required: true,
     },
+
     cashType: {
       type: String,
       // enum: ["cash", "bank", "mobile_banking"],
@@ -98,7 +100,7 @@ const purchaseSchema = new mongoose.Schema(
       ref: "Brand",
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 purchaseSchema.pre("save", async function (next) {
