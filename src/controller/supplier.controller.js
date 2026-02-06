@@ -369,3 +369,56 @@ exports.updateSupplierDuePayment = asynchandeler(async (req, res) => {
     },
   );
 });
+
+// soft delete payment
+exports.softDeleteSupplierDuePayment = asynchandeler(async (req, res) => {
+  const { deleteSupplier } = req.query;
+  if (deleteSupplier === "true") {
+    const payment = await SupplierDuePayment.findOneAndUpdate(
+      { supplierId: req.params.supplierId },
+      { isActive: false, deletedAt: Date.now() },
+      {
+        new: true,
+      },
+    );
+    if (!payment)
+      apiResponse.sendError(res, 404, "Supplier due payment not found");
+    apiResponse.sendSuccess(
+      res,
+      200,
+      "Supplier due payment deleted successfully",
+      supplierDuePaymentDTO(payment),
+    );
+  } else {
+    const payment = await SupplierDuePayment.findOneAndUpdate(
+      { supplierId: req.params.supplierId },
+      { isActive: true, updatedAt: Date.now() },
+      {
+        new: true,
+      },
+    );
+    if (!payment)
+      apiResponse.sendError(res, 404, "Supplier due payment not found");
+    apiResponse.sendSuccess(
+      res,
+      200,
+      "Supplier due payment deleted successfully",
+      supplierDuePaymentDTO(payment),
+    );
+  }
+});
+
+// hard delete supplier due payment
+exports.deleteSupplierDuePayment = asynchandeler(async (req, res) => {
+  const payment = await SupplierDuePayment.findOneAndDelete({
+    supplierId: req.params.supplierId,
+  });
+  if (!payment)
+    apiResponse.sendError(res, 404, "Supplier due payment not found");
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Supplier due payment deleted successfully",
+    supplierDuePaymentDTO(payment),
+  );
+});

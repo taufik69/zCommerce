@@ -42,4 +42,12 @@ _.route("/update-supplier-due-payment/:id").put(
   validate(updateSupplierDuePaymentSchema),
   supplierController.updateSupplierDuePayment,
 );
+
+_.route("/soft-delete-supplier-due-payment/:supplierId").delete(
+  supplierController.softDeleteSupplierDuePayment,
+);
+
+_.route("/delete-supplier-due-payment/:supplierId").delete(
+  supplierController.deleteSupplierDuePayment,
+);
 module.exports = _;

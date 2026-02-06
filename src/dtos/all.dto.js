@@ -78,5 +78,6 @@ exports.supplierDuePaymentDTO = (doc) => {
     remainingDue: doc.remainingDue,
     isActive: doc.isActive,
     createdAt: doc.createdAt,
+    deletedAt: doc.deletedAt,
   };
 };
