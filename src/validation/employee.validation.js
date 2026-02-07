@@ -106,8 +106,6 @@ const employeeCreateSchema = joi
 
     // soft delete fields/backend controlled
     isActive: joi.boolean().optional(),
-    department: joi.string().trim().allow("").optional(),
-    section: joi.string().trim().allow("").optional(),
   })
   .options({ abortEarly: false, stripUnknown: true });
 
