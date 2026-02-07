@@ -1,77 +1,74 @@
-// validation/customer.validation.js
-const joi = require("joi");
+const Joi = require("joi");
 const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 
 const bdMobileRegex = /^(01\d{9}|\+8801\d{9})$/;
 const nidRegex = /^(\d{10}|\d{13}|\d{17})$/;
 
-const customerCreateSchema = joi
-  .object({
-    customerId: joi.forbidden(),
-    customerType: joi.string().trim().allow("").optional(),
+const PAYMENT_MODES = [
+  "cash",
+  "bank",
+  "bkash",
+  "nagad",
+  "rocket",
+  "cheque",
+  "other",
+];
 
-    fullName: joi.string().trim().min(2).max(100).required().messages({
-      "string.empty": "Full name is required.",
-      "any.required": "Full name is required.",
-      "string.min": "Full name must be at least 2 characters.",
-      "string.max": "Full name cannot exceed 100 characters.",
+const customerCreateSchema = Joi.object({
+  customerId: Joi.forbidden(),
+  customerType: Joi.string().trim().allow("").optional(),
+
+  fullName: Joi.string().trim().min(2).max(100).required().messages({
+    "string.empty": "Full name is required.",
+    "any.required": "Full name is required.",
+    "string.min": "Full name must be at least 2 characters.",
+    "string.max": "Full name cannot exceed 100 characters.",
+  }),
+
+  mobileNumber: Joi.string().trim().pattern(bdMobileRegex).required().messages({
+    "string.empty": "Mobile number is required.",
+    "any.required": "Mobile number is required.",
+    "string.pattern.base":
+      "Mobile number must be a valid BD number (01XXXXXXXXX or +8801XXXXXXXXX).",
+  }),
+
+  occupation: Joi.string().trim().allow("").optional(),
+
+  nidNumber: Joi.string()
+    .trim()
+    .pattern(nidRegex)
+    .allow("")
+    .optional()
+    .messages({
+      "string.pattern.base": "NID number must be 10, 13, or 17 digits.",
     }),
 
-    mobileNumber: joi
-      .string()
-      .trim()
-      .pattern(bdMobileRegex)
-      .required()
-      .messages({
-        "string.empty": "Mobile number is required.",
-        "any.required": "Mobile number is required.",
-        "string.pattern.base":
-          "Mobile number must be a valid BD number (01XXXXXXXXX or +8801XXXXXXXXX).",
-      }),
+  openingDues: Joi.number().min(0).default(0).messages({
+    "number.base": "Opening dues must be a number.",
+    "number.min": "Opening dues cannot be negative.",
+  }),
 
-    occupation: joi.string().trim().allow("").optional(),
+  regularDiscountPercent: Joi.number().min(0).max(100).default(0).messages({
+    "number.base": "Regular discount must be a number.",
+    "number.min": "Discount cannot be negative.",
+    "number.max": "Discount cannot be more than 100.",
+  }),
 
-    nidNumber: joi
-      .string()
-      .trim()
-      .pattern(nidRegex)
-      .allow("")
-      .optional()
-      .messages({
-        "string.pattern.base": "NID number must be 10, 13, or 17 digits.",
-      }),
-
-    openingDues: joi.number().min(0).default(0).messages({
-      "number.base": "Opening dues must be a number.",
-      "number.min": "Opening dues cannot be negative.",
+  emailAddress: Joi.string()
+    .trim()
+    .lowercase()
+    .email()
+    .allow("")
+    .optional()
+    .messages({
+      "string.email": "Please provide a valid email address.",
     }),
 
-    regularDiscountPercent: joi.number().min(0).max(100).default(0).messages({
-      "number.base": "Regular discount must be a number.",
-      "number.min": "Discount cannot be negative.",
-      "number.max": "Discount cannot be more than 100.",
-    }),
-
-    emailAddress: joi
-      .string()
-      .trim()
-      .lowercase()
-      .email()
-      .allow("")
-      .optional()
-      .messages({
-        "string.email": "Please provide a valid email address.",
-      }),
-
-    remarks: joi.string().trim().max(1000).allow("").optional(),
-    presentAddress: joi.string().trim().max(1000).allow("").optional(),
-    permanentAddress: joi.string().trim().max(1000).allow("").optional(),
-
-    isActive: joi.boolean().optional(),
-    deletedAt: joi.forbidden(),
-  })
-  .options({ abortEarly: false, stripUnknown: true });
+  remarks: Joi.string().trim().max(1000).allow("").optional(),
+  presentAddress: Joi.string().trim().max(1000).allow("").optional(),
+  permanentAddress: Joi.string().trim().max(1000).allow("").optional(),
+}).options({ abortEarly: false, stripUnknown: true });
 
 const validateCustomerImage = (req) => {
   if (!req.files || req.files.length === 0) return null;
@@ -147,7 +144,79 @@ const validateCustomerUpdate = async (req, res, next) => {
     apiResponse.sendError(res, 400, buildJoiError(error));
   }
 };
+
+// Create Schema
+const createCustomerPaymentSchema = Joi.object({
+  // auto generated
+  slug: Joi.forbidden(),
+
+  customerName: Joi.string().trim().min(2).max(100).required().messages({
+    "string.empty": "Customer name is required",
+    "any.required": "Customer name is required",
+    "string.min": "Customer name must be at least 2 characters",
+    "string.max": "Customer name cannot exceed 100 characters",
+  }),
+
+  referenceInvoice: Joi.string().trim().allow("").optional(),
+
+  dueBalance: Joi.number().min(0).default(0).messages({
+    "number.base": "Due balance must be a number",
+    "number.min": "Due balance cannot be negative",
+  }),
+
+  paidAmount: Joi.number().min(0).default(0).messages({
+    "number.base": "Paid amount must be a number",
+    "number.min": "Paid amount cannot be negative",
+  }),
+
+  lessAmount: Joi.number().min(0).default(0).messages({
+    "number.base": "Less amount must be a number",
+    "number.min": "Less amount cannot be negative",
+  }),
+
+  cashBack: Joi.number().min(0).default(0).messages({
+    "number.base": "Cash back must be a number",
+    "number.min": "Cash back cannot be negative",
+  }),
+
+  date: Joi.date().optional(), // mongoose default Date.now
+
+  paymentMode: Joi.string()
+    .valid(...PAYMENT_MODES)
+    .default("cash")
+    .messages({
+      "any.only":
+        "Payment mode must be cash, bank, bkash, nagad, rocket, cheque or other",
+    }),
+
+  remarks: Joi.string().trim().max(500).allow("").optional(),
+
+  // system fields
+  isActive: Joi.boolean().optional(),
+  deletedAt: Joi.date().allow(null).optional(),
+}).options({ abortEarly: false, stripUnknown: true });
+
+// Update Schema (all optional but at least one required)
+const updateCustomerPaymentSchema = Joi.object({
+  customerName: Joi.string().trim().min(2).max(100).optional(),
+  referenceInvoice: Joi.string().trim().allow("").optional(),
+  dueBalance: Joi.number().min(0).optional(),
+  paidAmount: Joi.number().min(0).optional(),
+  lessAmount: Joi.number().min(0).optional(),
+  cashBack: Joi.number().min(0).optional(),
+  date: Joi.date().optional(),
+  paymentMode: Joi.string()
+    .valid(...PAYMENT_MODES)
+    .optional(),
+  remarks: Joi.string().trim().max(500).allow("").optional(),
+  isActive: Joi.boolean().optional(),
+  deletedAt: Joi.date().allow(null).optional(),
+})
+  .min(1) // prevent empty update body
+  .options({ abortEarly: false, stripUnknown: true });
 module.exports = {
   validateCustomerCreate,
   validateCustomerUpdate,
+  createCustomerPaymentSchema,
+  updateCustomerPaymentSchema,
 };

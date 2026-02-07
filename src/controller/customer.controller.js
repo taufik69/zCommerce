@@ -1,12 +1,19 @@
 const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
-const { customerModel } = require("../models/customer.model");
+const {
+  customerModel,
+  customerPaymentRecived,
+} = require("../models/customer.model");
 const {
   cloudinaryFileUpload,
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
-const { customerListDTO } = require("../dtos/all.dto");
+const {
+  customerListDTO,
+  customerPaymentDetailsDTO,
+  customerPaymentListDTO,
+} = require("../dtos/all.dto");
 
 // @desc create a new customer
 // @route POST /api/customers/create-customer
@@ -176,4 +183,70 @@ exports.deleteCustomer = asynchandeler(async (req, res) => {
       console.log("Old image delete failed:", err.message);
     }
   })();
+});
+
+// customer payment recived controller
+exports.createCustomerPaymentRecived = asynchandeler(async (req, res) => {
+  const paymentRecived = new customerPaymentRecived(req.body);
+  await paymentRecived.save();
+  if (!paymentRecived) {
+    return apiResponse.sendError(res, 404, "Customer payment not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Customer payment recived successfully",
+    customerPaymentDetailsDTO(paymentRecived),
+  );
+});
+
+// @desc Get customer payments
+// @route GET /api/get-customer-payment-reviced
+// @query ?slug=rahim-ahmed
+// @query ?name=rahim
+exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
+  const { slug, name } = req.query;
+
+  // 1) Get single by slug
+  if (slug) {
+    const doc = await customerPaymentRecived.findOne({
+      slug,
+      isActive: true,
+    });
+
+    if (!doc) {
+      return apiResponse.sendError(res, 404, "Customer payment not found");
+    }
+
+    return apiResponse.sendSuccess(
+      res,
+      200,
+      "Customer payment retrieved successfully",
+      customerPaymentDetailsDTO(doc),
+    );
+  }
+
+  // 2) Search by customer name (partial match)
+  let query = { isActive: true };
+
+  if (name && name.trim()) {
+    query.customerName = {
+      $regex: name.trim(),
+      $options: "i",
+    };
+  }
+
+  const docs = await customerPaymentRecived.find(query).sort({ createdAt: -1 });
+
+  if (!docs || docs.length === 0) {
+    apiResponse.sendError(res, 404, "No customer payments found");
+  }
+
+  //  Return list
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Customer payments retrieved successfully",
+    customerPaymentListDTO(docs),
+  );
 });

@@ -3,10 +3,11 @@ const _ = express.Router();
 
 const customerController = require("../../controller/customer.controller");
 const { multipleFileUpload } = require("../../middleware/multer.middleware");
-
+const validate = require("../../middleware/validate");
 const {
   validateCustomerCreate,
   validateCustomerUpdate,
+  createCustomerPaymentSchema,
 } = require("../../validation/customer.validation");
 
 _.route("/create-customer").post(
@@ -25,6 +26,15 @@ _.route("/update-customer/:customerId").put(
 
 _.route("/delete-customer/:customerId").delete(
   customerController.deleteCustomer,
+);
+// customer payment recived api
+_.route("/customer-payment-recived").post(
+  validate(createCustomerPaymentSchema),
+  customerController.createCustomerPaymentRecived,
+);
+
+_.route("/get-customer-payment-recived").get(
+  customerController.getCustomerPaymentReviced,
 );
 
 module.exports = _;

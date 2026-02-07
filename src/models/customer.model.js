@@ -174,4 +174,119 @@ customerSchema.pre("save", async function (next) {
 });
 
 const customerModel = mongoose.model("Customer", customerSchema);
-module.exports = { customerModel };
+
+// customer payment recived model schema
+
+const { default: slugify } = require("slugify");
+
+const customerPaymentRecivedSchema = new mongoose.Schema(
+  {
+    customerName: {
+      type: String,
+      required: [true, "Customer name is required"],
+      trim: true,
+    },
+
+    slug: {
+      type: String,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+
+    referenceInvoice: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    dueBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    paidAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    lessAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    cashBack: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    date: {
+      type: Date,
+    },
+
+    paymentMode: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    remarks: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  {
+    timestamps: true,
+  },
+);
+
+/**
+ * Generate slug from customerName
+ */
+customerPaymentRecivedSchema.pre("save", function (next) {
+  if (this.isModified("customerName")) {
+    this.slug = slugify(this.customerName, {
+      lower: true,
+      strict: true,
+    });
+  }
+  next();
+});
+
+/**
+ * Ensure slug uniqueness
+ */
+customerPaymentRecivedSchema.pre("save", async function (next) {
+  const existing = await this.constructor.findOne({ slug: this.slug });
+
+  if (existing && existing._id.toString() !== this._id.toString()) {
+    throw new customError(
+      `Customer payment with name "${this.customerName}" already exists`,
+      400,
+    );
+  }
+
+  next();
+});
+
+const customerPaymentRecived = mongoose.model(
+  "CustomerPaymentRecived",
+  customerPaymentRecivedSchema,
+);
+
+module.exports = { customerModel, customerPaymentRecived };

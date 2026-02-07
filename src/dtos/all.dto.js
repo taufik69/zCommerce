@@ -128,3 +128,40 @@ exports.customerDetailsDTO = (doc) => {
     updatedAt: doc.updatedAt,
   };
 };
+
+// customerPayment.dto.js
+exports.customerPaymentListDTO = (docs = []) => {
+  return docs.map((doc) => ({
+    customerName: doc.customerName,
+    slug: doc.slug,
+    referenceInvoice: doc.referenceInvoice || "",
+    dueBalance: doc.dueBalance ?? 0,
+    paidAmount: doc.paidAmount ?? 0,
+    lessAmount: doc.lessAmount ?? 0,
+    cashBack: doc.cashBack ?? 0,
+    date: doc.date,
+    paymentMode: doc.paymentMode || "",
+    remarks: doc.remarks || "",
+    deletedAt: doc.deletedAt,
+    createdAt: doc.createdAt,
+  }));
+};
+
+exports.customerPaymentDetailsDTO = (doc) => {
+  if (!doc) return null;
+
+  return {
+    customerName: doc.customerName,
+    slug: doc.slug,
+    referenceInvoice: doc.referenceInvoice || "",
+    dueBalance: doc.dueBalance ?? 0,
+    paidAmount: doc.paidAmount ?? 0,
+    lessAmount: doc.lessAmount ?? 0,
+    cashBack: doc.cashBack ?? 0,
+    date: doc.date,
+    paymentMode: doc.paymentMode || "",
+    remarks: doc.remarks || "",
+    deletedAt: doc.deletedAt,
+    createdAt: doc.createdAt,
+  };
+};
