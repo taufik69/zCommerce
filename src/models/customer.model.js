@@ -284,6 +284,14 @@ customerPaymentRecivedSchema.pre("save", async function (next) {
   next();
 });
 
+// when update then also update slug
+customerPaymentRecivedSchema.pre("findOneAndUpdate", async function (next) {
+  const update = this.getUpdate();
+  if (update.customerName) {
+    update.slug = slugify(update.customerName, { lower: true });
+  }
+  next();
+});
 const customerPaymentRecived = mongoose.model(
   "CustomerPaymentRecived",
   customerPaymentRecivedSchema,

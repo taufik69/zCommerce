@@ -250,3 +250,24 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
     customerPaymentListDTO(docs),
   );
 });
+
+// @desc update customer payment recived
+//@route PUT /api/update-customer-payment-reviced
+//@param slug
+exports.updateCustomerPaymentRecived = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const paymentRecived = await customerPaymentRecived.findOneAndUpdate(
+    { slug },
+    req.body,
+    { new: true, runValidators: true },
+  );
+  if (!paymentRecived) {
+    return apiResponse.sendError(res, 404, "Customer payment not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Customer payment updated successfully",
+    customerPaymentDetailsDTO(paymentRecived),
+  );
+});

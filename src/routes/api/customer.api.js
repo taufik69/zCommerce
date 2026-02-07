@@ -37,4 +37,8 @@ _.route("/get-customer-payment-recived").get(
   customerController.getCustomerPaymentReviced,
 );
 
+_.route("/update-customer-payment-recived/:slug").put(
+  customerController.updateCustomerPaymentRecived,
+);
+
 module.exports = _;
