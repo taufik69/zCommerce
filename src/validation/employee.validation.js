@@ -1,5 +1,6 @@
 const joi = require("joi");
 const { customError } = require("../lib/CustomError");
+const { apiResponse } = require("../utils/apiResponse");
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const GENDERS = ["male", "female", "other"];
@@ -175,6 +176,8 @@ const validateEmployeeCreate = async (req) => {
 
     return value;
   } catch (error) {
+    console.log(error);
+    apiResponse.sendError(res, 400, error.message || buildJoiError(error));
     throw new customError(buildJoiError(error), 400);
   }
 };

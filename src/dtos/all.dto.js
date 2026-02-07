@@ -81,3 +81,50 @@ exports.supplierDuePaymentDTO = (doc) => {
     deletedAt: doc.deletedAt,
   };
 };
+// customer.dto.js
+
+exports.customerListDTO = (docs = []) => {
+  return docs.map((doc) => ({
+    id: doc._id?.toString(),
+    customerId: doc.customerId,
+    customerType: doc.customerType || "",
+    fullName: doc.fullName,
+    mobileNumber: doc.mobileNumber,
+    occupation: doc.occupation || "",
+    nidNumber: doc.nidNumber || "",
+    openingDues: doc.openingDues ?? 0,
+    regularDiscountPercent: doc.regularDiscountPercent ?? 0,
+    emailAddress: doc.emailAddress || "",
+    image: doc.image || null,
+    presentAddress: doc.presentAddress || "",
+    permanentAddress: doc.permanentAddress || "",
+    isActive: doc.isActive,
+    deletedAt: doc.deletedAt,
+    createdAt: doc.createdAt,
+  }));
+};
+
+exports.customerDetailsDTO = (doc) => {
+  if (!doc) return null;
+
+  return {
+    id: doc._id?.toString(),
+    customerId: doc.customerId,
+    customerType: doc.customerType || "",
+    fullName: doc.fullName,
+    mobileNumber: doc.mobileNumber,
+    occupation: doc.occupation || "",
+    nidNumber: doc.nidNumber || "",
+    openingDues: doc.openingDues ?? 0,
+    regularDiscountPercent: doc.regularDiscountPercent ?? 0,
+    emailAddress: doc.emailAddress || "",
+    image: doc.image || null,
+    remarks: doc.remarks || "",
+    presentAddress: doc.presentAddress || "",
+    permanentAddress: doc.permanentAddress || "",
+    isActive: doc.isActive,
+    deletedAt: doc.deletedAt,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  };
+};

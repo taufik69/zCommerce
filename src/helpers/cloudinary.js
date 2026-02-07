@@ -29,7 +29,7 @@ const cloudinaryFileUpload = async (localFilePath) => {
       fetch_format: "auto",
       resource_type: "image",
       quality: "auto",
-      // ✅ Optimization Tricks
+      // Optimization Tricks
       transformation: [
         { width: 1024, crop: "limit" }, // limit max width
         { quality: "auto:low" }, // compress aggressively
