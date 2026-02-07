@@ -165,7 +165,7 @@ const buildJoiError = (error) => {
 };
 
 //  CREATE VALIDATION
-const validateEmployeeCreate = async (req) => {
+const validateEmployeeCreate = async (req, res, next) => {
   try {
     const value = await employeeCreateSchema.validateAsync(req.body);
 

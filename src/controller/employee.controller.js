@@ -24,8 +24,8 @@ const {
 } = require("../dtos/all.dto");
 
 //  CREATE EMPLOYEE
-exports.createEmployee = asynchandeler(async (req, res) => {
-  const value = await validateEmployeeCreate(req);
+exports.createEmployee = asynchandeler(async (req, res, next) => {
+  const value = await validateEmployeeCreate(req, res, next);
 
   const newEmployee = new employeeModel({ ...value, image: "" });
   await newEmployee.save();
