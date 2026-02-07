@@ -15,7 +15,6 @@ const productionError = (error, res) => {
 };
 // this error only show when you are working on developement mode
 const developementError = (error, res) => {
-  console.log("hi", error);
   return res.status(error.statusCode).json({
     statusCode: error.statusCode,
     message: error.message,

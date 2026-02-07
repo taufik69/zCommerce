@@ -22,7 +22,7 @@ const accountSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // make a slug using name
@@ -35,20 +35,22 @@ accountSchema.pre("save", function (next) {
 
 // check this slug already exist or not
 accountSchema.pre("save", async function (next) {
-  const existingAccount = await this.constructor.findOne({ slug: this.slug });
-  if (
-    existingAccount &&
-    existingAccount._id.toString() !== this._id.toString()
-  ) {
-    console.log(
-      `Account with slug ${this.slug} or name ${this.name} already exists`
-    );
-    throw new customError(
-      400,
-      `Account with slug ${this.slug} or name ${this.name} already exists`
-    );
+  try {
+    const existingAccount = await this.constructor.findOne({
+      slug: this.slug,
+      _id: { $ne: this._id },
+    });
+
+    if (existingAccount) {
+      return next(
+        new customError(`Account with slug '${this.slug}' already exists`, 400),
+      );
+    }
+
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 // when findOneAndUpdate query then again make slug

@@ -119,20 +119,26 @@ employeeDesignationSchema.pre("save", function (next) {
 
 // check this slug is alreay exist
 employeeDesignationSchema.pre("save", async function (next) {
-  const existingDesignation = await this.constructor.findOne({
-    slug: this.slug,
-  });
-  if (
-    existingDesignation &&
-    existingDesignation._id.toString() !== this._id.toString()
-  ) {
-    console.log(`Designation with slug ${this.slug} already exists`);
-    throw new customError(
-      `Designation with slug ${this.slug} already exists`,
-      400,
-    );
+  try {
+    const existingDesignation = await this.constructor.findOne({
+      slug: this.slug,
+    });
+    if (
+      existingDesignation &&
+      existingDesignation._id.toString() !== this._id.toString()
+    ) {
+      console.log(`Designation with slug ${this.slug} already exists`);
+      next(
+        new customError(
+          `Designation with slug ${this.slug} already exists`,
+          400,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 // when update name then update slug also
