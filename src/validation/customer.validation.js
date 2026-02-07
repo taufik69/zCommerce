@@ -214,9 +214,78 @@ const updateCustomerPaymentSchema = Joi.object({
 })
   .min(1) // prevent empty update body
   .options({ abortEarly: false, stripUnknown: true });
+
+// custoemr advance payment validation schema
+const createCustomerAdvancePaymentSchema = Joi.object({
+  customerName: Joi.string().trim().min(2).max(100).required().messages({
+    "string.empty": "Customer name is required",
+    "any.required": "Customer name is required",
+    "string.min": "Customer name must be at least 2 characters",
+    "string.max": "Customer name cannot exceed 100 characters",
+  }),
+
+  balance: Joi.number().min(0).default(0).messages({
+    "number.base": "Balance must be a number",
+    "number.min": "Balance cannot be negative",
+  }),
+
+  paidAmount: Joi.number().positive().min(1).required().messages({
+    "number.base": "Paid amount must be a number",
+    "number.min": "Paid amount must be greater than 0",
+    "any.required": "Paid amount is required",
+  }),
+
+  advanceCashBack: Joi.number().min(0).default(0).messages({
+    "number.base": "Advance cash back must be a number",
+    "number.min": "Advance cash back cannot be negative",
+  }),
+
+  paymentMode: Joi.string()
+    .valid(...PAYMENT_MODES)
+    .default("cash")
+    .messages({
+      "any.only":
+        "Payment mode must be cash, bank, bkash, nagad, rocket, cheque or other",
+    }),
+
+  date: Joi.date().optional(),
+
+  remarks: Joi.string().trim().max(500).allow("").optional(),
+
+  isActive: Joi.boolean().optional(),
+  deletedAt: Joi.date().allow(null).optional(),
+}).options({ abortEarly: false, stripUnknown: true });
+
+// =============================
+// UPDATE SCHEMA
+// =============================
+const updateCustomerAdvancePaymentSchema = Joi.object({
+  customerName: Joi.string().trim().min(2).max(100).optional(),
+
+  balance: Joi.number().min(0).optional(),
+
+  paidAmount: Joi.number().positive().min(1).optional(),
+
+  advanceCashBack: Joi.number().min(0).optional(),
+
+  paymentMode: Joi.string()
+    .valid(...PAYMENT_MODES)
+    .optional(),
+
+  date: Joi.date().optional(),
+
+  remarks: Joi.string().trim().max(500).allow("").optional(),
+
+  isActive: Joi.boolean().optional(),
+  deletedAt: Joi.date().allow(null).optional(),
+})
+  .min(1) // prevent empty update body
+  .options({ abortEarly: false, stripUnknown: true });
 module.exports = {
   validateCustomerCreate,
   validateCustomerUpdate,
   createCustomerPaymentSchema,
   updateCustomerPaymentSchema,
+  createCustomerAdvancePaymentSchema,
+  updateCustomerAdvancePaymentSchema,
 };

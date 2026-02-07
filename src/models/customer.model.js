@@ -297,4 +297,111 @@ const customerPaymentRecived = mongoose.model(
   customerPaymentRecivedSchema,
 );
 
-module.exports = { customerModel, customerPaymentRecived };
+// advance customer payment
+
+const customerAdvancePaymentSchema = new mongoose.Schema(
+  {
+    customerName: {
+      type: String,
+      required: [true, "Customer name is required"],
+      trim: true,
+    },
+    slug: {
+      type: String,
+    },
+
+    // form shows current balance (optional store)
+    balance: {
+      type: Number,
+      default: 0,
+      min: [0, "Balance cannot be negative"],
+    },
+
+    paidAmount: {
+      type: Number,
+
+      min: [0, "Paid amount cannot be negative"],
+    },
+
+    advanceCashBack: {
+      type: Number,
+      default: 0,
+      min: [0, "Advance cash back cannot be negative"],
+    },
+
+    paymentMode: {
+      type: String,
+      trim: true,
+    },
+
+    date: {
+      type: Date,
+      default: Date.now,
+    },
+
+    remarks: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 500,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { timestamps: true },
+);
+
+// make a slug
+customerAdvancePaymentSchema.pre("save", function (next) {
+  if (this.isModified("customerName")) {
+    this.slug = slugify(this.customerName, {
+      lower: true,
+      strict: true,
+      trim: true,
+    });
+  }
+  next();
+});
+
+// check this slug already exist or not
+customerAdvancePaymentSchema.pre("save", async function (next) {
+  const existing = await this.constructor.findOne({ slug: this.slug });
+  if (existing && existing._id.toString() !== this._id.toString()) {
+    throw new customError(
+      `Customer advance payment with name "${this.customerName}" already exists`,
+      400,
+    );
+  }
+  next();
+});
+
+// when update then also update slug
+customerAdvancePaymentSchema.pre("findOneAndUpdate", async function (next) {
+  const update = this.getUpdate();
+  if (update.customerName) {
+    update.slug = slugify(update.customerName, {
+      lower: true,
+      strict: true,
+      trim: true,
+    });
+  }
+  next();
+});
+const customerAdvancePaymentModel = mongoose.model(
+  "CustomerAdvancePayment",
+  customerAdvancePaymentSchema,
+);
+
+module.exports = {
+  customerModel,
+  customerPaymentRecived,
+  customerAdvancePaymentModel,
+};

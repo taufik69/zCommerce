@@ -165,3 +165,34 @@ exports.customerPaymentDetailsDTO = (doc) => {
     createdAt: doc.createdAt,
   };
 };
+
+// customerAdvancePayment.dto.js;
+exports.customerAdvancePaymentListDTO = (docs = []) => {
+  return docs.map((doc) => ({
+    customerName: doc.customerName,
+    slug: doc.slug,
+    balance: doc.balance ?? 0,
+    paidAmount: doc.paidAmount ?? 0,
+    advanceCashBack: doc.advanceCashBack ?? 0,
+    paymentMode: doc.paymentMode || "",
+    date: doc.date,
+    remarks: doc.remarks || "",
+    createdAt: doc.createdAt,
+  }));
+};
+
+exports.customerAdvancePaymentDetailsDTO = (doc) => {
+  if (!doc) return null;
+
+  return {
+    customerName: doc.customerName,
+    slug: doc.slug,
+    balance: doc.balance ?? 0,
+    paidAmount: doc.paidAmount ?? 0,
+    advanceCashBack: doc.advanceCashBack ?? 0,
+    paymentMode: doc.paymentMode || "",
+    date: doc.date,
+    remarks: doc.remarks || "",
+    createdAt: doc.createdAt,
+  };
+};

@@ -4,6 +4,7 @@ const { asynchandeler } = require("../lib/asyncHandeler");
 const {
   customerModel,
   customerPaymentRecived,
+  customerAdvancePaymentModel,
 } = require("../models/customer.model");
 const {
   cloudinaryFileUpload,
@@ -13,6 +14,8 @@ const {
   customerListDTO,
   customerPaymentDetailsDTO,
   customerPaymentListDTO,
+  customerAdvancePaymentListDTO,
+  customerAdvancePaymentDetailsDTO,
 } = require("../dtos/all.dto");
 
 // @desc create a new customer
@@ -290,3 +293,121 @@ exports.deleteCustomerPaymentRecived = asynchandeler(async (req, res) => {
     customerPaymentDetailsDTO(paymentRecived),
   );
 });
+
+// customerAdvancePayment controlle
+exports.createCustomerAdvancePaymentRecived = asynchandeler(
+  async (req, res) => {
+    const paymentRecived = new customerAdvancePaymentModel(req.body);
+    await paymentRecived.save();
+    if (!paymentRecived) {
+      return apiResponse.sendError(
+        res,
+        401,
+        "Customer advance payment not found",
+      );
+    }
+    apiResponse.sendSuccess(
+      res,
+      200,
+      "Customer advance payment recived successfully",
+      paymentRecived.customerName,
+    );
+  },
+);
+
+// @desc Get customer payments
+// @route GET /api/get-customer-advance-payment-reviced
+// @query ?slug=rahim-ahmed
+// @query ?name=rahim
+exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
+  const { slug, name } = req.query;
+
+  //  Get single by slug
+  if (slug) {
+    const doc = await customerAdvancePaymentModel.findOne({
+      slug,
+      isActive: true,
+    });
+
+    if (!doc) {
+      return apiResponse.sendError(res, 404, "Customer payment not found");
+    }
+
+    return apiResponse.sendSuccess(
+      res,
+      200,
+      "Customer payment retrieved successfully",
+      customerAdvancePaymentDetailsDTO(doc),
+    );
+  }
+
+  // 2) Search by customer name (partial match)
+  let query = { isActive: true };
+
+  if (name && name.trim()) {
+    query.customerName = {
+      $regex: name.trim(),
+      $options: "i",
+    };
+  }
+
+  const docs = await customerAdvancePaymentModel
+    .find(query)
+    .sort({ createdAt: -1 });
+
+  if (!docs || docs.length === 0) {
+    apiResponse.sendError(res, 404, "No customer payments found");
+  }
+
+  //  Return list
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Customer payments retrieved successfully",
+    customerAdvancePaymentListDTO(docs),
+  );
+});
+
+// @desc update customer payment recived
+//@route PUT /api/update-customer-payment-reviced
+//@param slug
+exports.updateCustomerAdvancePaymentRecived = asynchandeler(
+  async (req, res) => {
+    const { slug } = req.params;
+    const paymentRecived = await customerAdvancePaymentModel.findOneAndUpdate(
+      { slug },
+      req.body,
+      { new: true, runValidators: true },
+    );
+    if (!paymentRecived) {
+      return apiResponse.sendError(res, 404, "Customer payment not found");
+    }
+    apiResponse.sendSuccess(
+      res,
+      200,
+      "Customer payment updated successfully",
+      customerAdvancePaymentDetailsDTO(paymentRecived),
+    );
+  },
+);
+
+// @desc delete  customer payment recived
+//@route DELETE /api/delete-customer-payment-reviced
+//@param slug
+exports.deleteCustomerAdvancePaymentRecived = asynchandeler(
+  async (req, res) => {
+    const { slug } = req.params;
+    const paymentRecived = await customerAdvancePaymentModel.findOneAndDelete({
+      slug,
+    });
+    if (!paymentRecived) {
+      return apiResponse.sendError(res, 404, "Customer payment not found");
+    }
+    apiResponse.sendSuccess(
+      res,
+      200,
+      "Customer payment deleted successfully",
+      customerAdvancePaymentDetailsDTO(paymentRecived),
+    );
+  },
+);

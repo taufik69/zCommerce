@@ -8,6 +8,8 @@ const {
   validateCustomerCreate,
   validateCustomerUpdate,
   createCustomerPaymentSchema,
+  createCustomerAdvancePaymentSchema,
+  updateCustomerAdvancePaymentSchema,
 } = require("../../validation/customer.validation");
 
 _.route("/create-customer").post(
@@ -44,4 +46,21 @@ _.route("/delete-customer-payment-recived/:slug").delete(
   customerController.deleteCustomerPaymentRecived,
 );
 
+// customer advance payment recived api
+_.route("/customer-advance-payment-recived").post(
+  validate(createCustomerAdvancePaymentSchema),
+  customerController.createCustomerAdvancePaymentRecived,
+);
+
+_.route("/get-customer-advance-payment-reviced").get(
+  customerController.getCustomerAdvancePaymentReviced,
+);
+
+_.route("/update-customer-advance-payment-recived/:slug").put(
+  validate(updateCustomerAdvancePaymentSchema),
+  customerController.updateCustomerAdvancePaymentRecived,
+);
+_.route("/delete-customer-advance-payment-recived/:slug").delete(
+  customerController.deleteCustomerAdvancePaymentRecived,
+);
 module.exports = _;
