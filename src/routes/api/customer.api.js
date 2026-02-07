@@ -40,5 +40,8 @@ _.route("/get-customer-payment-recived").get(
 _.route("/update-customer-payment-recived/:slug").put(
   customerController.updateCustomerPaymentRecived,
 );
+_.route("/delete-customer-payment-recived/:slug").delete(
+  customerController.deleteCustomerPaymentRecived,
+);
 
 module.exports = _;

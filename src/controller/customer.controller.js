@@ -271,3 +271,22 @@ exports.updateCustomerPaymentRecived = asynchandeler(async (req, res) => {
     customerPaymentDetailsDTO(paymentRecived),
   );
 });
+
+// @desc delete  customer payment recived
+//@route DELETE /api/delete-customer-payment-reviced
+//@param slug
+exports.deleteCustomerPaymentRecived = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const paymentRecived = await customerPaymentRecived.findOneAndDelete({
+    slug,
+  });
+  if (!paymentRecived) {
+    return apiResponse.sendError(res, 404, "Customer payment not found");
+  }
+  apiResponse.sendSuccess(
+    res,
+    200,
+    "Customer payment deleted successfully",
+    customerPaymentDetailsDTO(paymentRecived),
+  );
+});
