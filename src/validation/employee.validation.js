@@ -126,33 +126,31 @@ const employeeUpdateSchema = employeeCreateSchema.fork(
   (schema) => schema.optional(),
 );
 
-const validateImageFile = (req) => {
+const validateImageFile = (req, res, next) => {
   if (!req.files || req.files.length === 0) return null;
 
   if (req.files.length > 1) {
-    throw new customError("You can upload a maximum of 1 image", 400);
+    next(new customError("You can upload a maximum of 1 image", 400));
   }
 
   const file = req.files[0];
 
   if (file.fieldname !== "image") {
-    throw new customError(
-      "Please provide a valid image fieldName (image)",
-      400,
+    next(
+      new customError("Please provide a valid image fieldName (image)", 400),
     );
   }
 
   // 1MB example (তোমার UI screenshot এ max 1MB ছিল)
   if (file.size > 1 * 1024 * 1024) {
-    throw new customError("Image size should be less than 1MB", 400);
+    next(new customError("Image size should be less than 1MB", 400));
   }
 
   // Optional mime check
   const allowed = ["image/png", "image/jpeg", "image/jpg", "image/gif"];
   if (file.mimetype && !allowed.includes(file.mimetype)) {
-    throw new customError(
-      "Invalid image type. Allowed: PNG, JPG, GIF, SVG",
-      400,
+    next(
+      new customError("Invalid image type. Allowed: PNG, JPG, GIF, SVG", 400),
     );
   }
 
@@ -169,7 +167,7 @@ const validateEmployeeCreate = async (req, res, next) => {
   try {
     const value = await employeeCreateSchema.validateAsync(req.body);
 
-    const imageFile = validateImageFile(req);
+    const imageFile = validateImageFile(req, res, next);
     if (imageFile) value.image = imageFile;
 
     return value;
