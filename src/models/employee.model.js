@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { customError } = require("../lib/CustomError");
 const Counter = require("./counter.model");
+const { apiResponse } = require("../utils/apiResponse");
 const employeeSchema = new mongoose.Schema(
   {
     employeeId: {
@@ -103,17 +104,26 @@ const employeeSchema = new mongoose.Schema(
 
 // before save check the employeeid is duplicate or not
 employeeSchema.pre("save", async function (next) {
-  const emp = this;
-  if (emp.isModified("employeeId") && emp.employeeId) {
-    const existing = await mongoose
-      .model("Employee")
-      .findOne({ employeeId: emp.employeeId, _id: { $ne: emp._id } });
-    if (existing) {
-      return next(new customError(400, "employeeId already exists"));
+  try {
+    const emp = this;
+
+    if (emp.isModified("employeeId") && emp.employeeId) {
+      const existing = await mongoose.model("Employee").findOne({
+        employeeId: emp.employeeId,
+        _id: { $ne: emp._id },
+      });
+
+      if (existing) {
+        return next(new customError("Employee ID already exists", 400));
+      }
     }
+
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
+
 /**
  * - employeeId manually set
  */
@@ -145,10 +155,15 @@ employeeSchema.post("save", async function (doc, next) {
  */
 employeeSchema.post("save", function (error, doc, next) {
   if (error && error.code === 11000) {
-    const field = Object.keys(error.keyPattern || {})[0] || "field";
-    return next(new customError(400, `${field} already exists`));
+    const field =
+      (error.keyPattern && Object.keys(error.keyPattern)[0]) ||
+      (error.keyValue && Object.keys(error.keyValue)[0]) ||
+      "field";
+
+    return next(new customError(`${field} already exists`, 400));
   }
-  next(error);
+
+  return next(error);
 });
 
 module.exports =
