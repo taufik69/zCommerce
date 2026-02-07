@@ -239,17 +239,23 @@ sectionSchema.pre("save", function (next) {
 
 // check this slug is alreay exist
 sectionSchema.pre("save", async function (next) {
-  const existingSection = await this.constructor.findOne({
-    slug: this.slug,
-  });
-  if (
-    existingSection &&
-    existingSection._id.toString() !== this._id.toString()
-  ) {
-    console.log(`Section with slug ${this.slug} already exists`);
-    throw new customError(`Section with slug ${this.slug} already exists`, 400);
+  try {
+    const existingSection = await this.constructor.findOne({
+      slug: this.slug,
+    });
+    if (
+      existingSection &&
+      existingSection._id.toString() !== this._id.toString()
+    ) {
+      console.log(`Section with slug ${this.slug} already exists`);
+      next(
+        new customError(`Section with slug ${this.slug} already exists`, 400),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 // when update name then update slug also
