@@ -9,7 +9,7 @@ const validate = (schema, property = "body") => {
         field: e.path.join("."),
         message: e.message,
       }));
-      throw new customError(errors, 422);
+      next(new customError(errors, 400));
     }
 
     req[property] = value;

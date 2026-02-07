@@ -177,26 +177,33 @@ const departmentSchema = new mongoose.Schema(
 
 // make a slug using name
 departmentSchema.pre("save", function (next) {
+  if (!this.isModified("name")) return next();
   this.slug = slugify(this.name, { lower: true });
   next();
 });
 
 // check this slug is alreay exist
 departmentSchema.pre("save", async function (next) {
-  const existingDepartment = await this.constructor.findOne({
-    slug: this.slug,
-  });
-  if (
-    existingDepartment &&
-    existingDepartment._id.toString() !== this._id.toString()
-  ) {
-    console.log(`Department with slug ${this.slug} already exists`);
-    throw new customError(
-      `Department with slug ${this.slug} already exists`,
-      400,
-    );
+  try {
+    const existingDepartment = await this.constructor.findOne({
+      slug: this.slug,
+    });
+    if (
+      existingDepartment &&
+      existingDepartment._id.toString() !== this._id.toString()
+    ) {
+      console.log(`Department with slug ${this.slug} already exists`);
+      next(
+        new customError(
+          `Department with slug ${this.slug} already exists`,
+          400,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 // when update name then update slug also
