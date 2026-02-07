@@ -57,22 +57,39 @@ exports.createCustomer = asynchandeler(async (req, res) => {
 // @route GET /api/customers
 // @access Private
 exports.getAllCustomers = asynchandeler(async (req, res) => {
-  const { customerId } = req.query;
-  let query = {};
+  const { customerId, customerType, q } = req.query;
+
+  const query = { isActive: true };
+
+  // exact by customerId (highest priority)
   if (customerId) {
     query.customerId = customerId;
-  } else {
-    query.isActive = true;
   }
 
-  const customers = await customerModel.find(query);
-  if (!customers || customers.length === 0) {
-    apiResponse.sendError(res, 404, "Customers not found");
+  // filter by type
+  if (customerType) {
+    query.customerType = customerType;
   }
-  apiResponse.sendSuccess(
+
+  // partial search by name OR phone (q = "rah" or "0171")
+  if (q && q.trim()) {
+    const search = q.trim();
+    query.$or = [
+      { fullName: { $regex: search, $options: "i" } },
+      { mobileNumber: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  const customers = await customerModel.find(query).sort({ createdAt: -1 });
+
+  if (!customers || customers.length === 0) {
+    return apiResponse.sendError(res, 404, "Customers not found");
+  }
+
+  return apiResponse.sendSuccess(
     res,
     200,
-    "Customers retrive sucessfully ",
+    "Customers retrieved successfully",
     customerListDTO(customers),
   );
 });
