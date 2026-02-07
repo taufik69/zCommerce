@@ -57,12 +57,11 @@ const outletInformationSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-//
-// 🔹 Generate slug before saving
-//
+// Generate slug before saving
+
 outletInformationSchema.pre("save", function (next) {
   if (this.isModified("locationName")) {
     this.slug = slugify(this.locationName, { lower: true, strict: true });
@@ -70,23 +69,30 @@ outletInformationSchema.pre("save", function (next) {
   next();
 });
 
-//
-// 🔹 Check duplicate slug
-//
+// Check duplicate slug
+
 outletInformationSchema.pre("save", async function (next) {
-  const existingOutlet = await this.constructor.findOne({ slug: this.slug });
-  if (existingOutlet && existingOutlet._id.toString() !== this._id.toString()) {
-    throw new customError(
-      400,
-      `Outlet with slug "${this.slug}" or location name "${this.locationName}" already exists`
-    );
+  try {
+    const existingOutlet = await this.constructor.findOne({ slug: this.slug });
+    if (
+      existingOutlet &&
+      existingOutlet._id.toString() !== this._id.toString()
+    ) {
+      return next(
+        new customError(
+          `Outlet with slug "${this.slug}" or location name "${this.locationName}" already exists`,
+          400,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
-//
-// 🔹 Update slug when findOneAndUpdate
-//
+// Update slug when findOneAndUpdate
+
 outletInformationSchema.pre("findOneAndUpdate", async function (next) {
   const update = this.getUpdate();
   if (update.locationName) {

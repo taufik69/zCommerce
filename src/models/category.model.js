@@ -42,7 +42,7 @@ const categorySchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Pre-save middleware to generate slug from name
@@ -55,23 +55,28 @@ categorySchema.pre("save", function (next) {
 
 //check if slug is unique
 categorySchema.pre("save", async function (next) {
-  const existingCategory = await this.constructor.findOne({ slug: this.slug });
-  if (
-    existingCategory &&
-    existingCategory._id.toString() !== this._id.toString()
-  ) {
-    console.log(
-      `Category with slug ${this.slug} or ${this.name} already exists`
-    );
-
-    throw new customError(
-      `Category with slug ${this.slug} or ${this.name} already exists`,
-      400
-    );
+  try {
+    const existingCategory = await this.constructor.findOne({
+      slug: this.slug,
+    });
+    if (
+      existingCategory &&
+      existingCategory._id.toString() !== this._id.toString()
+    ) {
+      return next(
+        new customError(
+          `Category with slug ${this.slug} or ${this.name} already exists`,
+          400,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
-const Category = mongoose.model("Category", categorySchema);
+const Category =
+  mongoose.models.Category || mongoose.model("Category", categorySchema);
 
 module.exports = Category;

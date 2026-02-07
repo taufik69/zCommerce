@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
+const { customError } = require("../lib/CustomError");
 
 const permissionSchema = new mongoose.Schema(
   {
@@ -10,10 +11,10 @@ const permissionSchema = new mongoose.Schema(
     },
     isActive: { type: Boolean, default: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-// ✅ For save()
+// For save()
 permissionSchema.pre("save", function (next) {
   if (this.isModified("permissionName")) {
     this.slug = slugify(this.permissionName, { lower: true, strict: true });
@@ -21,7 +22,7 @@ permissionSchema.pre("save", function (next) {
   next();
 });
 
-// ✅ For insertMany()
+// For insertMany()
 permissionSchema.pre("insertMany", function (next, docs) {
   docs.forEach((doc) => {
     doc.slug = slugify(doc.permissionName, { lower: true, strict: true });
@@ -29,18 +30,23 @@ permissionSchema.pre("insertMany", function (next, docs) {
   next();
 });
 
-// ✅ Unique Slug Check (works for save & insertMany both)
+//  Unique Slug Check (works for save & insertMany both)
 permissionSchema.pre("save", async function (next) {
-  const existingPermission = await this.constructor.findOne({
-    slug: this.slug,
-  });
-  if (
-    existingPermission &&
-    existingPermission._id.toString() !== this._id.toString()
-  ) {
-    throw new Error(`Permission with slug ${this.slug} already exists`);
+  try {
+    const existingPermission = await this.constructor.findOne({
+      slug: this.slug,
+    });
+    if (
+      existingPermission &&
+      existingPermission._id.toString() !== this._id.toString()
+    ) {
+      return next(new customError("Permission name already exists", 400));
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
-module.exports = mongoose.model("Permission", permissionSchema);
+module.exports =
+  mongoose.models.Permission || mongoose.model("Permission", permissionSchema);

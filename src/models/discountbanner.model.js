@@ -42,12 +42,11 @@ const discountBannerSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-//
-// 🔹 Generate slug before saving
-//
+// Generate slug before saving
+
 discountBannerSchema.pre("save", function (next) {
   if (this.isModified("title")) {
     this.slug = slugify(this.title, { lower: true, strict: true });
@@ -55,23 +54,30 @@ discountBannerSchema.pre("save", function (next) {
   next();
 });
 
-//
-// 🔹 Check duplicate slug
-//
+//  Check duplicate slug
+
 discountBannerSchema.pre("save", async function (next) {
-  const existingBanner = await this.constructor.findOne({ slug: this.slug });
-  if (existingBanner && existingBanner._id.toString() !== this._id.toString()) {
-    throw new customError(
-      400,
-      `Banner with slug "${this.slug}" or title "${this.title}" already exists`
-    );
+  try {
+    const existingBanner = await this.constructor.findOne({ slug: this.slug });
+    if (
+      existingBanner &&
+      existingBanner._id.toString() !== this._id.toString()
+    ) {
+      return next(
+        new customError(
+          `Banner with slug "${this.slug}" or title "${this.title}" already exists`,
+          400,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
-//
-// 🔹 Update slug when findOneAndUpdate
-//
+//  Update slug when findOneAndUpdate
+
 discountBannerSchema.pre("findOneAndUpdate", async function (next) {
   const update = this.getUpdate();
   if (update.title) {

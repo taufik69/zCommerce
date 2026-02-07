@@ -171,7 +171,7 @@ const variantSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // calculate stock adjustment // adjustment plus
@@ -239,37 +239,46 @@ variantSchema.virtual("totalSalesReturnQuantity").get(function () {
 
 // Check for duplicate variant by size, color, product
 variantSchema.pre("save", async function (next) {
-  const existing = await this.constructor.findOne({
-    product: this.product,
-    size: this.size,
-    color: this.color,
-    slug: this.slug,
-  });
+  try {
+    const existing = await this.constructor.findOne({
+      product: this.product,
+      size: this.size,
+      color: this.color,
+      slug: this.slug,
+    });
 
-  if (existing && existing._id.toString() !== this._id.toString()) {
-    throw new customError(
-      `Variant with size ${this.size} and color ${this.color} already exists.`
-    );
+    if (existing && existing._id.toString() !== this._id.toString()) {
+      return next(
+        new customError(
+          `Variant with size ${this.size} and color ${this.color} already exists.`,
+          400,
+        ),
+      );
+    }
+
+    next();
+  } catch (error) {
+    next(error);
   }
-
-  next();
 });
 
 // check if slug already exist or not
 variantSchema.pre("save", async function (next) {
-  const existVariant = await this.constructor.findOne({ slug: this.slug });
-  if (
-    existVariant &&
-    existVariant._id &&
-    existVariant._id.toString() !== this._id.toString()
-  ) {
-    console.log(`${this.variantName} already exists Try another`);
-    throw new customError(
-      ` ${this.variantName} already exists Try another`,
-      400
-    );
+  try {
+    const existVariant = await this.constructor.findOne({ slug: this.slug });
+    if (
+      existVariant &&
+      existVariant._id &&
+      existVariant._id.toString() !== this._id.toString()
+    ) {
+      return next(
+        new customError(` ${this.variantName} already exists Try another`, 400),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 // find purchase model and return total purchased quantity in
@@ -277,26 +286,34 @@ variantSchema.virtual("multipleVariantTotalPurchasedQuantity");
 
 // Middleware: শুধুমাত্র find এর জন্য
 variantSchema.post("find", async function (docs, next) {
-  await Promise.all(
-    docs.map(async (doc) => {
-      const purchases = await purchaseModel.find({
-        "allproduct.variant": doc._id,
-      });
-
-      let totalPurchased = 0;
-      purchases.forEach((purchase) => {
-        purchase.allproduct.forEach((item) => {
-          if (item.variant && item.variant.toString() === doc._id.toString()) {
-            totalPurchased += item.quantity || 0;
-          }
+  try {
+    await Promise.all(
+      docs.map(async (doc) => {
+        const purchases = await purchaseModel.find({
+          "allproduct.variant": doc._id,
         });
-      });
 
-      // Set the virtual property
-      doc.multipleVariantTotalPurchasedQuantity = totalPurchased;
-    })
-  );
+        let totalPurchased = 0;
+        purchases.forEach((purchase) => {
+          purchase.allproduct.forEach((item) => {
+            if (
+              item.variant &&
+              item.variant.toString() === doc._id.toString()
+            ) {
+              totalPurchased += item.quantity || 0;
+            }
+          });
+        });
 
-  next();
+        // Set the virtual property
+        doc.multipleVariantTotalPurchasedQuantity = totalPurchased;
+      }),
+    );
+
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
-module.exports = mongoose.model("Variant", variantSchema);
+module.exports =
+  mongoose.models.Variant || mongoose.model("Variant", variantSchema);

@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { customError } = require("../lib/CustomError");
 
 const purchaseSchema = new mongoose.Schema(
   {
@@ -104,20 +105,24 @@ const purchaseSchema = new mongoose.Schema(
 );
 
 purchaseSchema.pre("save", async function (next) {
-  const existingInvoiceNumber = await this.constructor.findOne({
-    invoiceNumber: this.invoiceNumber,
-  });
-  if (
-    existingInvoiceNumber &&
-    existingInvoiceNumber._id.toString() !== this._id.toString()
-  ) {
-    console.log(`Invoice Number ${this.invoiceNumber} already exists`);
-    throw new Error("Invoice Number already exists");
+  try {
+    const existingInvoiceNumber = await this.constructor.findOne({
+      invoiceNumber: this.invoiceNumber,
+    });
+    if (
+      existingInvoiceNumber &&
+      existingInvoiceNumber._id.toString() !== this._id.toString()
+    ) {
+      return next(new customError("Invoice Number already exists", 400));
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 // check invoiceid is unique or not
 purchaseSchema.index({ invoiceNumber: 1 }, { unique: true });
-const Purchase = mongoose.model("Purchase", purchaseSchema);
+const Purchase =
+  mongoose.models.Purchase || mongoose.model("Purchase", purchaseSchema);
 
 module.exports = Purchase;

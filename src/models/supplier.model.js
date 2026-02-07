@@ -82,18 +82,24 @@ supplierSchema.index({ supplierId: 1 }, { unique: true });
 
 // pre-save duplicate check (like your Purchase model)
 supplierSchema.pre("save", async function (next) {
-  const existing = await this.constructor.findOne({
-    supplierId: this.supplierId,
-  });
+  try {
+    const existing = await this.constructor.findOne({
+      supplierId: this.supplierId,
+    });
 
-  if (existing && existing._id.toString() !== this._id.toString()) {
-    throw new customError(
-      `Supplier with supplierId ${this.supplierId} already exists.`,
-      401,
-    );
+    if (existing && existing._id.toString() !== this._id.toString()) {
+      return next(
+        new customError(
+          `Supplier with supplierId ${this.supplierId} already exists.`,
+          400,
+        ),
+      );
+    }
+
+    next();
+  } catch (error) {
+    next(error);
   }
-
-  next();
 });
 
 const SupplierModel =

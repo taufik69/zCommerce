@@ -28,7 +28,7 @@ const brandSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Middleware to generate slug before saving using slugify
@@ -41,18 +41,24 @@ brandSchema.pre("save", function (next) {
 
 // Middleware to check if slug is unique before saving
 brandSchema.pre("save", async function (next) {
-  const existingBrand = await this.constructor.findOne({ slug: this.slug });
-  if (existingBrand && existingBrand._id.toString() !== this._id.toString()) {
-    console.log(`Brand with slug ${this.slug} or ${this.name} already exists`);
-    throw new customError(
-      `Category with slug ${this.slug} or ${this.name} already exists`,
-      400
-    );
+  try {
+    const existingBrand = await this.constructor.findOne({ slug: this.slug });
+    if (existingBrand && existingBrand._id.toString() !== this._id.toString()) {
+      console.log(
+        `Brand with slug ${this.slug} or ${this.name} already exists`,
+      );
+      return next(
+        new customError(
+          `Category with slug ${this.slug} or ${this.name} already exists`,
+          400,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
-const Brand = mongoose.model("Brand", brandSchema);
+const Brand = mongoose.models.Brand || mongoose.model("Brand", brandSchema);
 
 module.exports = Brand;
-
-// export default mongoose.model("Brand", brandSchema);

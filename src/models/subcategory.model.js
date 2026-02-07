@@ -32,7 +32,7 @@ const subcategorySchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Pre-save middleware to generate slug from name
@@ -45,25 +45,29 @@ subcategorySchema.pre("save", function (next) {
 
 // check if slug is unique
 subcategorySchema.pre("save", async function (next) {
-  const existingSubcategory = await this.constructor.findOne({
-    slug: this.slug,
-  });
-  if (
-    existingSubcategory &&
-    existingSubcategory._id.toString() !== this._id.toString()
-  ) {
-    console.log(
-      `Subcategory with slug ${this.slug} or ${this.name} already exists`
-    );
-
-    throw new customError(
-      `Subcategory with slug ${this.slug} or ${this.name} already exists`,
-      400
-    );
+  try {
+    const existingSubcategory = await this.constructor.findOne({
+      slug: this.slug,
+    });
+    if (
+      existingSubcategory &&
+      existingSubcategory._id.toString() !== this._id.toString()
+    ) {
+      return next(
+        new customError(
+          `Subcategory with slug ${this.slug} or ${this.name} already exists`,
+          400,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
-const Subcategory = mongoose.model("Subcategory", subcategorySchema);
+const Subcategory =
+  mongoose.models.Subcategory ||
+  mongoose.model("Subcategory", subcategorySchema);
 
 module.exports = Subcategory;

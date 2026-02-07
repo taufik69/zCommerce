@@ -72,7 +72,7 @@ const discountSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // make a slug
@@ -85,21 +85,27 @@ discountSchema.pre("save", function (next) {
 
 // check if slug already exist or not
 discountSchema.pre("save", async function (next) {
-  const existDiscount = await this.constructor.findOne({ slug: this.slug });
-  if (
-    existDiscount &&
-    existDiscount._id &&
-    existDiscount._id.toString() !== this._id.toString()
-  ) {
-    console.log(`${this.discountName} already exists Try another`);
-    throw new customError(
-      ` ${this.discountName} already exists Try another`,
-      400
-    );
+  try {
+    const existDiscount = await this.constructor.findOne({ slug: this.slug });
+    if (
+      existDiscount &&
+      existDiscount._id &&
+      existDiscount._id.toString() !== this._id.toString()
+    ) {
+      return next(
+        new customError(
+          ` ${this.discountName} already exists Try another`,
+          400,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
-const Discount = mongoose.model("Discount", discountSchema);
+const Discount =
+  mongoose.models.Discount || mongoose.model("Discount", discountSchema);
 
 module.exports = Discount;

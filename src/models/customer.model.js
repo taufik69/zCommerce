@@ -139,41 +139,50 @@ customerSchema.pre("save", function (next) {
  * - mobileNumber unique
  */
 customerSchema.pre("save", async function (next) {
-  const Customer = this.constructor;
+  try {
+    const Customer = this.constructor;
 
-  // check customerId
-  if (this.customerId) {
-    const existingById = await Customer.findOne({
-      customerId: this.customerId,
-    });
-    if (existingById && existingById._id.toString() !== this._id.toString()) {
-      throw new customError(
-        `Customer with ID ${this.customerId} already exists`,
-        400,
-      );
+    // check customerId
+    if (this.customerId) {
+      const existingById = await Customer.findOne({
+        customerId: this.customerId,
+      });
+      if (existingById && existingById._id.toString() !== this._id.toString()) {
+        return next(
+          new customError(
+            `Customer with ID ${this.customerId} already exists`,
+            400,
+          ),
+        );
+      }
     }
-  }
 
-  // check mobileNumber
-  if (this.mobileNumber) {
-    const existingByMobile = await Customer.findOne({
-      mobileNumber: this.mobileNumber,
-    });
-    if (
-      existingByMobile &&
-      existingByMobile._id.toString() !== this._id.toString()
-    ) {
-      throw new customError(
-        `Customer with mobile ${this.mobileNumber} already exists`,
-        400,
-      );
+    // check mobileNumber
+    if (this.mobileNumber) {
+      const existingByMobile = await Customer.findOne({
+        mobileNumber: this.mobileNumber,
+      });
+      if (
+        existingByMobile &&
+        existingByMobile._id.toString() !== this._id.toString()
+      ) {
+        return next(
+          new customError(
+            `Customer with mobile ${this.mobileNumber} already exists`,
+            400,
+          ),
+        );
+      }
     }
-  }
 
-  next();
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
-const customerModel = mongoose.model("Customer", customerSchema);
+const customerModel =
+  mongoose.models.Customer || mongoose.model("Customer", customerSchema);
 
 // customer payment recived model schema
 
@@ -263,6 +272,7 @@ customerPaymentRecivedSchema.pre("save", function (next) {
     this.slug = slugify(this.customerName, {
       lower: true,
       strict: true,
+      trim: true,
     });
   }
   next();
@@ -272,16 +282,22 @@ customerPaymentRecivedSchema.pre("save", function (next) {
  * Ensure slug uniqueness
  */
 customerPaymentRecivedSchema.pre("save", async function (next) {
-  const existing = await this.constructor.findOne({ slug: this.slug });
+  try {
+    const existing = await this.constructor.findOne({ slug: this.slug });
 
-  if (existing && existing._id.toString() !== this._id.toString()) {
-    throw new customError(
-      `Customer payment with name "${this.customerName}" already exists`,
-      400,
-    );
+    if (existing && existing._id.toString() !== this._id.toString()) {
+      return next(
+        new customError(
+          `Customer payment with name "${this.customerName}" already exists`,
+          400,
+        ),
+      );
+    }
+
+    next();
+  } catch (error) {
+    next(error);
   }
-
-  next();
 });
 
 // when update then also update slug
@@ -292,10 +308,9 @@ customerPaymentRecivedSchema.pre("findOneAndUpdate", async function (next) {
   }
   next();
 });
-const customerPaymentRecived = mongoose.model(
-  "CustomerPaymentRecived",
-  customerPaymentRecivedSchema,
-);
+const customerPaymentRecived =
+  mongoose.models.CustomerPaymentRecived ||
+  mongoose.model("CustomerPaymentRecived", customerPaymentRecivedSchema);
 
 // advance customer payment
 
@@ -373,14 +388,20 @@ customerAdvancePaymentSchema.pre("save", function (next) {
 
 // check this slug already exist or not
 customerAdvancePaymentSchema.pre("save", async function (next) {
-  const existing = await this.constructor.findOne({ slug: this.slug });
-  if (existing && existing._id.toString() !== this._id.toString()) {
-    throw new customError(
-      `Customer advance payment with name "${this.customerName}" already exists`,
-      400,
-    );
+  try {
+    const existing = await this.constructor.findOne({ slug: this.slug });
+    if (existing && existing._id.toString() !== this._id.toString()) {
+      return next(
+        new customError(
+          `Customer advance payment with name "${this.customerName}" already exists`,
+          400,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 // when update then also update slug
@@ -395,10 +416,9 @@ customerAdvancePaymentSchema.pre("findOneAndUpdate", async function (next) {
   }
   next();
 });
-const customerAdvancePaymentModel = mongoose.model(
-  "CustomerAdvancePayment",
-  customerAdvancePaymentSchema,
-);
+const customerAdvancePaymentModel =
+  mongoose.models.CustomerAdvancePayment ||
+  mongoose.model("CustomerAdvancePayment", customerAdvancePaymentSchema);
 
 module.exports = {
   customerModel,

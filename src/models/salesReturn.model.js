@@ -41,7 +41,7 @@ const salesReturnSchema = new mongoose.Schema(
       trim: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // make a slug using name
@@ -54,22 +54,27 @@ salesReturnSchema.pre("save", function (next) {
 
 // check if slug already exist or not
 salesReturnSchema.pre("save", async function (next) {
-  const existingSalesReturn = await this.constructor.findOne({
-    slug: this.slug,
-  });
-  if (
-    existingSalesReturn &&
-    existingSalesReturn._id.toString() !== this._id.toString()
-  ) {
-    console.log(
-      `SalesReturn with slug ${this.slug} or productBarCode ${this.productBarCode} already exists`
-    );
-    throw new customError(
-      `SalesReturn with slug ${this.slug} or productBarCode ${this.productBarCode} already exists`,
-      400
-    );
+  try {
+    const existingSalesReturn = await this.constructor.findOne({
+      slug: this.slug,
+    });
+    if (
+      existingSalesReturn &&
+      existingSalesReturn._id.toString() !== this._id.toString()
+    ) {
+      return next(
+        new customError(
+          `SalesReturn with slug ${this.slug} or productBarCode ${this.productBarCode} already exists`,
+          400,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
-module.exports = mongoose.model("SalesReturn", salesReturnSchema);
+module.exports =
+  mongoose.models.SalesReturn ||
+  mongoose.model("SalesReturn", salesReturnSchema);

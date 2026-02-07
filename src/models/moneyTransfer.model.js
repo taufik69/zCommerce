@@ -30,4 +30,6 @@ const moneyTransferSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model("MoneyTransfer", moneyTransferSchema);
+module.exports =
+  mongoose.models.MoneyTransfer ||
+  mongoose.model("MoneyTransfer", moneyTransferSchema);

@@ -9,7 +9,7 @@ const roleSchema = new mongoose.Schema(
     name: { type: String, required: true, unique: true, default: "user" },
     isActive: { type: Boolean, default: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // make a slug using name
@@ -22,15 +22,19 @@ roleSchema.pre("save", function (next) {
 
 // check this slug already exist or not
 roleSchema.pre("save", async function (next) {
-  const existingRole = await this.constructor.findOne({ slug: this.slug });
-  if (existingRole && existingRole._id.toString() !== this._id.toString()) {
-    console.log(
-      `Role with slug ${this.slug} or name ${this.name} already exists`
-    );
-    throw new customError(
-      `Role with slug ${this.slug} or name ${this.name} already exists`
-    );
+  try {
+    const existingRole = await this.constructor.findOne({ slug: this.slug });
+    if (existingRole && existingRole._id.toString() !== this._id.toString()) {
+      return next(
+        new customError(
+          `Role with slug ${this.slug} or name ${this.name} already exists`,
+          400,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
-module.exports = mongoose.model("Role", roleSchema);
+module.exports = mongoose.models.Role || mongoose.model("Role", roleSchema);

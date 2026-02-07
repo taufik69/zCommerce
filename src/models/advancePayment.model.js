@@ -113,7 +113,9 @@ const employeeDesignationSchema = new mongoose.Schema(
 
 // make a slug using name
 employeeDesignationSchema.pre("save", function (next) {
-  this.slug = slugify(this.name, { lower: true });
+  if (this.isModified("name")) {
+    this.slug = slugify(this.name, { lower: true });
+  }
   next();
 });
 
@@ -127,8 +129,7 @@ employeeDesignationSchema.pre("save", async function (next) {
       existingDesignation &&
       existingDesignation._id.toString() !== this._id.toString()
     ) {
-      console.log(`Designation with slug ${this.slug} already exists`);
-      next(
+      return next(
         new customError(
           `Designation with slug ${this.slug} already exists`,
           400,
@@ -177,8 +178,9 @@ const departmentSchema = new mongoose.Schema(
 
 // make a slug using name
 departmentSchema.pre("save", function (next) {
-  if (!this.isModified("name")) return next();
-  this.slug = slugify(this.name, { lower: true });
+  if (this.isModified("name")) {
+    this.slug = slugify(this.name, { lower: true });
+  }
   next();
 });
 
@@ -192,8 +194,7 @@ departmentSchema.pre("save", async function (next) {
       existingDepartment &&
       existingDepartment._id.toString() !== this._id.toString()
     ) {
-      console.log(`Department with slug ${this.slug} already exists`);
-      next(
+      return next(
         new customError(
           `Department with slug ${this.slug} already exists`,
           400,
@@ -240,7 +241,9 @@ const sectionSchema = new mongoose.Schema(
 
 // make a slug using name
 sectionSchema.pre("save", function (next) {
-  this.slug = slugify(this.name, { lower: true });
+  if (this.isModified("name")) {
+    this.slug = slugify(this.name, { lower: true, strict: true });
+  }
   next();
 });
 
@@ -254,8 +257,7 @@ sectionSchema.pre("save", async function (next) {
       existingSection &&
       existingSection._id.toString() !== this._id.toString()
     ) {
-      console.log(`Section with slug ${this.slug} already exists`);
-      next(
+      return next(
         new customError(`Section with slug ${this.slug} already exists`, 400),
       );
     }

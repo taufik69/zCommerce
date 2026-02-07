@@ -16,18 +16,22 @@ const merchantSchema = new mongoose.Schema({
 
 // Ensure uniqueness of slug and merchantID
 merchantSchema.pre("save", async function (next) {
-  const existingMerchant = await this.constructor.findOne({
-    $or: [{ merchantID: this.merchantID }],
-  });
+  try {
+    const existingMerchant = await this.constructor.findOne({
+      $or: [{ merchantID: this.merchantID }],
+    });
 
-  if (
-    existingMerchant &&
-    existingMerchant._id.toString() !== this._id.toString()
-  ) {
-    throw new customError("Merchant ID or slug already exists", 400);
+    if (
+      existingMerchant &&
+      existingMerchant._id.toString() !== this._id.toString()
+    ) {
+      return next(new customError("Merchant ID or slug already exists", 400));
+    }
+
+    next();
+  } catch (error) {
+    next(error);
   }
-
-  next();
 });
 
 module.exports =

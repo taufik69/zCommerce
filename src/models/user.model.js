@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { customError } = require("../lib/CustomError");
 
 const userSchema = new mongoose.Schema(
   {
@@ -49,7 +50,7 @@ const userSchema = new mongoose.Schema(
       type: String,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Hash password before saving
@@ -62,45 +63,90 @@ userSchema.pre("save", async function (next) {
 
 // compare password
 userSchema.pre("findOneAndUpdate", async function (next) {
-  const update = this.getUpdate();
-  if (update.password) {
-    update.password = await bcrypt.hash(update.password, 10);
+  try {
+    const update = this.getUpdate() || {};
+
+    // handle both direct and $set updates
+    const $set = update.$set || update;
+
+    if ($set.password) {
+      $set.password = await bcrypt.hash($set.password, 10);
+    }
+
+    // re-assign update safely
+    if (update.$set) update.$set = $set;
+    else Object.assign(update, $set);
+
+    this.setUpdate(update);
+
+    return next();
+  } catch (error) {
+    return next(error);
   }
-  next();
 });
 
 // compare password
-userSchema.methods.comparePassword = async function (password) {
-  return await bcrypt.compare(password, this.password);
+userSchema.methods.comparePassword = async function (candidatePassword) {
+  // password field fetch না করলে বা missing হলে সরাসরি false
+  if (!this.password) return false;
+
+  try {
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (err) {
+    return false;
+  }
 };
 
 // Generate JWT token
 // Generate JWT token
 userSchema.methods.generateJwtRefreshToken = function () {
-  return jwt.sign({ id: this._id }, process.env.REFRESH_TOKEN_SCCERET, {
-    expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
-  });
+  try {
+    if (!process.env.REFRESH_TOKEN_SECRET) {
+      throw new customError("Refresh token secret is not defined", 500);
+    }
+
+    return jwt.sign({ id: this._id }, process.env.REFRESH_TOKEN_SECRET, {
+      expiresIn: process.env.REFRESH_TOKEN_EXPIRY || "7d",
+    });
+  } catch (error) {
+    throw new customError("Failed to generate refresh token", 500);
+  }
 };
 
 // generate JWT access token
 userSchema.methods.generateJwtAccessToken = function () {
-  return jwt.sign(
-    {
-      id: this._id,
-      email: this.email,
-      name: this.name,
-      phone: this.phone,
-    },
-    process.env.ACCESS_TOKEN_SECRET,
-    {
-      expiresIn: process.env.ACCESS_TOKEN_EXPRIY,
+  try {
+    if (!process.env.ACCESS_TOKEN_SECRET) {
+      throw new customError("Access token secret is not defined", 500);
     }
-  );
+
+    return jwt.sign(
+      {
+        id: this._id,
+        email: this.email,
+        name: this.name,
+        phone: this.phone,
+      },
+      process.env.ACCESS_TOKEN_SECRET,
+      {
+        expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "15m",
+      },
+    );
+  } catch (error) {
+    throw new customError("Failed to generate access token", 500);
+  }
 };
 
 // veryfy JWT token
 userSchema.methods.verifyJwtRefreshToken = function (token) {
-  return jwt.verify(token, process.env.ACCESS_TOKEN_SCCRECT);
+  try {
+    return jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      throw new customError("Refresh token expired", 401);
+    }
+    throw new customError("Invalid refresh token", 401);
+  }
 };
 
-module.exports = mongoose.model("User", userSchema);
+module.exports = mongoose.models.User || mongoose.model("User", userSchema);

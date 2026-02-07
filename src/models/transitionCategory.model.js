@@ -22,7 +22,7 @@ const transitionCategorySchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // make a slug using name
@@ -35,18 +35,23 @@ transitionCategorySchema.pre("save", function (next) {
 
 // check this slug already exist or not
 transitionCategorySchema.pre("save", async function (next) {
-  const existingTransitionCategory = await this.constructor.findOne({
-    slug: this.slug,
-  });
-  if (
-    existingTransitionCategory &&
-    existingTransitionCategory._id &&
-    existingTransitionCategory._id.toString() !== this._id.toString()
-  ) {
-    console.log(`${this.name} already exists Try another`);
-    throw new customError(`${this.name} already exists Try another`, 400);
+  try {
+    const existingTransitionCategory = await this.constructor.findOne({
+      slug: this.slug,
+    });
+    if (
+      existingTransitionCategory &&
+      existingTransitionCategory._id &&
+      existingTransitionCategory._id.toString() !== this._id.toString()
+    ) {
+      return next(
+        new customError(`${this.name} already exists Try another`, 400),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 // when update then make a slug using name

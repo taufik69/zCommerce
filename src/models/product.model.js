@@ -21,7 +21,7 @@ const reviewSchema = new mongoose.Schema(
       ref: "User",
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const productSchema = new mongoose.Schema(
@@ -265,7 +265,7 @@ const productSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // Auto-generate slug from name
@@ -287,17 +287,23 @@ productSchema.pre("findOneAndUpdate", async function (next) {
 
 // Ensure unique slug
 productSchema.pre("save", async function (next) {
-  const existingProduct = await this.constructor.findOne({ slug: this.slug });
-  if (
-    existingProduct &&
-    existingProduct._id.toString() !== this._id.toString()
-  ) {
-    throw new customError(
-      `Product with slug ${this.slug} or ${this.name} already exists`,
-      400
-    );
+  try {
+    const existingProduct = await this.constructor.findOne({ slug: this.slug });
+    if (
+      existingProduct &&
+      existingProduct._id.toString() !== this._id.toString()
+    ) {
+      return next(
+        new customError(
+          `Product with slug ${this.slug} or ${this.name} already exists`,
+          400,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 // virtual populate for variants
@@ -379,28 +385,37 @@ productSchema.virtual("singleVariantTotalPurchasedQuantity");
 
 // Middleware: শুধুমাত্র find এর জন্য
 productSchema.post("find", async function (docs, next) {
-  await Promise.all(
-    docs.map(async (doc) => {
-      const purchases = await purchaseModel.find({
-        "allproduct.product": doc._id,
-      });
-
-      let totalPurchased = 0;
-      purchases.forEach((purchase) => {
-        purchase.allproduct.forEach((item) => {
-          if (item.product && item.product.toString() === doc._id.toString()) {
-            totalPurchased += item.quantity || 0;
-          }
+  try {
+    await Promise.all(
+      docs.map(async (doc) => {
+        const purchases = await purchaseModel.find({
+          "allproduct.product": doc._id,
         });
-      });
 
-      // Set the virtual property
-      doc.singleVariantTotalPurchasedQuantity = totalPurchased;
-    })
-  );
+        let totalPurchased = 0;
 
-  next();
+        purchases.forEach((purchase) => {
+          purchase.allproduct.forEach((item) => {
+            if (
+              item.product &&
+              item.product.toString() === doc._id.toString()
+            ) {
+              totalPurchased += item.quantity || 0;
+            }
+          });
+        });
+
+        // attach calculated field
+        doc.singleVariantTotalPurchasedQuantity = totalPurchased;
+      }),
+    );
+
+    next();
+  } catch (error) {
+    return next(error);
+  }
 });
 
-const Product = mongoose.model("Product", productSchema);
+const Product =
+  mongoose.models.Product || mongoose.model("Product", productSchema);
 module.exports = Product;

@@ -25,16 +25,26 @@ couponSchema.pre("save", function (next) {
 
 // check this slug already exist or not
 couponSchema.pre("save", async function (next) {
-  const existingCoupon = await this.constructor.findOne({ slug: this.slug });
-  if (existingCoupon && existingCoupon._id.toString() !== this._id.toString()) {
-    console.log(
-      `Coupon with slug ${this.slug} or code ${this.code} already exists`
-    );
-    throw new customError(
-      `Coupon with slug ${this.slug} or code ${this.code} already exists`
-    );
+  try {
+    const existingCoupon = await this.constructor.findOne({ slug: this.slug });
+    if (
+      existingCoupon &&
+      existingCoupon._id.toString() !== this._id.toString()
+    ) {
+      console.log(
+        `Coupon with slug ${this.slug} or code ${this.code} already exists`,
+      );
+      return next(
+        new customError(
+          `Coupon with slug ${this.slug} or code ${this.code} already exists`,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
-module.exports = mongoose.model("Coupon", couponSchema);
+module.exports =
+  mongoose.models.Coupon || mongoose.model("Coupon", couponSchema);

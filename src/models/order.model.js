@@ -170,7 +170,7 @@ const orderSchema = new mongoose.Schema(
     },
     totalQuantity: { type: Number, default: 0 },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-module.exports = mongoose.model("Order", orderSchema);
+module.exports = mongoose.models.Order || mongoose.model("Order", orderSchema);

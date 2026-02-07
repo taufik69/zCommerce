@@ -9,27 +9,30 @@ const sizeChartSchema = new mongoose.Schema(
     },
     image: {},
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // check this slug already exist or not
 sizeChartSchema.pre("save", async function (next) {
-  const existingSizeChart = await this.constructor.findOne({
-    slug: this.subCategory,
-  });
-  if (
-    existingSizeChart &&
-    existingSizeChart._id.toString() !== this._id.toString()
-  ) {
-    console.log(
-      `SizeChart with slug ${this.slug} or name ${this.name} already exists`
-    );
-    throw new customError(
-      `SizeChart with slug ${this.slug} or name ${this.name} already exists`,
-      400
-    );
+  try {
+    const existingSizeChart = await this.constructor.findOne({
+      slug: this.subCategory,
+    });
+    if (
+      existingSizeChart &&
+      existingSizeChart._id.toString() !== this._id.toString()
+    ) {
+      return next(
+        new customError(
+          `SizeChart with slug ${this.slug} or name ${this.name} already exists`,
+          400,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 module.exports =

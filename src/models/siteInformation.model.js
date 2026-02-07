@@ -89,7 +89,7 @@ const siteInformationSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // make a slug
@@ -102,27 +102,40 @@ siteInformationSchema.pre("save", function (next) {
 
 // did not put double siteinformation only take one siteinformation
 siteInformationSchema.pre("save", async function (next) {
-  const siteInformationCount = await this.constructor.countDocuments();
-  if (siteInformationCount >= 1 && this.isNew) {
-    throw new customError("Only one SiteInformation document is allowed.", 400);
+  try {
+    const siteInformationCount = await this.constructor.countDocuments();
+    if (siteInformationCount >= 1 && this.isNew) {
+      return next(
+        new customError("Only one SiteInformation document is allowed.", 400),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 // if slug already exist
 siteInformationSchema.pre("save", async function (next) {
-  const existSiteInformation = await this.constructor.findOne({
-    slug: this.slug,
-  });
-  if (
-    existSiteInformation &&
-    existSiteInformation._id &&
-    existSiteInformation._id.toString() !== this._id.toString()
-  ) {
-    console.log(`${this.storeName} already exists Try another`);
-    throw new customError(`${this.storeName} already exists Try another`, 400);
+  try {
+    const existSiteInformation = await this.constructor.findOne({
+      slug: this.slug,
+    });
+    if (
+      existSiteInformation &&
+      existSiteInformation._id &&
+      existSiteInformation._id.toString() !== this._id.toString()
+    ) {
+      next(
+        new customError(`${this.storeName} already exists Try another`, 400),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
-module.exports = mongoose.model("SiteInformation", siteInformationSchema);
+module.exports =
+  mongoose.models.SiteInformation ||
+  mongoose.model("SiteInformation", siteInformationSchema);

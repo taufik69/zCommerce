@@ -43,7 +43,7 @@ const byReturnSchema = new mongoose.Schema(
       trim: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // generate slug using productBarCode + supplierName
@@ -52,6 +52,7 @@ byReturnSchema.pre("save", function (next) {
     this.slug = slugify(`${this.productBarCode}-${this.supplierName}`, {
       lower: true,
       strict: true,
+      trim: true,
     });
   }
   next();
@@ -59,19 +60,22 @@ byReturnSchema.pre("save", function (next) {
 
 // check duplicate slug
 byReturnSchema.pre("save", async function (next) {
-  const existingByReturn = await this.constructor.findOne({
-    slug: this.slug,
-  });
-  if (
-    existingByReturn &&
-    existingByReturn._id.toString() !== this._id.toString()
-  ) {
-    throw new customError(
-      `ByReturn with slug ${this.slug} already exists`,
-      400
-    );
+  try {
+    const existingByReturn = await this.constructor.findOne({
+      slug: this.slug,
+    });
+    if (
+      existingByReturn &&
+      existingByReturn._id.toString() !== this._id.toString()
+    ) {
+      return next(
+        new customError(`ByReturn with slug ${this.slug} already exists`, 400),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 });
 
 module.exports =

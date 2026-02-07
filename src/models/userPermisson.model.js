@@ -9,7 +9,9 @@ const userPermissionSchema = new mongoose.Schema(
     },
     permissions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Permission" }],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-module.exports = mongoose.model("UserPermission", userPermissionSchema);
+module.exports =
+  mongoose.models.UserPermission ||
+  mongoose.model("UserPermission", userPermissionSchema);
