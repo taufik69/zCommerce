@@ -11,6 +11,7 @@ const {
   cloudinaryFileUpload,
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
+const { statusCodes } = require("../constant/constant");
 
 // @desc create  variant controller
 exports.createVariant = asynchandeler(async (req, res) => {
@@ -18,15 +19,24 @@ exports.createVariant = asynchandeler(async (req, res) => {
   const files = req.files;
 
   if (!variants || !Array.isArray(variants) || variants.length === 0) {
-    throw new customError("At least one variant is required", 400);
+    throw new customError(
+      "At least one variant is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   if (!files || files.length === 0) {
-    throw new customError("At least one variant image is required", 400);
+    throw new customError(
+      "At least one variant image is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   if (variants.length !== files.length) {
-    throw new customError("Each variant must have a corresponding image", 400);
+    throw new customError(
+      "Each variant must have a corresponding image",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   let savedVariants = [];
@@ -58,9 +68,9 @@ exports.createVariant = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.CREATED,
     "Variants created successfully",
-    savedVariants
+    savedVariants,
   );
 });
 
@@ -75,7 +85,15 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
     .populate("stockVariantAdjust byReturn salesReturn")
     .select("-updatedAt")
     .sort({ createdAt: -1 });
-  apiResponse.sendSuccess(res, 200, "Variants fetched successfully", variants);
+  if (!variants || variants.length === 0) {
+    throw new customError("Variants not found", statusCodes.NOT_FOUND);
+  }
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Variants fetched successfully",
+    variants,
+  );
 });
 
 // @desc get single variant
@@ -89,13 +107,13 @@ exports.getSingleVariant = asynchandeler(async (req, res, next) => {
     })
     .populate("stockVariantAdjust byReturn salesReturn");
   if (!singleVariant) {
-    throw new customError("Variant not found", 404);
+    throw new customError("Variant not found", statusCodes.NOT_FOUND);
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Variant fetched successfully",
-    singleVariant
+    singleVariant,
   );
 });
 
@@ -106,7 +124,7 @@ exports.updateVariant = asynchandeler(async (req, res) => {
   // Find the variant first
   const existingVariant = await variant.findOne({ slug });
   if (!existingVariant) {
-    throw new customError("Variant not found", 404);
+    throw new customError("Variant not found", statusCodes.NOT_FOUND);
   }
 
   // Handle image update if new image is provided
@@ -128,14 +146,14 @@ exports.updateVariant = asynchandeler(async (req, res) => {
   const updatedVariant = await variant.findOneAndUpdate(
     { slug },
     { ...req.body, image: updatedImageUrl },
-    { new: true }
+    { new: true },
   );
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Variant updated successfully",
-    updatedVariant
+    updatedVariant,
   );
 });
 
@@ -144,15 +162,15 @@ exports.deactivateVariant = asynchandeler(async (req, res) => {
   const { slug } = req.query;
   const variantToDeactivate = await variant.findOne({ slug });
   if (!variantToDeactivate) {
-    throw new customError("Variant not found", 404);
+    throw new customError("Variant not found", statusCodes.NOT_FOUND);
   }
   variantToDeactivate.isActive = false;
   await variantToDeactivate.save();
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Variant deactivated successfully",
-    variantToDeactivate
+    variantToDeactivate,
   );
 });
 
@@ -161,15 +179,15 @@ exports.activateVariant = asynchandeler(async (req, res) => {
   const { slug } = req.query;
   const variantToActivate = await variant.findOne({ slug });
   if (!variantToActivate) {
-    throw new customError("Variant not found", 404);
+    throw new customError("Variant not found", statusCodes.NOT_FOUND);
   }
   variantToActivate.isActive = true;
   await variantToActivate.save();
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Variant activated successfully",
-    variantToActivate
+    variantToActivate,
   );
 });
 
@@ -178,12 +196,12 @@ exports.deleteVariant = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const deletedVariant = await variant.findOneAndDelete({ slug });
   if (!deletedVariant) {
-    throw new customError("Variant not found", 404);
+    throw new customError("Variant not found", statusCodes.NOT_FOUND);
   }
   // remve the variant from the product's variants array
   const productData = await product.findById(deletedVariant.product);
   if (!productData) {
-    throw new customError("Product not found", 404);
+    throw new customError("Product not found", statusCodes.NOT_FOUND);
   }
   productData.variant.pull(deletedVariant._id);
   await productData.save();
@@ -193,8 +211,8 @@ exports.deleteVariant = asynchandeler(async (req, res) => {
   await deleteCloudinaryFile(publicId);
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Variant deleted successfully",
-    deletedVariant
+    deletedVariant,
   );
 });

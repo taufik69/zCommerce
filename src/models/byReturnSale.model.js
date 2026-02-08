@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const byReturnSchema = new mongoose.Schema(
   {
@@ -69,7 +70,10 @@ byReturnSchema.pre("save", async function (next) {
       existingByReturn._id.toString() !== this._id.toString()
     ) {
       return next(
-        new customError(`ByReturn with slug ${this.slug} already exists`, 400),
+        new customError(
+          `ByReturn with slug ${this.slug} already exists`,
+          statusCodes.BAD_REQUEST,
+        ),
       );
     }
     next();

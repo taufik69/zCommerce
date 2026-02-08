@@ -14,10 +14,11 @@ const {
 } = require("../helpers/cloudinary");
 const { validateProduct } = require("../validation/product.validation");
 const { populate } = require("../models/purchase.model");
+const { statusCodes } = require("../constant/constant");
 
 // Create a new product (only required fields)
 exports.createProduct = asynchandeler(async (req, res) => {
-  // ✅ Step 1: Validate required fields
+  //  Step 1: Validate required fields
   const value = await validateProduct(req);
   const {
     name,
@@ -63,22 +64,22 @@ exports.createProduct = asynchandeler(async (req, res) => {
 
   await product.save();
 
-  // ✅ Step 3: Send immediate response
+  //  Step 3: Send immediate response
   apiResponse.sendSuccess(
     res,
-    202,
+    statusCodes.CREATED,
     "Product creation is being processed in the background",
-    { productId: product._id }
+    { productId: product._id },
   );
 
-  // ✅ Step 4: Background processing (fire-and-forget)
+  //  Step 4: Background processing (fire-and-forget)
   (async () => {
     try {
       // Upload images if provided
       let imageUrls = [];
       if (req.files?.image?.length) {
         const imageUploads = await Promise.all(
-          req.files.image.map((file) => cloudinaryFileUpload(file.path))
+          req.files.image.map((file) => cloudinaryFileUpload(file.path)),
         );
         imageUrls = imageUploads.map((img) => img.optimizeUrl);
         product.image = imageUrls;
@@ -90,7 +91,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
           `${
             process.env.PRODUCT_QR_URL ||
             "https://www.facebook.com/zahirulislamdev"
-          }`
+          }`,
         ),
         {
           errorCorrectionLevel: "H",
@@ -98,15 +99,14 @@ exports.createProduct = asynchandeler(async (req, res) => {
           width: 200,
           height: 200,
           type: "png",
-        }
+        },
       );
 
       const base64qrCode = `data:image/png;base64,${qrCodeBuffer.toString(
-        "base64"
+        "base64",
       )}`;
-      const { optimizeUrl: qrCodeUrl } = await uploadBarcodeToCloudinary(
-        base64qrCode
-      );
+      const { optimizeUrl: qrCodeUrl } =
+        await uploadBarcodeToCloudinary(base64qrCode);
       product.qrCode = qrCodeUrl || null;
 
       // Save product with images & QR
@@ -115,7 +115,7 @@ exports.createProduct = asynchandeler(async (req, res) => {
     } catch (error) {
       console.error(
         `❌ Background product creation failed: ${product._id}`,
-        error.message
+        error.message,
       );
     }
   })();
@@ -189,9 +189,9 @@ exports.getAllProducts = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Products fetched successfully",
-    filteredProducts
+    filteredProducts,
   );
 });
 
@@ -222,9 +222,14 @@ exports.getProductBySlug = asynchandeler(async (req, res) => {
     });
 
   if (!product) {
-    throw new customError(404, "Product not found");
+    throw new customError("Product not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(res, 200, "Product fetched successfully", product);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Product fetched successfully",
+    product,
+  );
 });
 
 //@desc Update product by slug and when update name then change the sku as well as qrCode and barcode
@@ -236,14 +241,19 @@ exports.updateProductInfoBySlug = asynchandeler(async (req, res) => {
     { ...req.body },
     {
       new: true,
-    }
+    },
   ).populate("category subcategory brand variant discount");
 
   if (!product) {
-    throw new customError(404, "Product not found");
+    throw new customError("Product not found", statusCodes.NOT_FOUND);
   }
 
-  apiResponse.sendSuccess(res, 200, "Product updated successfully", product);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Product updated successfully",
+    product,
+  );
 });
 
 //@desc Add images to product by slug
@@ -252,27 +262,35 @@ exports.addProductImage = asynchandeler(async (req, res) => {
 
   const product = await Product.findOne({ slug });
   if (!product) {
-    return apiResponse.sendError(res, 404, "Product not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Product not found",
+    );
   }
 
-  // ✅ Step 1: Validate files
+  // Step 1: Validate files
   if (!req.files || !req.files.image || req.files.image.length === 0) {
-    return apiResponse.sendError(res, 400, "No image files provided");
+    return apiResponse.sendError(
+      res,
+      statusCodes.BAD_REQUEST,
+      "No image files provided",
+    );
   }
 
-  // ✅ Step 2: Send immediate response
+  //  Step 2: Send immediate response
   apiResponse.sendSuccess(
     res,
-    202,
+    statusCodes.OK,
     "Image upload is being processed in the background",
-    { slug }
+    { slug },
   );
 
-  // ✅ Step 3: Background processing
+  //  Step 3: Background processing
   (async () => {
     try {
       const imageUploads = await Promise.all(
-        req.files.image.map((file) => cloudinaryFileUpload(file.path))
+        req.files.image.map((file) => cloudinaryFileUpload(file.path)),
       );
       const newImageUrls = imageUploads.map((img) => img.optimizeUrl);
 
@@ -283,7 +301,7 @@ exports.addProductImage = asynchandeler(async (req, res) => {
     } catch (error) {
       console.error(
         `❌ Background image upload failed for product: ${product._id}`,
-        error.message
+        error.message,
       );
     }
   })();
@@ -296,23 +314,23 @@ exports.deleteProductImage = asynchandeler(async (req, res) => {
 
   const product = await Product.findOne({ slug });
   if (!product) {
-    throw new customError(404, "Product not found");
+    throw new customError("Product not found", statusCodes.NOT_FOUND);
   }
 
-  // ✅ Step 1: Normalize imageUrl to array
+  //  Step 1: Normalize imageUrl to array
   if (!Array.isArray(imageUrl)) {
     imageUrl = [imageUrl];
   }
 
-  // ✅ Step 2: Send immediate response
+  //  Step 2: Send immediate response
   apiResponse.sendSuccess(
     res,
-    202,
+    statusCodes.OK,
     "Image deletion is being processed in the background",
-    { slug }
+    { slug },
   );
 
-  // ✅ Step 3: Background processing
+  //  Step 3: Background processing
   (async () => {
     try {
       for (const url of imageUrl) {
@@ -321,7 +339,7 @@ exports.deleteProductImage = asynchandeler(async (req, res) => {
 
         if (!publicId) {
           console.warn(
-            `⚠️ Invalid image URL: ${url} for product: ${product._id}`
+            `⚠️ Invalid image URL: ${url} for product: ${product._id}`,
           );
           continue;
         }
@@ -331,11 +349,11 @@ exports.deleteProductImage = asynchandeler(async (req, res) => {
       }
 
       await product.save();
-      console.log(`✅ Background images deleted for product: ${product._id}`);
+      console.log(` Background images deleted for product: ${product._id}`);
     } catch (error) {
       console.error(
         `❌ Background image deletion failed for product: ${product._id}`,
-        error.message
+        error.message,
       );
     }
   })();
@@ -351,7 +369,15 @@ exports.getProductsWithPagination = asynchandeler(async (req, res) => {
     .limit(limit)
     .sort({ createdAt: -1 })
     .populate("category subcategory brand variant discount");
-  apiResponse.sendSuccess(res, 200, "Product fetched successfully", products);
+  if (!products || products.length === 0) {
+    throw new customError("Product not found", statusCodes.NOT_FOUND);
+  }
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Product fetched successfully",
+    products,
+  );
 });
 
 //@desc delete product by slug and whenn delete product then delete all images from cloudinary
@@ -360,18 +386,22 @@ exports.deleteProductBySlug = asynchandeler(async (req, res) => {
 
   const product = await Product.findOneAndDelete({ slug });
   if (!product) {
-    return apiResponse.sendError(res, 404, "Product not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Product not found",
+    );
   }
 
-  // ✅ Step 1: Send immediate response
+  //  Step 1: Send immediate response
   apiResponse.sendSuccess(
     res,
-    202,
+    statusCodes.OK,
     "Product deletion is being processed in the background",
-    { slug }
+    { slug },
   );
 
-  // ✅ Step 2: Background processing
+  //  Step 2: Background processing
   (async () => {
     try {
       // Delete all images from Cloudinary
@@ -386,7 +416,7 @@ exports.deleteProductBySlug = asynchandeler(async (req, res) => {
             } else {
               console.warn(`⚠️ Invalid image URL for product: ${product._id}`);
             }
-          })
+          }),
         );
       }
 
@@ -394,7 +424,7 @@ exports.deleteProductBySlug = asynchandeler(async (req, res) => {
     } catch (error) {
       console.error(
         `❌ Background product deletion failed: ${slug}`,
-        error.message
+        error.message,
       );
     }
   })();
@@ -407,9 +437,14 @@ exports.getProductReviewBySlug = asynchandeler(async (req, res) => {
     .select("reviews")
     .populate("reviews.reviewer", "name email image phone");
   if (!product) {
-    throw new customError(404, "Product not found");
+    throw new customError("Product not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(res, 200, "Product fetched successfully", product);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Product fetched successfully",
+    product,
+  );
 });
 
 // @desc update product review by slug
@@ -417,15 +452,15 @@ exports.updateProductReviewBySlug = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const product = await Product.findOne({ slug });
   if (!product) {
-    throw new customError(404, "Product not found");
+    throw new customError("Product not found", statusCodes.NOT_FOUND);
   }
   product.reviews.push(req.body);
   await product.save();
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Product review updated successfully",
-    product
+    product,
   );
 });
 
@@ -434,17 +469,17 @@ exports.removeProductReviewBySlug = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const product = await Product.findOne({ slug });
   if (!product) {
-    throw new customError(404, "Product not found");
+    throw new customError("Product not found", statusCodes.NOT_FOUND);
   }
   product.reviews = product.reviews.filter(
-    (review) => review._id.toString() !== req.body.id
+    (review) => review._id.toString() !== req.body.id,
   );
   await product.save();
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Product review removed successfully",
-    product
+    product,
   );
 });
 
@@ -453,11 +488,18 @@ exports.getAllMultipleVariantProducts = asynchandeler(async (req, res) => {
   const products = await Product.find({ variantType: "multipleVariant" })
     .populate("category subcategory brand variant discount")
     .sort({ createdAt: -1 });
+
+  if (!products || products.length === 0) {
+    throw new customError(
+      "Multiple variant products not found",
+      statusCodes.NOT_FOUND,
+    );
+  }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Multiple variant products fetched successfully",
-    products
+    products,
   );
 });
 
@@ -475,11 +517,18 @@ exports.getNewArrivalProducts = asynchandeler(async (req, res) => {
       populate: "discount",
     })
     .limit(20);
+
+  if (!products || products.length === 0) {
+    throw new customError(
+      "New arrival products not found",
+      statusCodes.NOT_FOUND,
+    );
+  }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "New arrival products fetched successfully",
-    products
+    products,
   );
 });
 
@@ -490,7 +539,7 @@ exports.getProductsByPriceRange = asynchandeler(async (req, res) => {
   maxPrice = Number(maxPrice);
 
   if (isNaN(minPrice) || isNaN(maxPrice)) {
-    throw new customError("Invalid price range", 400);
+    throw new customError("Invalid price range", statusCodes.BAD_REQUEST);
   }
 
   const products = await Product.aggregate([
@@ -527,7 +576,15 @@ exports.getProductsByPriceRange = asynchandeler(async (req, res) => {
     },
   ]);
 
-  apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
+  if (!products || products.length === 0) {
+    throw new customError("Products not found", statusCodes.NOT_FOUND);
+  }
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Products fetched successfully",
+    products,
+  );
 });
 
 //@desc  get related product
@@ -538,11 +595,19 @@ exports.getRelatedProducts = asynchandeler(async (req, res) => {
   })
     .populate("category subcategory brand variant discount")
     .sort({ createdAt: -1 });
-  apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
+  if (!products || products.length === 0) {
+    throw new customError("Products not found", statusCodes.NOT_FOUND);
+  }
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Products fetched successfully",
+    products,
+  );
 });
 
 //@desc   discount product
-// ✅ Get all Discounted Products (Product + Variant)
+// Get all Discounted Products (Product + Variant)
 exports.getDiscountProducts = asynchandeler(async (req, res) => {
   // ==============================
   // 1️⃣ Find discounted main products
@@ -559,8 +624,14 @@ exports.getDiscountProducts = asynchandeler(async (req, res) => {
     })
     .sort({ createdAt: -1 });
 
+  if (!products || products.length === 0) {
+    throw new customError(
+      "Discounted products not found",
+      statusCodes.NOT_FOUND,
+    );
+  }
   // ==============================
-  // 2️⃣ Find discounted variant products
+  // 2️ Find discounted variant products
   // ==============================
   const variantDiscountedProducts = await variant
     .find({ discount: { $ne: null } })
@@ -575,8 +646,15 @@ exports.getDiscountProducts = asynchandeler(async (req, res) => {
       select: "-variant",
     });
 
-  // ==============================
-  // 3️⃣ Merge both product lists
+  if (!variantDiscountedProducts || variantDiscountedProducts.length === 0) {
+    throw new customError(
+      "Discounted variant products not found",
+      statusCodes.NOT_FOUND,
+    );
+  }
+
+  // =============================
+  // 3️⃣Merge both product lists
   // ==============================
   const allDiscountedProducts = [...products, ...variantDiscountedProducts];
 
@@ -585,9 +663,9 @@ exports.getDiscountProducts = asynchandeler(async (req, res) => {
   // ==============================
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Discounted products fetched successfully",
-    allDiscountedProducts
+    allDiscountedProducts,
   );
 });
 
@@ -607,6 +685,13 @@ exports.getBestSellingProducts = asynchandeler(async (_, res) => {
       populate: "discount",
     })
     .limit(10);
+
+  if (!products || products.length === 0) {
+    throw new customError(
+      "Best selling products not found",
+      statusCodes.NOT_FOUND,
+    );
+  }
 
   // now find the variant products which are best selling
   const variantBestSellingProducts = await variant
@@ -634,13 +719,20 @@ exports.getBestSellingProducts = asynchandeler(async (_, res) => {
     })
 
     .limit(50);
+
+  if (!variantBestSellingProducts || variantBestSellingProducts.length === 0) {
+    throw new customError(
+      "Best selling variant products not found",
+      statusCodes.NOT_FOUND,
+    );
+  }
   products.push(...variantBestSellingProducts);
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Best selling products fetched successfully",
-    products
+    products,
   );
 });
 
@@ -655,7 +747,7 @@ exports.getNameWiseSearch = asynchandeler(async (req, res) => {
   if (name) {
     matchConditions.push(
       { name: { $regex: name, $options: "i" } },
-      { "variant.variantName": { $regex: name, $options: "i" } }
+      { "variant.variantName": { $regex: name, $options: "i" } },
     );
   }
 
@@ -690,8 +782,13 @@ exports.getNameWiseSearch = asynchandeler(async (req, res) => {
   ]);
 
   if (products.length === 0) {
-    throw new customError("Product not found", 404);
+    throw new customError("Product not found", statusCodes.NOT_FOUND);
   }
 
-  apiResponse.sendSuccess(res, 200, "Products fetched successfully", products);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Products fetched successfully",
+    products,
+  );
 });

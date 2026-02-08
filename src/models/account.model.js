@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const accountSchema = new mongoose.Schema(
   {
@@ -43,7 +44,10 @@ accountSchema.pre("save", async function (next) {
 
     if (existingAccount) {
       return next(
-        new customError(`Account with slug '${this.slug}' already exists`, 400),
+        new customError(
+          `Account with slug '${this.slug}' already exists`,
+          statusCodes.BAD_REQUEST,
+        ),
       );
     }
 

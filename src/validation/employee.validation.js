@@ -1,6 +1,7 @@
 const joi = require("joi");
 const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
+const { statusCodes } = require("../constant/constant");
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const GENDERS = ["male", "female", "other"];
@@ -130,27 +131,43 @@ const validateImageFile = (req, res, next) => {
   if (!req.files || req.files.length === 0) return null;
 
   if (req.files.length > 1) {
-    next(new customError("You can upload a maximum of 1 image", 400));
+    return next(
+      new customError(
+        "You can upload a maximum of 1 image",
+        statusCodes.BAD_REQUEST,
+      ),
+    );
   }
 
   const file = req.files[0];
 
   if (file.fieldname !== "image") {
-    next(
-      new customError("Please provide a valid image fieldName (image)", 400),
+    return next(
+      new customError(
+        "Please provide a valid image fieldName (image)",
+        statusCodes.BAD_REQUEST,
+      ),
     );
   }
 
   // 1MB example (তোমার UI screenshot এ max 1MB ছিল)
   if (file.size > 1 * 1024 * 1024) {
-    next(new customError("Image size should be less than 1MB", 400));
+    return next(
+      new customError(
+        "Image size should be less than 1MB",
+        statusCodes.BAD_REQUEST,
+      ),
+    );
   }
 
   // Optional mime check
   const allowed = ["image/png", "image/jpeg", "image/jpg", "image/gif"];
   if (file.mimetype && !allowed.includes(file.mimetype)) {
-    next(
-      new customError("Invalid image type. Allowed: PNG, JPG, GIF, SVG", 400),
+    return next(
+      new customError(
+        "Invalid image type. Allowed: PNG, JPG, GIF, SVG",
+        statusCodes.BAD_REQUEST,
+      ),
     );
   }
 
@@ -173,22 +190,31 @@ const validateEmployeeCreate = async (req, res, next) => {
     return value;
   } catch (error) {
     console.log(error);
-    apiResponse.sendError(res, 400, error.message || buildJoiError(error));
-    throw new customError(buildJoiError(error), 400);
+    apiResponse.sendError(
+      res,
+      statusCodes.BAD_REQUEST,
+      error.message || buildJoiError(error),
+    );
+    throw new customError(buildJoiError(error), statusCodes.BAD_REQUEST);
   }
 };
 
 //  UPDATE VALIDATION
-const validateEmployeeUpdate = async (req) => {
+const validateEmployeeUpdate = async (req, res, next) => {
   try {
     const value = await employeeUpdateSchema.validateAsync(req.body);
 
-    const imageFile = validateImageFile(req);
+    const imageFile = validateImageFile(req, res, next);
     if (imageFile) value.image = imageFile;
 
     return value;
   } catch (error) {
-    throw new customError(buildJoiError(error), 400);
+    apiResponse.sendError(
+      res,
+      statusCodes.BAD_REQUEST,
+      error.message || buildJoiError(error),
+    );
+    throw new customError(buildJoiError(error), statusCodes.BAD_REQUEST);
   }
 };
 

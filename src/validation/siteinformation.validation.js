@@ -1,6 +1,6 @@
 const joi = require("joi");
 const { customError } = require("../lib/CustomError");
-
+const { statusCodes } = require("../constant/constant");
 // Joi Schema for site info
 const siteInformationSchema = joi
   .object({
@@ -41,7 +41,7 @@ const siteInformationSchema = joi
   .options({ abortEarly: false, allowUnknown: true });
 
 // Middleware validation function
-async function validateSiteInformation(req) {
+async function validateSiteInformation(req, res, next) {
   try {
     // Validate text fields
     const value = await siteInformationSchema.validateAsync(req.body);
@@ -49,30 +49,46 @@ async function validateSiteInformation(req) {
     // Validate file
     const file = req.file;
     if (!file) {
-      throw new customError("Please provide a logo image", 400);
+      return next(
+        new customError("Please provide a logo image", statusCodes.BAD_REQUEST),
+      );
     }
 
     // Max size 2MB
     if (file.size > 2 * 1024 * 1024) {
-      throw new customError("Image size must be less than 2MB", 400);
+      return next(
+        new customError(
+          "Image size must be less than 2MB",
+          statusCodes.BAD_REQUEST,
+        ),
+      );
     }
 
     // Allowed types
     const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
     if (!allowedTypes.includes(file.mimetype)) {
-      throw new customError(
-        "Only JPEG, PNG, or WEBP image formats are allowed",
-        400
+      return next(
+        new customError(
+          "Only JPEG, PNG, or WEBP image formats are allowed",
+          statusCodes.BAD_REQUEST,
+        ),
       );
     }
 
     return { ...value, image: file };
   } catch (error) {
     if (error.isJoi) {
+      next(
+        new customError(
+          "Site Information validation error: " +
+            error.details.map((err) => err.message).join(", "),
+          statusCodes.BAD_REQUEST,
+        ),
+      );
       throw new customError(
         "Site Information validation error: " +
           error.details.map((err) => err.message).join(", "),
-        400
+        400,
       );
     }
     throw error;

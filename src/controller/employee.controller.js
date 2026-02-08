@@ -22,6 +22,7 @@ const {
   employeeDesignationDTO,
   employeeDepartmentDTO,
 } = require("../dtos/all.dto");
+const { statusCodes } = require("../constant/constant");
 
 //  CREATE EMPLOYEE
 exports.createEmployee = asynchandeler(async (req, res, next) => {
@@ -29,9 +30,11 @@ exports.createEmployee = asynchandeler(async (req, res, next) => {
 
   const newEmployee = new employeeModel({ ...value, image: "" });
   await newEmployee.save();
+  if (!newEmployee)
+    throw new customError("Employee not found", statusCodes.NOT_FOUND);
   apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.CREATED,
     "Employee created successfully",
     newEmployee,
   );
@@ -60,9 +63,14 @@ exports.getEmployeeList = asynchandeler(async (req, res) => {
   if (req.query.id) {
     const employee = await employeeModel.findOne({ employeeId: req.query.id });
     if (!employee) {
-      apiResponse.sendError(res, 404, "Employee not found");
+      apiResponse.sendError(res, statusCodes.NOT_FOUND, "Employee not found");
     }
-    apiResponse.sendSuccess(res, 200, "Employee fetch successfully", employee);
+    apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Employee fetch successfully",
+      employee,
+    );
   }
   const employeeList = await employeeModel.find().sort({ createdAt: -1 });
   apiResponse.sendSuccess(res, 200, "Employee list fetch successfully", {
@@ -72,9 +80,9 @@ exports.getEmployeeList = asynchandeler(async (req, res) => {
 });
 
 // UPDATE EMPLOYEE
-exports.updateEmployee = asynchandeler(async (req, res) => {
+exports.updateEmployee = asynchandeler(async (req, res, next) => {
   // 1) Validate request
-  const value = await validateEmployeeUpdate(req);
+  const value = await validateEmployeeUpdate(req, res, next);
 
   // 2) Prevent forbidden updates
   delete value.employeeId;
@@ -87,7 +95,11 @@ exports.updateEmployee = asynchandeler(async (req, res) => {
   });
 
   if (!employee) {
-    return apiResponse.sendError(res, 404, "Employee not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Employee not found",
+    );
   }
 
   // keep old image url for later delete
@@ -105,7 +117,7 @@ exports.updateEmployee = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Employee updated successfully",
     updatedEmployee,
   );
@@ -145,7 +157,11 @@ exports.deleteEmployeeHard = asynchandeler(async (req, res) => {
   const employee = await employeeModel.findOne({ employeeId: req.params.id });
 
   if (!employee) {
-    return apiResponse.sendError(res, 404, "Employee not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Employee not found",
+    );
   }
 
   if (employee.image) {
@@ -165,9 +181,14 @@ exports.deleteEmployeeHard = asynchandeler(async (req, res) => {
 
   await employeeModel.deleteOne({ _id: employee._id });
 
-  apiResponse.sendSuccess(res, 200, "Employee deleted successfully", {
-    employeeId: employee.employeeId,
-  });
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Employee deleted successfully",
+    {
+      employeeId: employee.employeeId,
+    },
+  );
 });
 
 // soft delete employee
@@ -175,7 +196,11 @@ exports.deleteEmployeeSoft = asynchandeler(async (req, res) => {
   const employee = await employeeModel.findOne({ employeeId: req.params.id });
 
   if (!employee) {
-    return apiResponse.sendError(res, 404, "Employee not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Employee not found",
+    );
   }
 
   employee.deletedAt = new Date();
@@ -183,9 +208,14 @@ exports.deleteEmployeeSoft = asynchandeler(async (req, res) => {
   employee.isActive = false;
   await employee.save();
 
-  apiResponse.sendSuccess(res, 200, "Employee soft deleted successfully", {
-    employeeId: employee.employeeId,
-  });
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Employee soft deleted successfully",
+    {
+      employeeId: employee.employeeId,
+    },
+  );
 });
 
 //restor employee
@@ -195,13 +225,22 @@ exports.restoreEmployee = asynchandeler(async (req, res) => {
   });
 
   if (!employee) {
-    return apiResponse.sendError(res, 404, "Employee not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Employee not found",
+    );
   }
 
   if (!employee.isDeleted) {
-    return apiResponse.sendSuccess(res, 200, "Employee is already active", {
-      employeeId: employee.employeeId,
-    });
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Employee is already active",
+      {
+        employeeId: employee.employeeId,
+      },
+    );
   }
 
   employee.deletedAt = null;
@@ -210,20 +249,29 @@ exports.restoreEmployee = asynchandeler(async (req, res) => {
 
   await employee.save();
 
-  apiResponse.sendSuccess(res, 200, "Employee restored successfully", {
-    employeeId: employee.employeeId,
-  });
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Employee restored successfully",
+    {
+      employeeId: employee.employeeId,
+    },
+  );
 });
 
 // --------------------> create employee AdvancePayment
 exports.createEmployeeAdvancePayment = asynchandeler(async (req, res) => {
   const advancePayment = await employeeAdvancePayment.create(req.body);
   if (!advancePayment) {
-    return apiResponse.sendError(res, 404, "Advance Payment not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Advance Payment not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.CREATED,
     "Advance Payment created successfully",
     employeeAdvancePaymentDTO(advancePayment),
   );
@@ -241,11 +289,15 @@ exports.getEmployeeAdvancePayment = asynchandeler(async (req, res) => {
 
   const employeeAdvancePayment = await employeeAdvancePayment.find(filterQuery);
   if (employeeAdvancePayment.length == 0) {
-    return apiResponse.sendError(res, 404, "Advance Payment not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Advance Payment not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Advance Payment fetch successfully",
     employeeAdvancePayment.map((advancePayment) =>
       employeeAdvancePaymentDTO(advancePayment),
@@ -261,11 +313,15 @@ exports.updateEmployeeAdvancePayment = asynchandeler(async (req, res) => {
     { new: true },
   );
   if (!advancePayment) {
-    return apiResponse.sendError(res, 404, "Advance Payment not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Advance Payment not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Advance Payment updated successfully",
     employeeAdvancePaymentDTO(advancePayment),
   );
@@ -277,11 +333,15 @@ exports.deleteEmployeeAdvancePayment = asynchandeler(async (req, res) => {
     employeeId: req.params.id,
   });
   if (!advancePayment) {
-    return apiResponse.sendError(res, 404, "Advance Payment not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Advance Payment not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Advance Payment deleted successfully",
     employeeAdvancePaymentDTO(advancePayment),
   );
@@ -293,15 +353,22 @@ exports.deleteEmployeeAdvancePayment = asynchandeler(async (req, res) => {
 exports.createEmployeeDesignation = asynchandeler(async (req, res) => {
   const { name } = req.body;
   if (!name) {
-    throw new customError(401, "Designation name is required");
+    throw new customError(
+      "Designation name is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
   const employeeDesignation = await employeeDesignationModel.create(req.body);
   if (!employeeDesignation) {
-    return apiResponse.sendError(res, 404, "Designation not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Designation not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.CREATED,
     "Designation created successfully",
     employeeDesignationDTO(employeeDesignation),
   );
@@ -319,11 +386,15 @@ exports.getEmployeeDesignation = asynchandeler(async (req, res) => {
 
   const employeeDesignation = await employeeDesignationModel.find(filterQuery);
   if (employeeDesignation.length == 0) {
-    return apiResponse.sendError(res, 404, "Designation not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Designation not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Designation fetch successfully",
     employeeDesignation.map((designation) =>
       employeeDesignationDTO(designation),
@@ -339,11 +410,15 @@ exports.updateEmployeeDesignation = asynchandeler(async (req, res) => {
     { new: true },
   );
   if (!designation) {
-    return apiResponse.sendError(res, 404, "Designation not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Designation not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Designation updated successfully",
     employeeDesignationDTO(designation),
   );
@@ -355,11 +430,15 @@ exports.deleteEmployeeDesignation = asynchandeler(async (req, res) => {
     slug: req.params.slug,
   });
   if (!designation) {
-    return apiResponse.sendError(res, 404, "Designation not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Designation not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Designation deleted successfully",
     employeeDesignationDTO(designation),
   );
@@ -369,15 +448,22 @@ exports.deleteEmployeeDesignation = asynchandeler(async (req, res) => {
 exports.createEmployeeDepartment = asynchandeler(async (req, res) => {
   const { name } = req.body;
   if (!name) {
-    throw new customError(401, "Department name is required");
+    throw new customError(
+      statusCodes.BAD_REQUEST,
+      "Department name is required",
+    );
   }
   const employeeDepartment = await departmentModel.create(req.body);
   if (!employeeDepartment) {
-    return apiResponse.sendError(res, 404, "Department not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Department not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.CREATED,
     "Department created successfully",
     employeeDepartmentDTO(employeeDepartment),
   );
@@ -395,11 +481,15 @@ exports.getEmployeeDepartment = asynchandeler(async (req, res) => {
 
   const employeeDepartment = await departmentModel.find(filterQuery);
   if (employeeDepartment.length == 0) {
-    return apiResponse.sendError(res, 404, "Department not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Department not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Department fetch successfully",
     employeeDepartment.map((department) => employeeDepartmentDTO(department)),
   );
@@ -412,11 +502,15 @@ exports.updateEmployeeDepartment = asynchandeler(async (req, res) => {
     { new: true },
   );
   if (!department) {
-    return apiResponse.sendError(res, 404, "Department not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Department not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Department updated successfully",
     employeeDepartmentDTO(department),
   );
@@ -428,11 +522,15 @@ exports.deleteEmployeeDepartment = asynchandeler(async (req, res) => {
     slug: req.params.slug,
   });
   if (!department) {
-    return apiResponse.sendError(res, 404, "Department not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Department not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Department deleted successfully",
     employeeDepartmentDTO(department),
   );
@@ -442,15 +540,19 @@ exports.deleteEmployeeDepartment = asynchandeler(async (req, res) => {
 exports.createEmployeeSection = asynchandeler(async (req, res) => {
   const { name } = req.body;
   if (!name) {
-    throw new customError(401, "Section name is required");
+    throw new customError(statusCodes.BAD_REQUEST, "Section name is required");
   }
   const employeeSection = await sectionModel.create(req.body);
   if (!employeeSection) {
-    return apiResponse.sendError(res, 404, "Section not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Section not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.CREATED,
     "Section created successfully",
     employeeDepartmentDTO(employeeSection),
   );
@@ -468,11 +570,15 @@ exports.getEmployeeSection = asynchandeler(async (req, res) => {
 
   const employeeSection = await sectionModel.find(filterQuery);
   if (employeeSection.length == 0) {
-    return apiResponse.sendError(res, 404, "Section not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Section not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Section fetch successfully",
     employeeSection.map((section) => employeeDepartmentDTO(section)),
   );
@@ -486,11 +592,15 @@ exports.updateEmployeeSection = asynchandeler(async (req, res) => {
     { new: true },
   );
   if (!section) {
-    return apiResponse.sendError(res, 404, "Section not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Section not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Section updated successfully",
     employeeDepartmentDTO(section),
   );
@@ -502,11 +612,15 @@ exports.deleteEmployeeSection = asynchandeler(async (req, res) => {
     slug: req.params.slug,
   });
   if (!section) {
-    return apiResponse.sendError(res, 404, "Section not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Section not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Section deleted successfully",
     employeeDepartmentDTO(section),
   );

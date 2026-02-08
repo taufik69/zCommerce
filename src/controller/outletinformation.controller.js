@@ -10,33 +10,34 @@ const {
   cloudinaryFileUpload,
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
+const { statusCodes } = require("../constant/constant");
 
 // create outlet information
-exports.createOutletInformation = asynchandeler(async (req, res) => {
-  // 1️⃣ Validate request body
-  const validatedData = await validateOutletInformation(req);
+exports.createOutletInformation = asynchandeler(async (req, res, next) => {
+  //  Validate request body
+  const validatedData = await validateOutletInformation(req, res, next);
 
-  // 2️⃣ Create outlet in DB immediately (without waiting for image upload)
+  // Create outlet in DB immediately (without waiting for image upload)
   const outlet = await OutletInformation.create({
     ...validatedData,
     image: null,
   });
 
-  // 3️⃣ Send early response to client
+  // 3 Send early response to client
   apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.CREATED,
     "Outlet information saved. Image uploading in background...",
-    outlet
+    outlet,
   );
 
-  // 4️⃣ Background image upload
+  // 4️Background image upload
   (async () => {
     try {
       if (validatedData.image) {
         const imageUpload = await cloudinaryFileUpload(
           validatedData.image.path,
-          "outlets"
+          "outlets",
         );
         await OutletInformation.findByIdAndUpdate(outlet._id, {
           image: imageUpload.optimizeUrl,
@@ -48,7 +49,7 @@ exports.createOutletInformation = asynchandeler(async (req, res) => {
     } catch (error) {
       console.error(
         `❌ Image upload failed for outlet: ${outlet._id}`,
-        error.message
+        error.message,
       );
     }
   })();
@@ -59,11 +60,14 @@ exports.getAllOutletInformation = asynchandeler(async (req, res) => {
   const outlets = await OutletInformation.find({ isActive: true }).sort({
     createdAt: -1,
   });
+  if (!outlets) {
+    throw new customError("No outlets found", statusCodes.NOT_FOUND);
+  }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "All outlets fetched successfully",
-    outlets
+    outlets,
   );
 });
 
@@ -72,33 +76,38 @@ exports.getOutletInformationBySlug = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const outlet = await OutletInformation.findOne({ slug, isActive: true });
   if (!outlet) {
-    throw new customError("Outlet not found", 404);
+    throw new customError("Outlet not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(res, 200, "Outlet fetched successfully", outlet);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Outlet fetched successfully",
+    outlet,
+  );
 });
 
 // update outlet information
 exports.updateOutletInformation = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
-  // ✅ Step 1: Find existing outlet
+  //  Step 1: Find existing outlet
   const outlet = await OutletInformation.findOne({ slug, isActive: true });
   if (!outlet) {
-    throw new customError("Outlet not found", 404);
+    throw new customError("Outlet not found", statusCodes.NOT_FOUND);
   }
 
-  // ✅ Step 2: Validate request data
-  const validatedData = await validateOutletInformation(req);
+  //  Step 2: Validate request data
+  const validatedData = await validateOutletInformation(req, res, next);
 
-  // ✅ Step 3: Send early response
+  //  Step 3: Send early response
   apiResponse.sendSuccess(
     res,
-    202,
+    statusCodes.OK,
     "Outlet update request accepted. Processing in background...",
-    { slug }
+    { slug },
   );
 
-  // ✅ Step 4: Background processing
+  // Step 4: Background processing
   (async () => {
     try {
       let newImageUrl = outlet.image;
@@ -116,7 +125,7 @@ exports.updateOutletInformation = asynchandeler(async (req, res) => {
             }
           } catch (err) {
             console.warn(
-              `⚠️ Failed to delete old image for outlet ${outlet._id}: ${err.message}`
+              `⚠️ Failed to delete old image for outlet ${outlet._id}: ${err.message}`,
             );
           }
         }
@@ -124,10 +133,13 @@ exports.updateOutletInformation = asynchandeler(async (req, res) => {
         // Upload new image
         const uploadResult = await cloudinaryFileUpload(
           req.file.path,
-          "outlets"
+          "outlets",
         );
         if (!uploadResult) {
-          throw new customError("New image upload failed", 500);
+          throw new customError(
+            "New image upload failed",
+            statusCodes.SERVER_ERROR,
+          );
         }
         newImageUrl = uploadResult.optimizeUrl;
       }
@@ -158,14 +170,19 @@ exports.deleteOutletInformation = asynchandeler(async (req, res) => {
   // : Find outlet
   const outlet = await OutletInformation.findOne({ slug, isActive: true });
   if (!outlet) {
-    throw new customError("Outlet not found", 404);
+    throw new customError("Outlet not found", statusCodes.NOT_FOUND);
   }
 
   // : Send early response
-  apiResponse.sendSuccess(res, 202, "Outlet deletion request accepted", {
-    slug: outlet.slug,
-    id: outlet._id,
-  });
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Outlet deletion request accepted",
+    {
+      slug: outlet.slug,
+      id: outlet._id,
+    },
+  );
 
   //  Background deletion (fire-and-forget)
   (async () => {
@@ -181,7 +198,7 @@ exports.deleteOutletInformation = asynchandeler(async (req, res) => {
           }
         } catch (err) {
           console.warn(
-            `⚠️ Failed to delete image for outlet ${outlet._id}: ${err.message}`
+            `⚠️ Failed to delete image for outlet ${outlet._id}: ${err.message}`,
           );
         }
       }

@@ -7,19 +7,21 @@ const byReturnModel = require("../models/byReturnSale.model");
 const orderModel = require("../models/order.model");
 const StockAdjustModel = require("../models/stockadjust.model");
 const createTransactionModel = require("../models/crateTransaction.model");
-const tranasactionCategoryModel = require("../models/transitionCategory.model");
 const fundhandoverModel = require("../models/fundHandoverDescription.model");
 const invoiceModel = require("../models/invoice.model");
 const VariantModel = require("../models/variant.model");
 const ProductModel = require("../models/product.model");
-const accountModel = require("../models/account.model");
+const { statusCodes } = require("../constant/constant");
 
 exports.purchaseInvoice = asynchandeler(async (req, res) => {
   const { startDate, endDate, supplierName } = req.body;
 
   // Required validation
   if (!startDate || !endDate) {
-    throw new customError("startDate and endDate are required", 400);
+    throw new customError(
+      "startDate and endDate are required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   // Base match query
@@ -159,10 +161,15 @@ exports.purchaseInvoice = asynchandeler(async (req, res) => {
   ]);
 
   if (!result.length) {
-    return apiResponse.sendSuccess(res, 200, "No data found", []);
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No data found", []);
   }
 
-  return apiResponse.sendSuccess(res, 200, "Invoice summary", result[0]);
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Invoice summary",
+    result[0],
+  );
 });
 
 // purchaseSummary
@@ -171,7 +178,10 @@ exports.purchaseSummary = asynchandeler(async (req, res) => {
 
   // Required Validation
   if (!startDate || !endDate) {
-    throw new customError("startDate and endDate are required", 400);
+    throw new customError(
+      "startDate and endDate are required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   // Match Query
@@ -299,10 +309,15 @@ exports.purchaseSummary = asynchandeler(async (req, res) => {
   ]);
 
   if (!result.length) {
-    return apiResponse.sendSuccess(res, 200, "No data found", []);
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No data found", []);
   }
 
-  return apiResponse.sendSuccess(res, 200, "Purchase summary", result[0]);
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Purchase summary",
+    result[0],
+  );
 });
 
 // buyReturn
@@ -421,14 +436,17 @@ exports.getPurchaseBySupplier = asynchandeler(async (req, res) => {
   ]);
 
   if (!result.length) {
-    throw new customError("No data found for this supplier", 404);
+    throw new customError(
+      "No data found for this supplier",
+      statusCodes.NOT_FOUND,
+    );
   }
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Supplier purchase data fetched successfully",
-    result[0]
+    result[0],
   );
 });
 
@@ -439,11 +457,14 @@ exports.getSupplierSummary = asynchandeler(async (req, res) => {
       supplierName: { $ne: "" },
     })
     .select("supplierName");
+  if (!result.length) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No data found", []);
+  }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Supplier summary fetched successfully",
-    result
+    result,
   );
 });
 
@@ -468,7 +489,12 @@ exports.getInvoiceReport = asynchandeler(async (req, res) => {
     .sort({ createdAt: 1 });
 
   if (!orders.length) {
-    return apiResponse.sendSuccess(res, 200, "No invoice data found", []);
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "No invoice data found",
+      [],
+    );
   }
 
   // 🧮 Summary calculation
@@ -576,11 +602,16 @@ exports.getInvoiceReport = asynchandeler(async (req, res) => {
     };
   });
 
-  apiResponse.sendSuccess(res, 200, "Invoice report fetched successfully", {
-    reportPeriod: { startDate, endDate },
-    summary,
-    orderList,
-  });
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Invoice report fetched successfully",
+    {
+      reportPeriod: { startDate, endDate },
+      summary,
+      orderList,
+    },
+  );
 });
 
 // get all order info
@@ -637,14 +668,14 @@ exports.getOrderSummaryByDate = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Date-wise order summary fetched successfully",
     summary[0] || {
       statuses: [],
       grandTotal: { qty: 0, value: 0 },
       totalOrderCount: 0,
       totalAmount: 0,
-    }
+    },
   );
 });
 
@@ -675,7 +706,10 @@ exports.getCourierSendInformation = asynchandeler(async (req, res) => {
     .lean();
 
   if (!orders.length) {
-    throw new customError("No courier data found for given filter", 404);
+    throw new customError(
+      "No courier data found for given filter",
+      statusCodes.NOT_FOUND,
+    );
   }
 
   // ✅ Calculate totals
@@ -712,14 +746,14 @@ exports.getCourierSendInformation = asynchandeler(async (req, res) => {
 
   return apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Courier information fetched successfully",
     {
       orders: ordersWithDelivery,
       totalProductAmount,
       totalDeliveryCharge,
       productTotal,
-    }
+    },
   );
 });
 exports.overallStock = asynchandeler(async (req, res) => {
@@ -759,14 +793,17 @@ exports.overallStock = asynchandeler(async (req, res) => {
     .lean();
 
   if (!stockAdjusts.length) {
-    throw new customError("No stock adjustments found for given filter", 404);
+    throw new customError(
+      "No stock adjustments found for given filter",
+      statusCodes.NOT_FOUND,
+    );
   }
 
   return apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Stock adjustments retrieved successfully",
-    stockAdjusts
+    stockAdjusts,
   );
 });
 
@@ -778,6 +815,10 @@ exports.getAllAccounts = asynchandeler(async (req, res) => {
     .find({ account: { $exists: true } })
     .populate("account", "_id name")
     .select("account -_id");
+
+  if (!transactions.length) {
+    throw new customError("No accounts found", statusCodes.NOT_FOUND);
+  }
 
   // collect unique accounts using Map (keyed by id)
   const uniqueAccountsMap = new Map();
@@ -793,14 +834,14 @@ exports.getAllAccounts = asynchandeler(async (req, res) => {
 
   // convert to array and sort by name
   const uniqueAccounts = Array.from(uniqueAccountsMap.values()).sort((a, b) =>
-    (a.name || "").localeCompare(b.name || "")
+    (a.name || "").localeCompare(b.name || ""),
   );
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Accounts fetched successfully",
-    uniqueAccounts
+    uniqueAccounts,
   );
 });
 
@@ -811,11 +852,17 @@ exports.getTransactionCategories = asynchandeler(async (req, res) => {
     .populate("transactionCategory")
     .select("transactionCategory -_id ")
     .sort({ createdAt: 1 });
+  if (!categories.length) {
+    throw new customError(
+      "No transaction categories found",
+      statusCodes.NOT_FOUND,
+    );
+  }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Transaction categories fetched successfully",
-    categories
+    categories,
   );
 });
 // transaction report
@@ -849,11 +896,16 @@ exports.getTransactionReport = asynchandeler(async (req, res) => {
 
   // 🧮 If no transactions found
   if (!transactions.length) {
-    return apiResponse.sendSuccess(res, 200, "Transaction not found !!", {
-      filters: { startDate, endDate, transactionCategory },
-      summary: { cashReceived: 0, cashPayment: 0 },
-      transactions: [],
-    });
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Transaction not found !!",
+      {
+        filters: { startDate, endDate, transactionCategory },
+        summary: { cashReceived: 0, cashPayment: 0 },
+        transactions: [],
+      },
+    );
   }
 
   // 🧮 Calculate totals
@@ -868,12 +920,17 @@ exports.getTransactionReport = asynchandeler(async (req, res) => {
 
   const summary = { cashReceived, cashPayment };
 
-  // ✅ Send Response
-  apiResponse.sendSuccess(res, 200, "Transaction report fetched successfully", {
-    filters: { startDate, endDate, transactionCategory },
-    summary,
-    transactions,
-  });
+  //  Send Response
+  apiResponse.sendSuccess(
+    res,
+    STATUSCODES.OK,
+    "Transaction report fetched successfully",
+    {
+      filters: { startDate, endDate, transactionCategory },
+      summary,
+      transactions,
+    },
+  );
 });
 
 // transaction summary
@@ -882,7 +939,7 @@ exports.getTransactionSummaryByDate = asynchandeler(async (req, res) => {
 
   const match = {};
 
-  // ✅ Filter by date range
+  //  Filter by date range
   if (startDate && endDate) {
     match.date = {
       $gte: new Date(startDate),
@@ -893,7 +950,7 @@ exports.getTransactionSummaryByDate = asynchandeler(async (req, res) => {
   const report = await createTransactionModel.aggregate([
     { $match: match },
 
-    // ✅ Join category
+    //  Join category
     {
       $lookup: {
         from: "transitioncategories",
@@ -909,10 +966,10 @@ exports.getTransactionSummaryByDate = asynchandeler(async (req, res) => {
       },
     },
 
-    // ✅ Sort by latest date before grouping
+    //  Sort by latest date before grouping
     { $sort: { date: -1 } },
 
-    // ✅ Group by category and transaction type
+    //  Group by category and transaction type
     {
       $group: {
         _id: {
@@ -924,7 +981,7 @@ exports.getTransactionSummaryByDate = asynchandeler(async (req, res) => {
       },
     },
 
-    // ✅ Pivot payment/receive into same row
+    //  Pivot payment/receive into same row
     {
       $group: {
         _id: "$_id.category",
@@ -942,11 +999,11 @@ exports.getTransactionSummaryByDate = asynchandeler(async (req, res) => {
       },
     },
 
-    // ✅ Sort alphabetically or by name
+    // Sort alphabetically or by name
     { $sort: { _id: 1 } },
   ]);
 
-  // ✅ Add serial number and grand total
+  //  Add serial number and grand total
   let serial = 1;
   let grandReceived = 0;
   let grandPayment = 0;
@@ -971,13 +1028,13 @@ exports.getTransactionSummaryByDate = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Date-wise transaction summary fetched successfully",
     {
       filters: { startDate, endDate },
       summary,
       report: data,
-    }
+    },
   );
 });
 
@@ -987,7 +1044,7 @@ exports.getCashLedgerReport = asynchandeler(async (req, res) => {
 
   const match = {};
 
-  // ✅ Filter by date range (if provided)
+  //  Filter by date range (if provided)
   if (startDate && endDate) {
     match.date = {
       $gte: new Date(startDate),
@@ -995,14 +1052,14 @@ exports.getCashLedgerReport = asynchandeler(async (req, res) => {
     };
   }
 
-  // ✅ Fetch all transactions within range
+  //  Fetch all transactions within range
   const report = await createTransactionModel
     .find(match)
     .populate("transactionCategory")
     .populate("account")
     .sort({ date: -1 });
 
-  // ✅ Calculate totals
+  //  Calculate totals
   let totalCashReceived = 0;
   let totalCashPayment = 0;
 
@@ -1014,16 +1071,16 @@ exports.getCashLedgerReport = asynchandeler(async (req, res) => {
     }
   });
 
-  // ✅ Add serial numbers (TRXID-00001, TRXID-00002 ...)
+  //  Add serial numbers (TRXID-00001, TRXID-00002 ...)
   const transactionsWithSerial = report.map((transaction, index) => ({
     transactionId: `TRXID-${String(index + 1).padStart(6, "0")}`, // -> TRXID-000001
     ...transaction.toObject(),
   }));
 
-  // ✅ Calculate balance
+  // Calculate balance
   const balance = totalCashReceived - totalCashPayment;
 
-  // ✅ Final response
+  //  Final response
   const result = {
     totalCashReceived,
     totalCashPayment,
@@ -1033,9 +1090,9 @@ exports.getCashLedgerReport = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Cash ledger report fetched successfully",
-    result
+    result,
   );
 });
 
@@ -1046,7 +1103,7 @@ exports.getTransactionSummaryByDateAndAccount = asynchandeler(
 
     const match = {};
 
-    // ✅ Date range filter
+    //  Date range filter
     if (startDate && endDate) {
       match.date = {
         $gte: new Date(startDate),
@@ -1054,7 +1111,7 @@ exports.getTransactionSummaryByDateAndAccount = asynchandeler(
       };
     }
 
-    // ✅ Account filter (only if provided)
+    // Account filter (only if provided)
     if (account && account !== "") {
       match.account = new mongoose.Types.ObjectId(account);
     }
@@ -1062,7 +1119,7 @@ exports.getTransactionSummaryByDateAndAccount = asynchandeler(
     const report = await createTransactionModel.aggregate([
       { $match: match },
 
-      // ✅ Join account info
+      //  Join account info
       {
         $lookup: {
           from: "accounts",
@@ -1073,7 +1130,7 @@ exports.getTransactionSummaryByDateAndAccount = asynchandeler(
       },
       { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
 
-      // ✅ Group by date
+      //  Group by date
       {
         $group: {
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
@@ -1098,18 +1155,18 @@ exports.getTransactionSummaryByDateAndAccount = asynchandeler(
         },
       },
 
-      // ✅ Calculate balance
+      //  Calculate balance
       {
         $addFields: {
           balance: { $subtract: ["$receivedAmount", "$paymentAmount"] },
         },
       },
 
-      // ✅ Sort by date ascending
+      //  Sort by date ascending
       { $sort: { _id: 1 } },
     ]);
 
-    // ✅ Add serial number + grand totals
+    // Add serial number + grand totals
     let serial = 1;
     let totalReceived = 0;
     let totalPayment = 0;
@@ -1137,15 +1194,15 @@ exports.getTransactionSummaryByDateAndAccount = asynchandeler(
 
     apiResponse.sendSuccess(
       res,
-      200,
+      statusCodes.OK,
       "Transaction summary fetched successfully",
       {
         filters: { startDate, endDate, account: account || "All Accounts" },
         summary,
         report: data,
-      }
+      },
     );
-  }
+  },
 );
 
 // account name wise summary
@@ -1154,7 +1211,7 @@ exports.getAcoountNamewiseTransaction = asynchandeler(async (req, res) => {
 
   const match = {};
 
-  // ✅ Date range filter
+  //  Date range filter
   if (startDate && endDate) {
     match.date = {
       $gte: new Date(startDate),
@@ -1165,7 +1222,7 @@ exports.getAcoountNamewiseTransaction = asynchandeler(async (req, res) => {
   const report = await createTransactionModel.aggregate([
     { $match: match },
 
-    // ✅ Join account info
+    //  Join account info
     {
       $lookup: {
         from: "accounts",
@@ -1176,7 +1233,7 @@ exports.getAcoountNamewiseTransaction = asynchandeler(async (req, res) => {
     },
     { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
 
-    // ✅ Group by account name
+    //  Group by account name
     {
       $group: {
         _id: "$account.name", // Group by account name
@@ -1201,18 +1258,21 @@ exports.getAcoountNamewiseTransaction = asynchandeler(async (req, res) => {
       },
     },
 
-    // ✅ Add balance field
+    //  Add balance field
     {
       $addFields: {
         balance: { $subtract: ["$receivedAmount", "$paymentAmount"] },
       },
     },
 
-    // ✅ Sort by account name ascending
+    //  Sort by account name ascending
     { $sort: { _id: 1 } },
   ]);
+  if (!report.length) {
+    throw new customError("No transactions found", statusCodes.NOT_FOUND);
+  }
 
-  // ✅ Serial number and grand total calculation
+  // Serial number and grand total calculation
   let serial = 1;
   let totalReceived = 0;
   let totalPayment = 0;
@@ -1232,23 +1292,22 @@ exports.getAcoountNamewiseTransaction = asynchandeler(async (req, res) => {
     };
   });
 
-  // ✅ Grand totals
+  //  Grand totals
   const summary = {
     totalReceived,
     totalPayment,
     totalBalance,
   };
-
-  // ✅ Final API response
+  // Final API response
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Account-wise transaction summary fetched successfully",
     {
       filters: { startDate, endDate },
       summary,
       report: data,
-    }
+    },
   );
 });
 
@@ -1299,7 +1358,7 @@ exports.getFundHandoverReport = asynchandeler(async (req, res) => {
     { $sort: { _id: 1 } },
   ]);
 
-  // ✅ Merge all into a single object
+  //  Merge all into a single object
   let serial = 1;
   let grandTotal = 0;
   let details = [];
@@ -1330,9 +1389,9 @@ exports.getFundHandoverReport = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Fund handover report fetched successfully (merged into single object)",
-    finalReport
+    finalReport,
   );
 });
 
@@ -1407,9 +1466,9 @@ exports.getInvoiceReport = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Invoice report fetched successfully",
-    resultArray
+    resultArray,
   );
 });
 
@@ -1477,7 +1536,7 @@ exports.getInvoiceNetWiseProfit = asynchandeler(async (req, res) => {
   const report = await createTransactionModel.aggregate([
     { $match: match },
 
-    // ✅ Join category
+    //  Join category
     {
       $lookup: {
         from: "transitioncategories",
@@ -1493,10 +1552,10 @@ exports.getInvoiceNetWiseProfit = asynchandeler(async (req, res) => {
       },
     },
 
-    // ✅ Sort by latest date before grouping
+    //  Sort by latest date before grouping
     { $sort: { date: -1 } },
 
-    // ✅ Group by category and transaction type
+    //  Group by category and transaction type
     {
       $group: {
         _id: {
@@ -1507,8 +1566,7 @@ exports.getInvoiceNetWiseProfit = asynchandeler(async (req, res) => {
         latestDescription: { $first: "$transactionDescription" },
       },
     },
-
-    // ✅ Pivot payment/receive into same row
+    // Pivot payment/receive into same row
     {
       $group: {
         _id: "$_id.category",
@@ -1526,11 +1584,11 @@ exports.getInvoiceNetWiseProfit = asynchandeler(async (req, res) => {
       },
     },
 
-    // ✅ Sort alphabetically or by name
+    //  Sort alphabetically or by name
     { $sort: { _id: 1 } },
   ]);
 
-  // ✅ Add serial number and grand total
+  //  Add serial number and grand total
   let serial = 1;
   let grandReceived = 0;
   let grandPayment = 0;
@@ -1562,9 +1620,9 @@ exports.getInvoiceNetWiseProfit = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Invoice report fetched successfully",
-    resultArray
+    resultArray,
   );
 });
 
@@ -1596,13 +1654,15 @@ exports.getOrdersByDateAndFollowUp = asynchandeler(async (req, res) => {
     .populate("coupon")
     .populate("deliveryCharge")
     .sort({ createdAt: -1 });
-  console.log(orders);
-  return;
 
-  // ✅ Calculate totals
+  if (!orders.length) {
+    throw new customError("No orders found", statusCodes.NOT_FOUND);
+  }
+
+  //  Calculate totals
   const totalDeliveryCharge = orders.reduce(
     (sum, order) => sum + (order.deliveryCharge?.deliveryCharge || 0),
-    0
+    0,
   );
 
   const totalPrice = orders.reduce(
@@ -1610,10 +1670,10 @@ exports.getOrdersByDateAndFollowUp = asynchandeler(async (req, res) => {
       sum +
       (order.items?.reduce((itemSum, i) => itemSum + (i.totalPrice || 0), 0) ||
         0),
-    0
+    0,
   );
 
-  apiResponse.sendSuccess(res, 200, "Orders fetched successfully", {
+  apiResponse.sendSuccess(res, statusCodes.OK, "Orders fetched successfully", {
     orders,
     totalDeliveryCharge,
     totalPrice,
@@ -1634,6 +1694,9 @@ exports.getZeroSaleVariantsLast30Days = asynchandeler(async (req, res) => {
     .populate("stockVariantAdjust") // include adjustments for virtuals
     .populate("byReturn") // populate byReturn for virtual
     .populate("salesReturn"); // populate salesReturn for virtual
+  if (!variants) {
+    throw new customError("No variants found", statusCodes.NOT_FOUND);
+  }
 
   // Optionally, map to include virtuals if needed
   const data = variants.map((v) => ({
@@ -1653,9 +1716,9 @@ exports.getZeroSaleVariantsLast30Days = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Last 30 days zero sale variants fetched successfully",
-    data
+    data,
   );
 });
 
@@ -1673,6 +1736,9 @@ exports.getZeroSaleProductsLast30Days = asynchandeler(async (req, res) => {
     .populate("stockAdjustment")
     .populate("byReturn")
     .populate("salesReturn");
+  if (!products) {
+    throw new customError("No products found", statusCodes.NOT_FOUND);
+  }
 
   // Map to include virtuals and relevant fields
   const data = products.map((p) => ({
@@ -1693,9 +1759,9 @@ exports.getZeroSaleProductsLast30Days = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Last 30 days zero sale products fetched successfully",
-    data
+    data,
   );
 });
 

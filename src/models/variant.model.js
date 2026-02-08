@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
 const purchaseModel = require("../models/purchase.model");
+const { statusCodes } = require("../constant/constant");
 
 const variantSchema = new mongoose.Schema(
   {
@@ -251,7 +252,7 @@ variantSchema.pre("save", async function (next) {
       return next(
         new customError(
           `Variant with size ${this.size} and color ${this.color} already exists.`,
-          400,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }
@@ -272,7 +273,10 @@ variantSchema.pre("save", async function (next) {
       existVariant._id.toString() !== this._id.toString()
     ) {
       return next(
-        new customError(` ${this.variantName} already exists Try another`, 400),
+        new customError(
+          ` ${this.variantName} already exists Try another`,
+          statusCodes.BAD_REQUEST,
+        ),
       );
     }
     next();

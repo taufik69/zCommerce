@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const siteInformationSchema = new mongoose.Schema(
   {
@@ -106,7 +107,10 @@ siteInformationSchema.pre("save", async function (next) {
     const siteInformationCount = await this.constructor.countDocuments();
     if (siteInformationCount >= 1 && this.isNew) {
       return next(
-        new customError("Only one SiteInformation document is allowed.", 400),
+        new customError(
+          "Only one SiteInformation document is allowed.",
+          statusCodes.BAD_REQUEST,
+        ),
       );
     }
     next();
@@ -127,7 +131,10 @@ siteInformationSchema.pre("save", async function (next) {
       existSiteInformation._id.toString() !== this._id.toString()
     ) {
       next(
-        new customError(`${this.storeName} already exists Try another`, 400),
+        new customError(
+          `${this.storeName} already exists Try another`,
+          statusCodes.BAD_REQUEST,
+        ),
       );
     }
     next();

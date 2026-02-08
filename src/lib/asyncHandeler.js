@@ -3,7 +3,7 @@ exports.asynchandeler = (func) => {
     try {
       await func(req, res, next);
     } catch (error) {
-      console.log("from async handeler", error);
+      console.log(" error from asynchandeler", error);
       next(error);
     }
   };

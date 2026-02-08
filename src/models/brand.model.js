@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const brandSchema = new mongoose.Schema(
   {
@@ -44,13 +45,10 @@ brandSchema.pre("save", async function (next) {
   try {
     const existingBrand = await this.constructor.findOne({ slug: this.slug });
     if (existingBrand && existingBrand._id.toString() !== this._id.toString()) {
-      console.log(
-        `Brand with slug ${this.slug} or ${this.name} already exists`,
-      );
       return next(
         new customError(
           `Category with slug ${this.slug} or ${this.name} already exists`,
-          400,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }

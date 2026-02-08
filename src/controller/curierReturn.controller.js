@@ -4,29 +4,30 @@ const variantModel = require("../models/variant.model");
 const orderModel = require("../models/order.model");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
+const { statusCodes } = require("../constant/constant");
 
 //  Create Courier Return (Promise.all optimized)
 exports.createCourierReturn = asynchandeler(async (req, res) => {
   const { orderId } = req.body;
 
   if (!orderId) {
-    throw new customError("Order ID is required", 400);
+    throw new customError("Order ID is required", statusCodes.BAD_REQUEST);
   }
 
-  // ✅ Find order with items & courier info
+  //  Find order with items & courier info
   const order = await orderModel.findById(orderId).select("items courier");
 
   if (!order) {
-    throw new customError("Order not found", 404);
+    throw new customError("Order not found", statusCodes.NOT_FOUND);
   }
 
   const { items, courier, _id } = order;
 
-  // ✅ Map each item to a Promise (parallel updates)
+  // Map each item to a Promise (parallel updates)
   const updatePromises = items.map((item) => {
     const { product, variant, quantity, orderType } = item;
 
-    // 🟩 If single variant product
+    //  If single variant product
     if (orderType === "singlevariant" && product) {
       return productModel.findByIdAndUpdate(
         product,
@@ -42,7 +43,7 @@ exports.createCourierReturn = asynchandeler(async (req, res) => {
             },
           },
         },
-        { new: true }
+        { new: true },
       );
     }
 
@@ -62,7 +63,7 @@ exports.createCourierReturn = asynchandeler(async (req, res) => {
             },
           },
         },
-        { new: true }
+        { new: true },
       );
     }
 
@@ -75,9 +76,9 @@ exports.createCourierReturn = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Courier return processed successfully — stock updated.",
-    results.filter(Boolean)
+    results.filter(Boolean),
   );
 });
 
@@ -96,15 +97,19 @@ exports.getAllCourierReturns = asynchandeler(async (req, res) => {
       courierReturn: { $exists: true, $ne: null },
     })
     .populate("courierReturn.variant");
-  console.log(courierReturns);
+
+  //  If no returns found
+  if (!courierReturns.length && !variantReturns.length) {
+    throw new customError("No courier returns found", statusCodes.NOT_FOUND);
+  }
 
   //  Merge both arrays
   const allReturns = [...courierReturns, ...variantReturns];
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Fetched all courier returns successfully.",
-    allReturns
+    allReturns,
   );
 });

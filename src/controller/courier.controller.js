@@ -10,24 +10,43 @@ exports.createPathaoOrder = asynchandeler(async (req, res) => {
   const { merchantId, orderId } = req.body;
 
   const merchant = await Merchant.findById(merchantId);
-  if (!merchant) throw new customError("Merchant not found", 404);
+  if (!merchant)
+    throw new customError("Merchant not found", statusCodes.NOT_FOUND);
 
   const courier = new PathaoCourier(merchant);
   const order = await courier.createOrder(orderId);
-  if (!order) throw new customError("Failed to create Pathao order", 500);
-  apiResponse.sendSuccess(res, 201, "Pathao order created", order);
+  if (!order)
+    throw new customError(
+      "Failed to create Pathao order",
+      statusCodes.SERVER_ERROR,
+    );
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    "Pathao order created",
+    order,
+  );
 });
 
 exports.bulkPathaoOrder = asynchandeler(async (req, res) => {
   const { orderIds, merchantId } = req.body;
   const merchant = await Merchant.findById(merchantId);
-  if (!merchant) throw new customError("Merchant not found", 404);
+  if (!merchant)
+    throw new customError("Merchant not found", statusCodes.NOT_FOUND);
   const courier = new PathaoCourier(merchant);
   const orders = await courier.bulkOrderByIds(orderIds);
 
   if (!orders)
-    throw new customError("Failed to create Pathao bulk orders", 500);
-  apiResponse.sendSuccess(res, 201, "Pathao bulk orders created", orders);
+    throw new customError(
+      "Failed to create Pathao bulk orders",
+      statusCodes.SERVER_ERROR,
+    );
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    "Pathao bulk orders created",
+    orders,
+  );
 });
 
 // get short info of a Pathao order by internal order ID
@@ -82,6 +101,7 @@ exports.getPathaoAreasByZone = asynchandeler(async (req, res) => {
 
 // Steadfast Courier Integration
 const SteadFastCourier = require("../service/couriers/steadFast/SteadFastCourier");
+const { statusCodes } = require("../constant/constant");
 // Create single order
 exports.createSteadFastOrder = asynchandeler(async (req, res) => {
   const { merchantId, orderId } = req.body;

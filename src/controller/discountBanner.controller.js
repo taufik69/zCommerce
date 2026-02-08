@@ -7,10 +7,11 @@ const {
 } = require("../helpers/cloudinary");
 const discountBanner = require("../models/discountbanner.model");
 const { validateBanner } = require("../validation/banner.Validation");
+const { statusCodes } = require("../constant/constant");
 
 // create banner
-exports.createDiscountBanner = asynchandeler(async (req, res) => {
-  const validatedData = await validateBanner(req);
+exports.createDiscountBanner = asynchandeler(async (req, res, next) => {
+  const validatedData = await validateBanner(req, res, next);
 
   //  Create banner in DB immediately (without waiting for image)
   const banner = await discountBanner.create({
@@ -18,11 +19,14 @@ exports.createDiscountBanner = asynchandeler(async (req, res) => {
     image: null,
   });
 
+  if (!banner) {
+    throw new customError("Banner not created", statusCodes.SERVER_ERROR);
+  }
   //  Send early response to client
   apiResponse.sendSuccess(
     res,
-    202,
-    "Banner information saved. Image uploading..."
+    statusCodes.CREATED,
+    "Banner information saved. Image uploading...",
   );
 
   //  Background image upload and DB update
@@ -30,7 +34,7 @@ exports.createDiscountBanner = asynchandeler(async (req, res) => {
     try {
       if (req.file) {
         const imageUpload = await cloudinaryFileUpload(
-          validatedData?.image?.path
+          validatedData?.image?.path,
         );
 
         //  Update banner with uploaded image URL
@@ -39,7 +43,7 @@ exports.createDiscountBanner = asynchandeler(async (req, res) => {
         });
 
         console.log(
-          `✅ Banner image uploaded and updated for ID: ${banner._id}`
+          `✅ Banner image uploaded and updated for ID: ${banner._id}`,
         );
       } else {
         console.log(`ℹ️ No image file found for banner ID: ${banner._id}`);
@@ -47,7 +51,7 @@ exports.createDiscountBanner = asynchandeler(async (req, res) => {
     } catch (error) {
       console.error(
         `❌ Image upload failed for banner ID: ${banner._id}:`,
-        error.message
+        error.message,
       );
     }
   })();
@@ -57,23 +61,27 @@ exports.getAllDiscountBanner = asynchandeler(async (req, res) => {
   // Optional query params: isActive, priority sorting, limit, etc.
   const { isActive, limit, sort } = req.query;
 
-  // ✅ Build filter dynamically
+  // Build filter dynamically
   const filter = {};
   if (isActive !== undefined) {
     filter.isActive = isActive === "true";
   }
-
-  // ✅ Fetch banners
+  // Fetch banners
   const banners = await discountBanner
     .find(filter)
     .sort(sort ? { priority: sort === "asc" ? 1 : -1 } : { createdAt: -1 })
     .limit(limit ? parseInt(limit) : 0);
 
   if (!banners || banners.length === 0) {
-    throw new customError("No banners found", 404);
+    throw new customError("No banners found", statusCodes.NOT_FOUND);
   }
 
-  apiResponse.sendSuccess(res, 200, "Banners fetched successfully", banners);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Banners fetched successfully",
+    banners,
+  );
 });
 
 // Get single banner by slug
@@ -83,41 +91,46 @@ exports.getSingleDiscountBanner = asynchandeler(async (req, res) => {
   const banner = await discountBanner.findOne({ slug, isActive: true });
 
   if (!banner) {
-    throw new customError("Banner not found", 404);
+    throw new customError("Banner not found", statusCodes.NOT_FOUND);
   }
 
-  apiResponse.sendSuccess(res, 200, "Banner fetched successfully", banner);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Banner fetched successfully",
+    banner,
+  );
 });
 
 // ===============================
 // Update Banner Controller
 // ===============================
-exports.updateDiscountBanner = asynchandeler(async (req, res) => {
+exports.updateDiscountBanner = asynchandeler(async (req, res, next) => {
   const { slug } = req.params;
 
-  // ✅ Step 1: Find existing banner
+  //  Step 1: Find existing banner
   const banner = await discountBanner.findOne({ slug, isActive: true });
   if (!banner) {
-    throw new customError("Banner not found", 404);
+    throw new customError("Banner not found", statusCodes.NOT_FOUND);
   }
 
-  // ✅ Step 2: Validate banner input (only basic fields)
-  const validatedData = await validateBanner(req);
+  //  Step 2: Validate banner input (only basic fields)
+  const validatedData = await validateBanner(req, res, next);
 
-  // ✅ Step 3: Send immediate success response
+  //  Step 3: Send immediate success response
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Banner update request accepted. Processing in background...",
-    { slug }
+    { slug },
   );
 
-  // ✅ Step 4: Background update logic (non-blocking)
+  // Step 4: Background update logic (non-blocking)
   (async () => {
     try {
       let newImageUrl = banner.image;
 
-      // ✅ If a new image is uploaded
+      //  If a new image is uploaded
       if (req.file) {
         // --- Delete old image from Cloudinary ---
         if (banner.image) {
@@ -130,7 +143,7 @@ exports.updateDiscountBanner = asynchandeler(async (req, res) => {
             }
           } catch (err) {
             console.warn(
-              `⚠️ Failed to delete old image for banner ${banner._id}: ${err.message}`
+              `⚠️ Failed to delete old image for banner ${banner._id}: ${err.message}`,
             );
           }
         }
@@ -138,12 +151,15 @@ exports.updateDiscountBanner = asynchandeler(async (req, res) => {
         // --- Upload new image ---
         const uploadResult = await cloudinaryFileUpload(req.file.path);
         if (!uploadResult) {
-          throw new customError("New image upload failed", 500);
+          throw new customError(
+            "New image upload failed",
+            statusCodes.SERVER_ERROR,
+          );
         }
         newImageUrl = uploadResult.optimizeUrl;
       }
 
-      // ✅ Update banner fields
+      //  Update banner fields
       banner.headLine = validatedData.headLine || banner.headLine;
       banner.details = validatedData.details || banner.details;
       banner.image = newImageUrl;
@@ -162,26 +178,25 @@ exports.updateDiscountBanner = asynchandeler(async (req, res) => {
 // ===============================
 exports.deleteDiscountBanner = asynchandeler(async (req, res) => {
   const { slug } = req.params;
-
-  // ✅ Step 1: Find banner by slug
+  //  Step 1: Find banner by slug
   const banner = await discountBanner.findOne({ slug, isActive: true });
   if (!banner) {
-    throw new customError("discount Banner not found", 404);
+    throw new customError("discount Banner not found", statusCodes.NOT_FOUND);
   }
 
-  // ✅ Step 2: Immediately mark banner inactive (soft delete)
+  //  Step 2: Immediately mark banner inactive (soft delete)
   banner.isActive = false;
   await banner.save();
 
-  // ✅ Step 3: Send immediate success response
+  //  Step 3: Send immediate success response
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Banner delete request accepted. Processing in background...",
-    { slug }
+    { slug },
   );
 
-  // ✅ Step 4: Background cleanup (non-blocking)
+  // Step 4: Background cleanup (non-blocking)
   (async () => {
     try {
       // --- Delete image from Cloudinary ---
@@ -192,12 +207,12 @@ exports.deleteDiscountBanner = asynchandeler(async (req, res) => {
           if (publicId) {
             await deleteCloudinaryFile(publicId.split("?")[0]);
             console.log(
-              `🗑️ Cloudinary image deleted for banner: ${banner._id}`
+              `🗑️ Cloudinary image deleted for banner: ${banner._id}`,
             );
           }
         } catch (err) {
           console.warn(
-            `⚠️ Failed to delete Cloudinary image for banner ${banner._id}: ${err.message}`
+            `⚠️ Failed to delete Cloudinary image for banner ${banner._id}: ${err.message}`,
           );
         }
       }
@@ -207,7 +222,7 @@ exports.deleteDiscountBanner = asynchandeler(async (req, res) => {
       console.log(`✅ discount Banner permanently deleted: ${banner._id}`);
     } catch (error) {
       console.error(
-        `❌ Background discount Banner delete failed: ${error.message}`
+        `❌ Background discount Banner delete failed: ${error.message}`,
       );
     }
   })();

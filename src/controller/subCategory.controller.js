@@ -6,37 +6,41 @@ const { asynchandeler } = require("../lib/asyncHandeler");
 const {
   validateSubCategory,
 } = require("../validation/subCatgegory.validation");
+const { statusCodes } = require("../constant/constant");
 
 // @desc    Create a new subcategory
 exports.createSubCategory = asynchandeler(async (req, res) => {
   const { name, category } = req.body;
 
-  // ✅ Validation
+  //  Validation
   if (!name || !category) {
-    throw new customError("Subcategory name and category are required", 400);
+    throw new customError(
+      "Subcategory name and category are required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
-  // ✅ Check category exists
+  // Check category exists
   const parentCategory = await Category.findById(category);
   if (!parentCategory) {
-    throw new customError("Parent category not found", 404);
+    throw new customError("Parent category not found", statusCodes.NOT_FOUND);
   }
 
-  // ✅ Create subcategory
+  // Create subcategory
   const subcategory = await Subcategory.create({
     name,
     category,
   });
 
-  // ✅ Push subcategory reference to parent category
+  // Push subcategory reference to parent category
   parentCategory.subcategories.push(subcategory._id);
   await parentCategory.save();
 
   return apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.CREATED,
     "Subcategory created successfully",
-    subcategory
+    subcategory,
   );
 });
 
@@ -51,9 +55,14 @@ exports.getAllSubCategory = asynchandeler(async (req, res) => {
     .populate("discount")
     .sort({ createdAt: -1 });
   if (!subCategories) {
-    throw new customError("Subcategories not found", 404);
+    throw new customError("Subcategories not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(res, 200, "Subcategories found", subCategories);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Subcategories found",
+    subCategories,
+  );
 });
 
 // @desc    Get a subcategory by slug
@@ -65,9 +74,14 @@ exports.getSubCategoryBySlug = asynchandeler(async (req, res) => {
     isActive: 1,
   });
   if (!subCategory) {
-    throw new customError("Subcategory not found", 404);
+    throw new customError("Subcategory not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(res, 200, "Subcategory found", subCategory);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Subcategory found",
+    subCategory,
+  );
 });
 
 // @desc    Update a subcategory by slug
@@ -77,7 +91,7 @@ exports.updateSubCategory = asynchandeler(async (req, res) => {
   // Find the subcategory by slug
   const subCategory = await Subcategory.findOne({ slug });
   if (!subCategory) {
-    throw new customError("Subcategory not found", 404);
+    throw new customError("Subcategory not found", statusCodes.NOT_FOUND);
   }
 
   const oldCategoryId = subCategory.category.toString();
@@ -103,7 +117,12 @@ exports.updateSubCategory = asynchandeler(async (req, res) => {
   await subCategory.save();
 
   // Send success response
-  apiResponse.sendSuccess(res, 200, "Subcategory updated", subCategory);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Subcategory updated",
+    subCategory,
+  );
 });
 
 // @desc    Delete a subcategory by slug
@@ -113,7 +132,7 @@ exports.deleteSubCategory = asynchandeler(async (req, res) => {
   // Find the subcategory by slug
   const subCategory = await Subcategory.findOne({ slug });
   if (!subCategory) {
-    throw new customError("Subcategory not found", 404);
+    throw new customError("Subcategory not found", statusCodes.NOT_FOUND);
   }
 
   // Delete the subcategory
@@ -125,26 +144,36 @@ exports.deleteSubCategory = asynchandeler(async (req, res) => {
   });
 
   // Send success response
-  apiResponse.sendSuccess(res, 200, "Subcategory deleted", subCategory);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Subcategory deleted",
+    subCategory,
+  );
 });
 
 // @desc    Activate a subcategory by slug
 exports.activateSubCategory = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const subCategory = await Subcategory.findOne({
-    slug: "kabli-panjabi",
+    slug: slug,
   });
 
   if (!subCategory) {
-    throw new customError("Subcategory not found", 404);
+    throw new customError("Subcategory not found", statusCodes.NOT_FOUND);
   }
   // now activate the subcategory in the database
   subCategory.isActive = true;
   await subCategory.save();
   // send success response
-  apiResponse.sendSuccess(res, 200, "Subcategory activated successfully", {
-    subCategory,
-  });
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Subcategory activated successfully",
+    {
+      subCategory,
+    },
+  );
 });
 
 // @desc    Deactivate a subcategory by slug
@@ -152,46 +181,57 @@ exports.deactivateSubCategory = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const subCategory = await Subcategory.findOne({ slug });
   if (!subCategory) {
-    throw new customError("Subcategory not found", 404);
+    throw new customError("Subcategory not found", statusCodes.NOT_FOUND);
   }
   // now deactivate the subcategory in the database
   subCategory.isActive = false;
   await subCategory.save();
   // send success response
-  apiResponse.sendSuccess(res, 200, "Subcategory deactivated successfully", {
-    subCategory,
-  });
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Subcategory deactivated successfully",
+    {
+      subCategory,
+    },
+  );
 });
 
 // @desc    Get all inactive subcategories
 exports.getInactiveSubCategories = asynchandeler(async (req, res) => {
   const subCategories = await Subcategory.find({ isActive: false }).populate(
     "category",
-    { name: 1, slug: 1, isActive: 1 }
+    { name: 1, slug: 1, isActive: 1 },
   );
   if (!subCategories) {
-    throw new customError("Inactive subcategories not found", 404);
+    throw new customError(
+      "Inactive subcategories not found",
+      statusCodes.NOT_FOUND,
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Inactive subcategories found",
-    subCategories
+    subCategories,
   );
 });
 // @desc    Get all active subcategories
 exports.getActiveSubCategories = asynchandeler(async (req, res) => {
   const subCategories = await Subcategory.find({ isActive: true }).populate(
     "category",
-    { name: 1, slug: 1, isActive: 1 }
+    { name: 1, slug: 1, isActive: 1 },
   );
   if (!subCategories) {
-    throw new customError("Active subcategories not found", 404);
+    throw new customError(
+      "Active subcategories not found",
+      statusCodes.NOT_FOUND,
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Active subcategories found",
-    subCategories
+    subCategories,
   );
 });

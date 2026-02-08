@@ -1,5 +1,6 @@
 const joi = require("joi");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const byReturnSchema = joi
   .object(
@@ -42,7 +43,7 @@ const byReturnSchema = joi
     {
       allowUnknown: true,
       abortEarly: false,
-    }
+    },
   )
   .unknown(true);
 
@@ -53,11 +54,11 @@ exports.validateByReturn = async (req) => {
   } catch (error) {
     if (error.details) {
       console.log(
-        "Validation error: " + error.details.map((err) => err.message)
+        "Validation error: " + error.details.map((err) => err.message),
       );
       throw new customError(
         "Validation error: " + error.details.map((err) => err.message),
-        400
+        statusCodes.BAD_REQUEST,
       );
     }
     throw error;

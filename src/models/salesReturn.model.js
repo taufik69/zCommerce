@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const salesReturnSchema = new mongoose.Schema(
   {
@@ -65,7 +66,7 @@ salesReturnSchema.pre("save", async function (next) {
       return next(
         new customError(
           `SalesReturn with slug ${this.slug} or productBarCode ${this.productBarCode} already exists`,
-          400,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }

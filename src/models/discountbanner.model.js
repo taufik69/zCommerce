@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const discountBannerSchema = new mongoose.Schema(
   {
@@ -66,7 +67,7 @@ discountBannerSchema.pre("save", async function (next) {
       return next(
         new customError(
           `Banner with slug "${this.slug}" or title "${this.title}" already exists`,
-          400,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }

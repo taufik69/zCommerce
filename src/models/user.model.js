@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const userSchema = new mongoose.Schema(
   {
@@ -102,14 +103,20 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 userSchema.methods.generateJwtRefreshToken = function () {
   try {
     if (!process.env.REFRESH_TOKEN_SECRET) {
-      throw new customError("Refresh token secret is not defined", 500);
+      throw new customError(
+        "Refresh token secret is not defined",
+        statusCodes.SERVER_ERROR,
+      );
     }
 
     return jwt.sign({ id: this._id }, process.env.REFRESH_TOKEN_SECRET, {
       expiresIn: process.env.REFRESH_TOKEN_EXPIRY || "7d",
     });
   } catch (error) {
-    throw new customError("Failed to generate refresh token", 500);
+    throw new customError(
+      "Failed to generate refresh token",
+      statusCodes.SERVER_ERROR,
+    );
   }
 };
 
@@ -117,7 +124,10 @@ userSchema.methods.generateJwtRefreshToken = function () {
 userSchema.methods.generateJwtAccessToken = function () {
   try {
     if (!process.env.ACCESS_TOKEN_SECRET) {
-      throw new customError("Access token secret is not defined", 500);
+      throw new customError(
+        "Access token secret is not defined",
+        statusCodes.SERVER_ERROR,
+      );
     }
 
     return jwt.sign(
@@ -133,7 +143,10 @@ userSchema.methods.generateJwtAccessToken = function () {
       },
     );
   } catch (error) {
-    throw new customError("Failed to generate access token", 500);
+    throw new customError(
+      "Failed to generate access token",
+      statusCodes.SERVER_ERROR,
+    );
   }
 };
 
@@ -143,9 +156,9 @@ userSchema.methods.verifyJwtRefreshToken = function (token) {
     return jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
   } catch (error) {
     if (error.name === "TokenExpiredError") {
-      throw new customError("Refresh token expired", 401);
+      throw new customError("Refresh token expired", statusCodes.UNAUTHORIZED);
     }
-    throw new customError("Invalid refresh token", 401);
+    throw new customError("Invalid refresh token", statusCodes.UNAUTHORIZED);
   }
 };
 

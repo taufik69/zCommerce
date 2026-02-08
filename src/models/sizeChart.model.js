@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const sizeChartSchema = new mongoose.Schema(
   {
@@ -25,7 +26,7 @@ sizeChartSchema.pre("save", async function (next) {
       return next(
         new customError(
           `SizeChart with slug ${this.slug} or name ${this.name} already exists`,
-          400,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }

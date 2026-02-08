@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const { customError } = require("../lib/CustomError");
 const Counter = require("./counter.model");
 const { apiResponse } = require("../utils/apiResponse");
+const { statusCodes } = require("../constant/constant");
 const employeeSchema = new mongoose.Schema(
   {
     employeeId: {
@@ -114,7 +115,12 @@ employeeSchema.pre("save", async function (next) {
       });
 
       if (existing) {
-        return next(new customError("Employee ID already exists", 400));
+        return next(
+          new customError(
+            "Employee ID already exists",
+            statusCodes.BAD_REQUEST,
+          ),
+        );
       }
     }
 

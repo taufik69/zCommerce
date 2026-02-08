@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const transitionCategorySchema = new mongoose.Schema(
   {
@@ -45,7 +46,10 @@ transitionCategorySchema.pre("save", async function (next) {
       existingTransitionCategory._id.toString() !== this._id.toString()
     ) {
       return next(
-        new customError(`${this.name} already exists Try another`, 400),
+        new customError(
+          `${this.name} already exists Try another`,
+          statusCodes.BAD_REQUEST,
+        ),
       );
     }
     next();

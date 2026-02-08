@@ -4,6 +4,7 @@ const Variant = require("../models/variant.model");
 const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
+const { statusCodes } = require("../constant/constant");
 
 exports.createPurchase = asynchandeler(async (req, res) => {
   const {
@@ -21,7 +22,10 @@ exports.createPurchase = asynchandeler(async (req, res) => {
 
   // Validate request
   if (!allproduct || !Array.isArray(allproduct) || allproduct.length === 0) {
-    throw new customError("At least one product or variant is required", 400);
+    throw new customError(
+      "At least one product or variant is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   // Calculate totals
@@ -122,9 +126,18 @@ exports.createPurchase = asynchandeler(async (req, res) => {
     ...req.body,
   });
 
-  if (!purchase) throw new customError("Failed to create purchase", 500);
+  if (!purchase)
+    throw new customError(
+      "Failed to create purchase",
+      statusCodes.SERVER_ERROR,
+    );
 
-  apiResponse.sendSuccess(res, 201, "Purchase created successfully", purchase);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    "Purchase created successfully",
+    purchase,
+  );
 });
 
 // get all purchases
@@ -139,6 +152,9 @@ exports.getAllPurchases = asynchandeler(async (req, res) => {
     .populate("category subCategory brand")
     .sort({ createdAt: -1 });
 
+  if (!purchases || purchases.length === 0) {
+    throw new customError("Purchases not found", statusCodes.NOT_FOUND);
+  }
   // serial যোগ করা হলো
   const purchasesWithSerial = purchases.map((p, index) => {
     const serialNumber = (index + 1).toString().padStart(6, "0");
@@ -150,7 +166,7 @@ exports.getAllPurchases = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Purchases fetched successfully",
     purchasesWithSerial,
   );
@@ -160,7 +176,7 @@ exports.getAllPurchases = asynchandeler(async (req, res) => {
 exports.getSinglePurchase = asynchandeler(async (req, res) => {
   const { id } = req.params;
   if (!id) {
-    throw new customError("ID is required", 400);
+    throw new customError("ID is required", statusCodes.BAD_REQUEST);
   }
   const purchase = await Purchase.findById(id)
     .populate({
@@ -171,9 +187,14 @@ exports.getSinglePurchase = asynchandeler(async (req, res) => {
     })
     .populate("category subCategory brand");
   if (!purchase) {
-    throw new customError("Purchase not found", 404);
+    throw new customError("Purchase not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(res, 200, "Purchase fetched successfully", purchase);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Purchase fetched successfully",
+    purchase,
+  );
 });
 
 // update purchase
@@ -195,7 +216,7 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
   // Find existing purchase
   const existingPurchase = await Purchase.findById(id);
   if (!existingPurchase) {
-    throw new customError("Purchase not found", 404);
+    throw new customError("Purchase not found", statusCodes.NOT_FOUND);
   }
 
   /** -----------------------------------
@@ -322,7 +343,7 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
 
   return apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Purchase updated successfully",
     existingPurchase,
   );
@@ -335,7 +356,7 @@ exports.deletePurchase = asynchandeler(async (req, res) => {
   // Find purchase
   const purchase = await Purchase.findById(id);
   if (!purchase) {
-    throw new customError("Purchase not found", 404);
+    throw new customError("Purchase not found", statusCodes.NOT_FOUND);
   }
 
   /** -----------------------------------
@@ -368,7 +389,7 @@ exports.deletePurchase = asynchandeler(async (req, res) => {
 
   return apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Purchase deleted successfully",
     null,
   );

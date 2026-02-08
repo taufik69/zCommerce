@@ -2,6 +2,7 @@ const Permission = require("../models/permisson.model");
 const { apiResponse } = require("../utils/apiResponse");
 const { customError } = require("../lib/CustomError");
 const validatePermission = require("../validation/permission.validation");
+const { statusCodes } = require("../constant/constant");
 
 // Create a new permission
 exports.createPermission = async (req, res) => {
@@ -12,20 +13,22 @@ exports.createPermission = async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.CREATED,
     "Permission created successfully",
-    permission
+    permission,
   );
 };
 
 // Get all permissions
 exports.getAllPermissions = async (req, res) => {
   const permissions = await Permission.find().sort({ createdAt: 1 });
+  if (!permissions || permissions.length === 0)
+    throw new customError("Permissions not found", statusCodes.NOT_FOUND);
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Permissions fetched successfully",
-    permissions
+    permissions,
   );
 };
 
@@ -33,12 +36,13 @@ exports.getAllPermissions = async (req, res) => {
 exports.getPermissionBySlug = async (req, res) => {
   const { slug } = req.params;
   const permission = await Permission.findOne({ slug: slug });
-  if (!permission) throw new customError("Permission not found", 404);
+  if (!permission)
+    throw new customError("Permission not found", statusCodes.NOT_FOUND);
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Permission fetched successfully",
-    permission
+    permission,
   );
 };
 
@@ -49,14 +53,15 @@ exports.updatePermission = async (req, res) => {
   const permission = await Permission.findOneAndUpdate(
     { slug: slug },
     { ...req.body },
-    { new: true }
+    { new: true },
   );
-  if (!permission) throw new customError("Permission not found", 404);
+  if (!permission)
+    throw new customError("Permission not found", statusCodes.NOT_FOUND);
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Permission updated successfully",
-    permission
+    permission,
   );
 };
 
@@ -66,14 +71,15 @@ exports.deactivatePermission = async (req, res) => {
   const permission = await Permission.findOneAndUpdate(
     { slug: slug },
     { isActive: false },
-    { new: true }
+    { new: true },
   );
-  if (!permission) throw new customError("Permission not found", 404);
+  if (!permission)
+    throw new customError("Permission not found", statusCodes.NOT_FOUND);
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Permission deactivated  successfully",
-    permission
+    permission,
   );
 };
 
@@ -83,14 +89,15 @@ exports.activePermission = async (req, res) => {
   const permission = await Permission.findOneAndUpdate(
     { slug: slug },
     { isActive: true },
-    { new: true }
+    { new: true },
   );
-  if (!permission) throw new customError("Permission not found", 404);
+  if (!permission)
+    throw new customError("Permission not found", statusCodes.NOT_FOUND);
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Permission activated  successfully",
-    permission
+    permission,
   );
 };
 
@@ -98,11 +105,12 @@ exports.activePermission = async (req, res) => {
 exports.deletePermission = async (req, res) => {
   const { slug } = req.params;
   const permission = await Permission.findOneAndDelete({ slug: slug });
-  if (!permission) throw new customError("Permission not found", 404);
+  if (!permission)
+    throw new customError("Permission not found", statusCodes.NOT_FOUND);
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Permission deleted successfully",
-    permission
+    permission,
   );
 };

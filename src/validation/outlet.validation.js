@@ -1,5 +1,6 @@
 const Joi = require("joi");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const outletInformationSchema = Joi.object({
   locationName: Joi.string().trim().required().messages({
@@ -28,7 +29,7 @@ const outletInformationSchema = Joi.object({
   isActive: Joi.boolean().optional(),
 });
 
-exports.validateOutletInformation = async (req) => {
+exports.validateOutletInformation = async (req, res, next) => {
   try {
     // Validate request body
     const value = await outletInformationSchema.validateAsync(req.body, {
@@ -38,14 +39,21 @@ exports.validateOutletInformation = async (req) => {
     // 🔹 Validate image (optional, single)
     if (req.file) {
       if (req.file.fieldname !== "image") {
-        throw new customError(
-          "Please provide a valid image field name (image)",
-          400
+        return next(
+          new customError(
+            "Please provide a valid image field name (image)",
+            statusCodes.BAD_REQUEST,
+          ),
         );
       }
 
       if (req.file.size > 15 * 1024 * 1024) {
-        throw new customError("Image size should be less than 15MB", 400);
+        return next(
+          new customError(
+            "Image size should be less than 15MB",
+            statusCodes.BAD_REQUEST,
+          ),
+        );
       }
     }
 
@@ -53,8 +61,16 @@ exports.validateOutletInformation = async (req) => {
   } catch (error) {
     if (error.details) {
       const message = error.details.map((err) => err.message).join(", ");
-      throw new customError("Validation error: " + message, 400);
+      next(new customError(message, statusCodes.BAD_REQUEST));
+      throw new customError(
+        "Validation error: " + message,
+        statusCodes.BAD_REQUEST,
+      );
     }
-    throw new customError(error.message || "Validation failed", 400);
+    next(new customError(message, statusCodes.BAD_REQUEST));
+    throw new customError(
+      error.message || "Validation failed",
+      statusCodes.BAD_REQUEST,
+    );
   }
 };

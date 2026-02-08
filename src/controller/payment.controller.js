@@ -3,16 +3,17 @@ const { asynchandeler } = require("../lib/asyncHandeler");
 const { apiResponse } = require("../utils/apiResponse");
 const SSLCommerzPayment = require("sslcommerz-lts");
 const Order = require("../models/order.model");
+const { statusCodes } = require("../constant/constant");
 // @desc success payment
 exports.successPayment = asynchandeler(async (req, res) => {
-  apiResponse.sendSuccess(res, 200, "Payment successful", req.body);
+  apiResponse.sendSuccess(res, statusCodes.OK, "Payment successful", req.body);
 });
 
 // @desc fail payment
 exports.failPayment = asynchandeler(async (req, res) => {
   const { tran_id } = req.body;
   if (!tran_id) {
-    throw new customError("Transaction ID missing", 400);
+    throw new customError("Transaction ID missing", statusCodes.BAD_REQUEST);
   }
 
   // Update order payment status
@@ -23,17 +24,21 @@ exports.failPayment = asynchandeler(async (req, res) => {
       orderStatus: "failed",
       paymentGatewayData: req.body,
     },
-    { new: true }
+    { new: true },
   );
 
   if (!updatedOrder) {
-    throw new customError("Order not found for this transaction", 404);
+    throw new customError(
+      "Order not found for this transaction",
+      statusCodes.NOT_FOUND,
+    );
   }
 
   apiResponse.sendSuccess(
     res,
+    statusCodes.OK,
     updatedOrder,
-    "Payment failed. Order status updated."
+    "Payment failed. Order status updated.",
   );
 });
 
@@ -41,7 +46,7 @@ exports.failPayment = asynchandeler(async (req, res) => {
 exports.cancelPayment = asynchandeler(async (req, res) => {
   const { tran_id } = req.body;
   if (!tran_id) {
-    throw new customError("Transaction ID missing", 400);
+    throw new customError("Transaction ID missing", statusCodes.BAD_REQUEST);
   }
 
   // Update order payment status
@@ -52,17 +57,21 @@ exports.cancelPayment = asynchandeler(async (req, res) => {
       orderStatus: "cancelled",
       paymentGatewayData: req.body,
     },
-    { new: true }
+    { new: true },
   );
 
   if (!updatedOrder) {
-    throw new customError("Order not found for this transaction", 404);
+    throw new customError(
+      "Order not found for this transaction",
+      statusCodes.NOT_FOUND,
+    );
   }
 
   apiResponse.sendSuccess(
     res,
+    statusCodes.OK,
     updatedOrder,
-    "Payment cancelled. Order status updated."
+    "Payment cancelled. Order status updated.",
   );
 });
 
@@ -70,14 +79,14 @@ exports.cancelPayment = asynchandeler(async (req, res) => {
 exports.ipnPayment = asynchandeler(async (req, res) => {
   const { val_id } = req.body;
   if (!val_id) {
-    throw new customError("Validation ID missing", 400);
+    throw new customError("Validation ID missing", statusCodes.BAD_REQUEST);
   }
 
   // Init SSLCommerz
   const sslcz = new SSLCommerzPayment(
     process.env.SSLC_STORE_ID,
     process.env.SSLC_STORE_PASSWORD,
-    process.env.NODE_ENV === "production" ? true : false
+    process.env.NODE_ENV === "production" ? true : false,
   );
 
   // Validate payment
@@ -98,19 +107,23 @@ exports.ipnPayment = asynchandeler(async (req, res) => {
         paymentGatewayData: validationResponse,
         orderStatus: "confirmed",
       },
-      { new: true }
+      { new: true },
     );
 
     if (!updatedOrder) {
-      throw new customError("Order not found for this transaction", 404);
+      throw new customError(
+        "Order not found for this transaction",
+        statusCodes.NOT_FOUND,
+      );
     }
 
     apiResponse.sendSuccess(
       res,
+      statusCodes.OK,
       updatedOrder,
-      "Payment validated and order confirmed"
+      "Payment validated and order confirmed",
     );
   } else {
-    throw new customError("Payment validation failed", 400);
+    throw new customError("Payment validation failed", statusCodes.BAD_REQUEST);
   }
 });

@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const permissionSchema = new mongoose.Schema(
   {
@@ -40,7 +41,12 @@ permissionSchema.pre("save", async function (next) {
       existingPermission &&
       existingPermission._id.toString() !== this._id.toString()
     ) {
-      return next(new customError("Permission name already exists", 400));
+      return next(
+        new customError(
+          "Permission name already exists",
+          statusCodes.BAD_REQUEST,
+        ),
+      );
     }
     next();
   } catch (error) {

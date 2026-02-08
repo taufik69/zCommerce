@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const outletInformationSchema = new mongoose.Schema(
   {
@@ -81,7 +82,7 @@ outletInformationSchema.pre("save", async function (next) {
       return next(
         new customError(
           `Outlet with slug "${this.slug}" or location name "${this.locationName}" already exists`,
-          400,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }

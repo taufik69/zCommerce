@@ -10,29 +10,33 @@ const {
   cloudinaryFileUpload,
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
+const { statusCodes } = require("../constant/constant");
 
 // create siteinformation
-exports.createSiteInformation = asynchandeler(async (req, res) => {
-  const value = await validateSiteInformation(req);
+exports.createSiteInformation = asynchandeler(async (req, res, next) => {
+  const value = await validateSiteInformation(req, res, next);
 
-  // ✅ Create doc first with image = null
+  //  Create doc first with image = null
   const siteInformation = await SiteInformation.create({
     ...value,
     image: null,
   });
 
   if (!siteInformation) {
-    throw new customError("SiteInformation not created", 400);
+    throw new customError(
+      "SiteInformation not created",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
-  // ✅ Send response immediately
+  //  Send response immediately
   apiResponse.sendSuccess(
     res,
-    202,
-    "SiteInformation is being processed in background..."
+    statusCodes.CREATED,
+    "SiteInformation is being processed in background...",
   );
 
-  // ✅ Background Upload + Update
+  //  Background Upload + Update
   (async () => {
     try {
       const { optimizeUrl } = await cloudinaryFileUpload(value.image.path);
@@ -40,17 +44,14 @@ exports.createSiteInformation = asynchandeler(async (req, res) => {
       const updatedInfo = await SiteInformation.findByIdAndUpdate(
         siteInformation._id,
         { image: optimizeUrl },
-        { new: true }
+        { new: true },
       );
 
-      console.log(
-        "✅ Background SiteInformation Update Completed:",
-        updatedInfo
-      );
+      console.log(" Background SiteInformation Update Completed:", updatedInfo);
     } catch (error) {
       console.error(
         "❌ Background SiteInformation image upload failed:",
-        error.message
+        error.message,
       );
     }
   })();
@@ -60,13 +61,13 @@ exports.createSiteInformation = asynchandeler(async (req, res) => {
 exports.getAllSiteInformation = asynchandeler(async (req, res) => {
   const siteInformation = await SiteInformation.find();
   if (!siteInformation.length) {
-    throw new customError("SiteInformation not found", 400);
+    throw new customError("SiteInformation not found", statusCodes.NOT_FOUND);
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "SiteInformation fetched successfully",
-    siteInformation
+    siteInformation,
   );
 });
 
@@ -74,12 +75,13 @@ exports.getAllSiteInformation = asynchandeler(async (req, res) => {
 exports.getSingleSiteInformation = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const siteInformation = await SiteInformation.findOne({ slug: slug });
-  if (!siteInformation) throw new customError("SiteInformation not found", 404);
+  if (!siteInformation)
+    throw new customError("SiteInformation not found", statusCodes.NOT_FOUND);
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "SiteInformation fetched successfully",
-    siteInformation
+    siteInformation,
   );
 });
 
@@ -89,10 +91,10 @@ exports.updateSiteInformationWithImage = asynchandeler(async (req, res) => {
 
   const siteInformation = await SiteInformation.findOne({ slug });
   if (!siteInformation) {
-    throw new customError("SiteInformation not found", 404);
+    throw new customError("SiteInformation not found", statusCodes.NOT_FOUND);
   }
 
-  // ✅ Update other fields immediately
+  //  Update other fields immediately
   const updatableFields = [
     "storeName",
     "propiterSlogan",
@@ -114,12 +116,12 @@ exports.updateSiteInformationWithImage = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    202,
+    statusCodes.OK,
     "SiteInformation update started",
-    siteInformation
+    siteInformation,
   );
 
-  // ✅ Background image upload/delete
+  //  Background image upload/delete
   if (req.file) {
     (async () => {
       try {
@@ -130,13 +132,13 @@ exports.updateSiteInformationWithImage = asynchandeler(async (req, res) => {
           const publicId = fileName.split(".")[0].split("?")[0];
 
           await deleteCloudinaryFile(publicId);
-          console.log("✅ Old image deleted:", publicId);
+          console.log(" Old image deleted:", publicId);
         }
 
         const { optimizeUrl } = await cloudinaryFileUpload(req.file.path);
         siteInformation.image = optimizeUrl;
         await siteInformation.save();
-        console.log("✅ New image uploaded:", optimizeUrl);
+        console.log(" New image uploaded:", optimizeUrl);
       } catch (error) {
         console.error("❌ Background image update failed:", error.message);
       }
@@ -150,18 +152,18 @@ exports.deleteSiteInformation = asynchandeler(async (req, res) => {
   // Find the existing SiteInformation
   const siteInformation = await SiteInformation.findOne({ slug });
   if (!siteInformation) {
-    throw new customError("SiteInformation not found", 404);
+    throw new customError("SiteInformation not found", statusCodes.NOT_FOUND);
   }
 
-  // ✅ Send immediate response to client
+  // Send immediate response to client
   apiResponse.sendSuccess(
     res,
-    202,
+    statusCodes.OK,
     "SiteInformation deletion started",
-    siteInformation
+    siteInformation,
   );
 
-  // ✅ Background delete
+  // Background delete
   (async () => {
     try {
       // Delete image from Cloudinary if exists
@@ -172,12 +174,12 @@ exports.deleteSiteInformation = asynchandeler(async (req, res) => {
         const publicId = fileName.split(".")[0].split("?")[0];
 
         await deleteCloudinaryFile(publicId);
-        console.log("✅ Cloudinary image deleted:", publicId);
+        console.log(" Cloudinary image deleted:", publicId);
       }
 
       // Delete the document from DB
       await SiteInformation.deleteOne({ slug });
-      console.log("✅ SiteInformation document deleted:", slug);
+      console.log(" SiteInformation document deleted:", slug);
     } catch (error) {
       console.error("❌ Background deletion failed:", error.message);
     }

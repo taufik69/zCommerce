@@ -1,5 +1,6 @@
 const joi = require("joi");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const couponSchema = joi
   .object({
@@ -53,15 +54,19 @@ const couponSchema = joi
   })
   .options({ abortEarly: false });
 
-exports.validateCoupon = async (req) => {
+exports.validateCoupon = async (req, res, next) => {
   try {
     const value = await couponSchema.validateAsync(req.body);
     return value;
   } catch (error) {
-    console.log("Validation error " + error.details.map((err) => err.message));
-    throw new customError(
-      "Validation error " + error.details.map((err) => err.message),
-      400
+    console.log(
+      "Validation error " + error?.details?.map((err) => err.message),
+    );
+    return next(
+      new customError(
+        "Validation error " + error.details.map((err) => err.message),
+        statusCodes.BAD_REQUEST,
+      ),
     );
   }
 };

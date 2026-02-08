@@ -10,15 +10,17 @@ const {
   supplierListDTO,
   supplierDuePaymentDTO,
 } = require("../dtos/all.dto");
+const { statusCodes } = require("../constant/constant");
 
 // @desc create a new supplier
 exports.createSupplier = asynchandeler(async (req, res) => {
   const supplier = new SupplierModel(req.body);
   await supplier.save();
-  if (!supplier) apiResponse.sendError(res, 404, "Supplier not found");
+  if (!supplier)
+    apiResponse.sendError(res, statusCodes.NOT_FOUND, "Supplier not found");
   apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.CREATED,
     "Supplier created successfully",
     supplierDTO(supplier),
   );
@@ -71,7 +73,7 @@ exports.getAllSupplier = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Supplier data fetched successfully",
     suppliers,
   );
@@ -86,10 +88,11 @@ exports.updateSupplier = asynchandeler(async (req, res) => {
       new: true,
     },
   );
-  if (!supplier) apiResponse.sendError(res, 404, "Supplier not found");
+  if (!supplier)
+    apiResponse.sendError(res, statusCodes.NOT_FOUND, "Supplier not found");
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Supplier updated successfully",
     supplierDTO(supplier),
   );
@@ -100,10 +103,11 @@ exports.deleteSupplier = asynchandeler(async (req, res) => {
   const supplier = await SupplierModel.findOneAndDelete({
     supplierId: req.params.supplierId,
   });
-  if (!supplier) apiResponse.sendError(res, 404, "Supplier not found");
+  if (!supplier)
+    apiResponse.sendError(res, statusCodes.NOT_FOUND, "Supplier not found");
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Supplier deleted successfully",
     supplierDTO(supplier),
   );
@@ -120,10 +124,11 @@ exports.softDeleteSupplier = asynchandeler(async (req, res) => {
         new: true,
       },
     );
-    if (!supplier) apiResponse.sendError(res, 404, "Supplier not found");
+    if (!supplier)
+      apiResponse.sendError(res, statusCodes.NOT_FOUND, "Supplier not found");
     apiResponse.sendSuccess(
       res,
-      200,
+      statusCodes.OK,
       "Supplier deleted successfully",
       supplierDTO(supplier),
     );
@@ -135,10 +140,11 @@ exports.softDeleteSupplier = asynchandeler(async (req, res) => {
         new: true,
       },
     );
-    if (!supplier) apiResponse.sendError(res, 404, "Supplier not found");
+    if (!supplier)
+      apiResponse.sendError(res, statusCodes.NOT_FOUND, "Supplier not found");
     apiResponse.sendSuccess(
       res,
-      200,
+      statusCodes.OK,
       "Supplier deleted successfully",
       supplierDTO(supplier),
     );
@@ -161,7 +167,7 @@ exports.createSupplierDuePayment = asynchandeler(async (req, res) => {
   if (totalReduce <= 0) {
     return apiResponse.sendError(
       res,
-      400,
+      statusCodes.BAD_REQUEST,
       "Paid amount or less amount must be greater than 0",
     );
   }
@@ -169,7 +175,11 @@ exports.createSupplierDuePayment = asynchandeler(async (req, res) => {
   // 1️Find supplier
   const supplier = await SupplierModel.findOne({ supplierId, isActive: true });
   if (!supplier) {
-    return apiResponse.sendError(res, 404, "Supplier not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Supplier not found",
+    );
   }
 
   const currentDue = Number(supplier.openingDues || 0);
@@ -177,7 +187,7 @@ exports.createSupplierDuePayment = asynchandeler(async (req, res) => {
   if (totalReduce > currentDue) {
     return apiResponse.sendError(
       res,
-      400,
+      statusCodes.BAD_REQUEST,
       `Payment exceeds due. Current due: ${currentDue}`,
     );
   }
@@ -217,7 +227,7 @@ exports.createSupplierDuePayment = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.OK,
     "Supplier due payment updated successfully",
     {
       ...supplierDTO(supplier),
@@ -283,7 +293,7 @@ exports.getAllSupplierDuePayment = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Supplier due payment fetched successfully",
     payments,
   );
@@ -297,7 +307,11 @@ exports.updateSupplierDuePayment = asynchandeler(async (req, res) => {
   // 1) find payment doc
   const paymentDoc = await SupplierDuePayment.findOne({ supplierId: id });
   if (!paymentDoc) {
-    return apiResponse.sendError(res, 404, "Supplier due payment not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Supplier due payment not found",
+    );
   }
 
   // 2) find supplier
@@ -306,7 +320,11 @@ exports.updateSupplierDuePayment = asynchandeler(async (req, res) => {
     isActive: true,
   });
   if (!supplier) {
-    return apiResponse.sendError(res, 404, "Supplier not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Supplier not found",
+    );
   }
 
   const currentDue = Number(supplier.openingDues || 0);
@@ -324,7 +342,7 @@ exports.updateSupplierDuePayment = asynchandeler(async (req, res) => {
   if (newTotal <= 0) {
     return apiResponse.sendError(
       res,
-      400,
+      statusCodes.BAD_REQUEST,
       "Paid amount + less amount must be greater than 0",
     );
   }
@@ -336,7 +354,7 @@ exports.updateSupplierDuePayment = asynchandeler(async (req, res) => {
   if (diff > 0 && diff > currentDue) {
     return apiResponse.sendError(
       res,
-      400,
+      statusCodes.BAD_REQUEST,
       `Update exceeds due. Current due: ${currentDue}, extra reduce needed: ${diff}`,
     );
   }
@@ -361,7 +379,7 @@ exports.updateSupplierDuePayment = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Supplier due payment updated successfully",
     {
       ...supplierDTO(supplier),
@@ -382,10 +400,14 @@ exports.softDeleteSupplierDuePayment = asynchandeler(async (req, res) => {
       },
     );
     if (!payment)
-      apiResponse.sendError(res, 404, "Supplier due payment not found");
+      apiResponse.sendError(
+        res,
+        statusCodes.NOT_FOUND,
+        "Supplier due payment not found",
+      );
     apiResponse.sendSuccess(
       res,
-      200,
+      statusCodes.OK,
       "Supplier due payment deleted successfully",
       supplierDuePaymentDTO(payment),
     );
@@ -398,10 +420,14 @@ exports.softDeleteSupplierDuePayment = asynchandeler(async (req, res) => {
       },
     );
     if (!payment)
-      apiResponse.sendError(res, 404, "Supplier due payment not found");
+      apiResponse.sendError(
+        res,
+        statusCodes.NOT_FOUND,
+        "Supplier due payment not found",
+      );
     apiResponse.sendSuccess(
       res,
-      200,
+      statusCodes.OK,
       "Supplier due payment deleted successfully",
       supplierDuePaymentDTO(payment),
     );
@@ -414,10 +440,14 @@ exports.deleteSupplierDuePayment = asynchandeler(async (req, res) => {
     supplierId: req.params.supplierId,
   });
   if (!payment)
-    apiResponse.sendError(res, 404, "Supplier due payment not found");
+    apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Supplier due payment not found",
+    );
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Supplier due payment deleted successfully",
     supplierDuePaymentDTO(payment),
   );

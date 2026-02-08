@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
+const { default: slugify } = require("slugify");
 const customerSchema = new mongoose.Schema(
   {
     customerId: {
@@ -151,7 +153,7 @@ customerSchema.pre("save", async function (next) {
         return next(
           new customError(
             `Customer with ID ${this.customerId} already exists`,
-            400,
+            statusCodes.BAD_REQUEST,
           ),
         );
       }
@@ -169,7 +171,7 @@ customerSchema.pre("save", async function (next) {
         return next(
           new customError(
             `Customer with mobile ${this.mobileNumber} already exists`,
-            400,
+            statusCodes.BAD_REQUEST,
           ),
         );
       }
@@ -185,8 +187,6 @@ const customerModel =
   mongoose.models.Customer || mongoose.model("Customer", customerSchema);
 
 // customer payment recived model schema
-
-const { default: slugify } = require("slugify");
 
 const customerPaymentRecivedSchema = new mongoose.Schema(
   {
@@ -289,7 +289,7 @@ customerPaymentRecivedSchema.pre("save", async function (next) {
       return next(
         new customError(
           `Customer payment with name "${this.customerName}" already exists`,
-          400,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }
@@ -394,7 +394,7 @@ customerAdvancePaymentSchema.pre("save", async function (next) {
       return next(
         new customError(
           `Customer advance payment with name "${this.customerName}" already exists`,
-          400,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }

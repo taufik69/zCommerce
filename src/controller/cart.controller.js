@@ -5,6 +5,7 @@ const Product = require("../models/product.model");
 const Variant = require("../models/variant.model");
 const Cart = require("../models/cart.model");
 const { getIO } = require("../socket/socket");
+const { statusCodes } = require("../constant/constant");
 
 //@desc add to cart
 exports.addToCart = asynchandeler(async (req, res) => {
@@ -16,11 +17,14 @@ exports.addToCart = asynchandeler(async (req, res) => {
   if (!quantity || quantity <= 0) {
     throw new customError(
       "Invalid quantity: quantity must be greater than 0",
-      400
+      statusCodes.BAD_REQUEST,
     );
   }
   if (!userId && !guestId) {
-    throw new customError("User or guest ID is required", 400);
+    throw new customError(
+      "User or guest ID is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   let product = null;
@@ -30,14 +34,16 @@ exports.addToCart = asynchandeler(async (req, res) => {
   // Product fetch
   if (productId) {
     product = await Product.findById(productId);
-    if (!product) throw new customError("Product not found", 404);
+    if (!product)
+      throw new customError("Product not found", statusCodes.NOT_FOUND);
     price = product.retailPrice;
   }
 
   // Variant fetch
   if (variantId) {
     variant = await Variant.findById(variantId);
-    if (!variant) throw new customError("Variant not found", 404);
+    if (!variant)
+      throw new customError("Variant not found", statusCodes.NOT_FOUND);
     price = variant.retailPrice;
   }
 
@@ -60,11 +66,11 @@ exports.addToCart = asynchandeler(async (req, res) => {
   let itemIndex = -1;
   if (variantId) {
     itemIndex = cart.items.findIndex(
-      (item) => item.variant && item.variant.toString() === variantId
+      (item) => item.variant && item.variant.toString() === variantId,
     );
   } else if (productId) {
     itemIndex = cart.items.findIndex(
-      (item) => item.product && item.product.toString() === productId
+      (item) => item.product && item.product.toString() === productId,
     );
   }
 
@@ -73,7 +79,7 @@ exports.addToCart = asynchandeler(async (req, res) => {
     cart.items[itemIndex].quantity += quantity;
     cart.items[itemIndex].price = price;
     cart.items[itemIndex].totalPrice = Math.round(
-      cart.items[itemIndex].quantity * price
+      cart.items[itemIndex].quantity * price,
     );
     if (color) cart.items[itemIndex].color = color;
     if (size) cart.items[itemIndex].size = size;
@@ -98,7 +104,7 @@ exports.addToCart = asynchandeler(async (req, res) => {
     {
       totalPrice: 0,
       quantity: 0,
-    }
+    },
   );
 
   cart.subTotal = cartItem.totalPrice;
@@ -107,7 +113,7 @@ exports.addToCart = asynchandeler(async (req, res) => {
   await cart.save();
 
   // Emit cartUpdated event
-  // ✅ emit to that specific user (room based)
+  //  emit to that specific user (room based)
 
   let getcart = await Cart.findOne({
     _id: cart._id,
@@ -120,7 +126,12 @@ exports.addToCart = asynchandeler(async (req, res) => {
     cart: getcart,
   });
 
-  apiResponse.sendSuccess(res, 201, "Product added to cart", cart);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    "Product added to cart",
+    cart,
+  );
 });
 
 //@desc cart quantity
@@ -130,7 +141,10 @@ exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
   const { productId, variantId } = req.body;
 
   if (!productId && !variantId) {
-    throw new customError("Product ID or Variant ID is required", 400);
+    throw new customError(
+      "Product ID or Variant ID is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   // Find the cart using either user, guestId, or cartId
@@ -140,18 +154,18 @@ exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
   });
 
   if (!cart) {
-    throw new customError("Cart not found", 404);
+    throw new customError("Cart not found", statusCodes.NOT_FOUND);
   }
 
   // Cart item খুঁজুন (variantId থাকলে সেটি, না থাকলে productId)
   let itemIndex = -1;
   if (variantId) {
     itemIndex = cart.items.findIndex(
-      (item) => item.variant && item.variant.toString() === variantId
+      (item) => item.variant && item.variant.toString() === variantId,
     );
   } else if (productId) {
     itemIndex = cart.items.findIndex(
-      (item) => item.product && item.product.toString() === productId
+      (item) => item.product && item.product.toString() === productId,
     );
   }
 
@@ -168,7 +182,7 @@ exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
   } else {
     throw new customError(
       "Minimum quantity is 1. Cannot decrement further.",
-      400
+      statusCodes.BAD_REQUEST,
     );
   }
 
@@ -182,7 +196,7 @@ exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
     {
       totalPrice: 0,
       quantity: 0,
-    }
+    },
   );
 
   cart.subTotal = cartItem.totalPrice;
@@ -199,9 +213,9 @@ exports.decreaseCartQuantity = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Cart quantity decreased successfully",
-    cart
+    cart,
   );
 });
 
@@ -210,15 +224,19 @@ exports.deleteCart = asynchandeler(async (req, res) => {
   const { cartId } = req.params;
   const { cartItemId } = req.body;
   if (!cartId || !cartItemId) {
-    throw new customError("Cart ID or Cart Item ID is required", 400);
+    throw new customError(
+      "Cart ID or Cart Item ID is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   const cart = await Cart.findOne({ _id: cartId })
     .populate("items.product")
     .populate("items.variant");
-  if (!cart) throw new customError("Cart not found with this ID", 404);
+  if (!cart)
+    throw new customError("Cart not found with this ID", statusCodes.NOT_FOUND);
   cart.items.map((item) =>
-    item._id == cartItemId ? cart.items.pull(item) : null
+    item._id == cartItemId ? cart.items.pull(item) : null,
   );
   await cart.save();
   // check if cart is empty
@@ -227,7 +245,7 @@ exports.deleteCart = asynchandeler(async (req, res) => {
   }
 
   if (!cart) {
-    throw new customError("Cart not found", 404);
+    throw new customError("Cart not found", statusCodes.NOT_FOUND);
   }
   const io = getIO();
   io.to(cart.user || cart.guestId).emit("cartUpdated", {
@@ -235,7 +253,12 @@ exports.deleteCart = asynchandeler(async (req, res) => {
     cart: cart,
   });
 
-  apiResponse.sendSuccess(res, 200, "Cart deleted successfully", cart);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Cart deleted successfully",
+    cart,
+  );
 });
 
 //@desc get all cart list using userid or guestid
@@ -248,7 +271,7 @@ exports.getAllCart = asynchandeler(async (req, res) => {
     .populate("items.variant")
     .lean();
   if (!cart) {
-    apiResponse.sendSuccess(res, 200, "Cart is empty", cart);
+    apiResponse.sendSuccess(res, statusCodes.NOT_FOUND, "Cart is empty", cart);
   }
   const cartItem = cart.items.reduce(
     (acc, item) => {
@@ -260,7 +283,7 @@ exports.getAllCart = asynchandeler(async (req, res) => {
     {
       totalPrice: 0,
       quantity: 0,
-    }
+    },
   );
 
   cart.subTotal = cartItem.totalPrice;
@@ -272,7 +295,12 @@ exports.getAllCart = asynchandeler(async (req, res) => {
     cart: cart,
   });
 
-  apiResponse.sendSuccess(res, 200, "Cart fetched successfully", cart);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Cart fetched successfully",
+    cart,
+  );
 });
 exports.getCartByUserId = asynchandeler(async (req, res) => {
   const { id } = req.params;
@@ -284,11 +312,11 @@ exports.getCartByUserId = asynchandeler(async (req, res) => {
 
   if (!cart) {
     cart = await Cart.findOne({ guestId: id }).populate(
-      "items.product items.variant"
+      "items.product items.variant",
     );
   }
   if (!cart) {
-    apiResponse.sendSuccess(res, 200, "Cart is empty", cart);
+    apiResponse.sendSuccess(res, statusCodes.NOT_FOUND, "Cart is empty", cart);
   }
   const io = getIO();
   io.to(cart.user || cart.guestId).emit("cartUpdated", {
@@ -296,5 +324,10 @@ exports.getCartByUserId = asynchandeler(async (req, res) => {
     cart: cart,
   });
 
-  apiResponse.sendSuccess(res, 200, "Cart fetched successfully", cart);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Cart fetched successfully",
+    cart,
+  );
 });

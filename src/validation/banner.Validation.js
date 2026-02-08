@@ -1,5 +1,6 @@
 const joi = require("joi");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const bannerSchema = joi.object({
   title: joi.string().trim().required().messages({
@@ -15,30 +16,38 @@ const bannerSchema = joi.object({
   isActive: joi.boolean().optional(),
 });
 
-exports.validateBanner = async (req) => {
+exports.validateBanner = async (req, res, next) => {
   try {
-    // 🔹 Joi validation
     const value = await bannerSchema.validateAsync(req.body, {
       abortEarly: false, // show all validation errors
     });
 
     if (req.file) {
-      // 🔹 Validate single image (req.file)
       if (!req.file) {
-        throw new customError("Please provide a banner image", 400);
+        return next(
+          new customError(
+            "Please provide a banner image",
+            statusCodes.BAD_REQUEST,
+          ),
+        );
       }
-
-      // 🔹 Validate fieldname
       if (req.file.fieldname !== "image") {
-        throw new customError(
-          "Please provide a valid image field name (image)",
-          400
+        next(
+          new customError(
+            "Please provide a valid image field name (image)",
+            statusCodes.BAD_REQUEST,
+          ),
         );
       }
 
-      // 🔹 Validate image size (limit 15MB)
-      if (req.file.size > 15 * 1024 * 1024) {
-        throw new customError("Image size should be less than 15MB", 400);
+      //Validate image size (limit 10MB)
+      if (req.file.size > 5 * 1024 * 1024) {
+        return next(
+          new customError(
+            "Image size should be less than 5MB",
+            statusCodes.BAD_REQUEST,
+          ),
+        );
       }
     }
 
@@ -46,9 +55,20 @@ exports.validateBanner = async (req) => {
   } catch (error) {
     if (error.details) {
       // Joi error
-      const message = error.details.map((err) => err.message).join(", ");
-      throw new customError("Validation error: " + message, 400);
+      const message = error?.details?.map((err) => err.message).join(", ");
+      return next(
+        new customError(
+          "Validation error: " + message,
+          statusCodes.BAD_REQUEST,
+        ),
+      );
     }
-    throw new customError(error.message || "Validation failed", 400);
+
+    return next(
+      new customError(
+        error.message || "Validation failed",
+        statusCodes.BAD_REQUEST,
+      ),
+    );
   }
 };

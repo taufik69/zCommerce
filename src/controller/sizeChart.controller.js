@@ -6,12 +6,16 @@ const {
   cloudinaryFileUpload,
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
+const { statusCodes } = require("../constant/constant");
 // create size chart
 exports.createSizeChart = asynchandeler(async (req, res, next) => {
   const { subCategory } = req.body;
 
   if (!subCategory) {
-    throw new customError("subCategory id is required", 400);
+    throw new customError(
+      "subCategory id is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   // Save SizeChart first without image
@@ -21,9 +25,14 @@ exports.createSizeChart = asynchandeler(async (req, res, next) => {
   });
 
   // Send immediate response
-  apiResponse.sendSuccess(res, 202, "Size chart creation started", {
-    newSizeChart,
-  });
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    "Size chart creation started",
+    {
+      newSizeChart,
+    },
+  );
 
   // Background image upload
   const image = req.files?.image;
@@ -38,13 +47,13 @@ exports.createSizeChart = asynchandeler(async (req, res, next) => {
         };
         await newSizeChart.save();
         console.log(
-          "✅ Size chart image uploaded successfully:",
-          newSizeChart._id
+          " Size chart image uploaded successfully:",
+          newSizeChart._id,
         );
       } catch (error) {
         console.error(
           "❌ Background size chart image upload failed:",
-          error.message
+          error.message,
         );
       }
     })();
@@ -54,9 +63,17 @@ exports.createSizeChart = asynchandeler(async (req, res, next) => {
 // get all size chart
 exports.getAllSizeChart = asynchandeler(async (req, res) => {
   const sizeChart = await SizeChart.find().sort({ createdAt: -1 });
-  return apiResponse.sendSuccess(res, 200, "Size chart fetched successfully", {
-    sizeChart,
-  });
+  if (!sizeChart || sizeChart.length === 0) {
+    throw new customError("Size chart not found", statusCodes.NOT_FOUND);
+  }
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Size chart fetched successfully",
+    {
+      sizeChart,
+    },
+  );
 });
 
 // get single size chart
@@ -66,11 +83,16 @@ exports.getSizeChartBySlug = asynchandeler(async (req, res) => {
     subCategory: subCategory,
   }).populate("subCategory");
   if (!sizeChart) {
-    throw new customError("Size chart not found", 404);
+    throw new customError("Size chart not found", statusCodes.NOT_FOUND);
   }
-  return apiResponse.sendSuccess(res, 200, "Size chart fetched successfully", {
-    sizeChart,
-  });
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Size chart fetched successfully",
+    {
+      sizeChart,
+    },
+  );
 });
 
 // update size chart
@@ -80,7 +102,7 @@ exports.updateSizeChart = asynchandeler(async (req, res, next) => {
 
   const sizeChart = await SizeChart.findOne({ subCategory: subcid });
   if (!sizeChart) {
-    throw new customError("Size chart not found", 404);
+    throw new customError("Size chart not found", statusCodes.NOT_FOUND);
   }
 
   // Update name immediately
@@ -88,7 +110,9 @@ exports.updateSizeChart = asynchandeler(async (req, res, next) => {
   await sizeChart.save();
 
   // Send immediate response
-  apiResponse.sendSuccess(res, 202, "Size chart update started", { sizeChart });
+  apiResponse.sendSuccess(res, statusCodes.OK, "Size chart update started", {
+    sizeChart,
+  });
 
   // Background image delete/upload
   if (req.files?.image && req.files.image.length > 0) {
@@ -99,7 +123,7 @@ exports.updateSizeChart = asynchandeler(async (req, res, next) => {
           await deleteCloudinaryFile(sizeChart.image.public_id);
           console.log(
             "✅ Old size chart image deleted:",
-            sizeChart.image.public_id
+            sizeChart.image.public_id,
           );
         }
 
@@ -113,12 +137,12 @@ exports.updateSizeChart = asynchandeler(async (req, res, next) => {
         await sizeChart.save();
         console.log(
           "✅ Size chart image uploaded successfully:",
-          sizeChart._id
+          sizeChart._id,
         );
       } catch (error) {
         console.error(
           "❌ Background size chart image update failed:",
-          error.message
+          error.message,
         );
       }
     })();
@@ -131,11 +155,16 @@ exports.deleteSizeChartBySlug = asynchandeler(async (req, res) => {
 
   const sizeChart = await SizeChart.findOne({ subCategory });
   if (!sizeChart) {
-    throw new customError("Size chart not found", 404);
+    throw new customError("Size chart not found", statusCodes.NOT_FOUND);
   }
 
   // ✅ Send immediate response
-  apiResponse.sendSuccess(res, 200, "Size chart deletion started", sizeChart);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Size chart deletion started",
+    sizeChart,
+  );
 
   // ✅ Background delete
   (async () => {

@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 const { Schema } = mongoose;
 
 const deliverySchema = new Schema({
@@ -21,7 +22,10 @@ deliverySchema.pre("save", async function (next) {
     const isExist = await this.constructor.findOne({ name: this.name });
     if (isExist && isExist._id.toString() !== this._id.toString()) {
       return next(
-        new customError("Delivery type with this name already exists", 400),
+        new customError(
+          "Delivery type with this name already exists",
+          statusCodes.BAD_REQUEST,
+        ),
       );
     }
     next();

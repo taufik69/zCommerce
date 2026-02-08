@@ -7,25 +7,29 @@ const {
   cloudinaryFileUpload,
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
+const { statusCodes } = require("../constant/constant");
 // @desc    Create a new brand
 // @route   POST /api/v1/brand
-exports.createBrand = asynchandeler(async (req, res) => {
-  const value = await validateBrand(req);
+exports.createBrand = asynchandeler(async (req, res, next) => {
+  const value = await validateBrand(req, res, next);
 
   const brand = await Brand.create({
     name: value.name,
     image: null,
   });
+  if (!brand) {
+    throw new customError("Brand creation failed", statusCodes.SERVER_ERROR);
+  }
 
-  // ✅ Send Immediate Response (Client doesn't wait)
+  //  Send Immediate Response (Client doesn't wait)
   apiResponse.sendSuccess(
     res,
-    202,
+    statusCodes.CREATED,
     "Brand creation started. Processing in background...",
-    brand
+    brand,
   );
 
-  // ✅ Background Async Task
+  // Background Async Task
   (async () => {
     try {
       // Upload Image in background
@@ -36,9 +40,9 @@ exports.createBrand = asynchandeler(async (req, res) => {
         image: optimizeUrl,
       });
 
-      console.log("✅ Brand Created (BG Task):", brand.name);
+      console.log(" Brand Created (BG Task):", brand.name);
     } catch (error) {
-      console.error("❌ Background Brand Creation Failed:", error.message);
+      console.error("Background Brand Creation Failed:", error.message);
     }
   })();
 });
@@ -46,9 +50,15 @@ exports.createBrand = asynchandeler(async (req, res) => {
 // get all brands
 exports.getAllBrands = asynchandeler(async (req, res, next) => {
   const brands = await Brand.find({ isActive: true }).sort({ createdAt: -1 });
-  return apiResponse.sendSuccess(res, 200, "Brands fetched successfully", {
+  if (!brands || brands.length === 0) {
+    throw new customError("Brands not found", statusCodes.NOT_FOUND);
+  }
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Brands fetched successfully",
     brands,
-  });
+  );
 });
 
 // get single brand by slug
@@ -56,32 +66,35 @@ exports.getBrandBySlug = asynchandeler(async (req, res, next) => {
   const { slug } = req.params;
   const brand = await Brand.findOne({ slug, isActive: true });
   if (!brand) {
-    throw new customError("Brand not found", 404);
+    throw new customError("Brand not found", statusCodes.NOT_FOUND);
   }
-  return apiResponse.sendSuccess(res, 200, "Brand fetched successfully", {
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Brand fetched successfully",
     brand,
-  });
+  );
 });
 
 // @desc    Update a brand by slug
 exports.updateBrand = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
-  // ✅ Step 1: Find the brand
+  //  Step 1: Find the brand
   const brand = await Brand.findOne({ slug, isActive: true });
   if (!brand) {
-    throw new customError("Brand not found", 404);
+    throw new customError("Brand not found", statusCodes.NOT_FOUND);
   }
 
-  // ✅ Step 2: Send immediate response (non-blocking)
+  //  Step 2: Send immediate response (non-blocking)
   apiResponse.sendSuccess(
     res,
-    202,
+    statusCodes.OK,
     "Brand update is successfully. Processing in background.",
-    { slug }
+    { slug },
   );
 
-  // ✅ Step 3: Background processing (fire-and-forget)
+  //  Step 3: Background processing (fire-and-forget)
   (async () => {
     try {
       let optimizeUrlsCloudinary = [];
@@ -94,7 +107,7 @@ exports.updateBrand = asynchandeler(async (req, res) => {
           if (publicId) {
             await deleteCloudinaryFile(publicId.split("?")[0]);
           } else {
-            console.warn(`⚠️ Invalid image URL for brand: ${brand._id}`);
+            console.warn(` Invalid image URL for brand: ${brand._id}`);
           }
         });
 
@@ -104,7 +117,10 @@ exports.updateBrand = asynchandeler(async (req, res) => {
         const uploadPromises = req.files.map(async (file) => {
           const result = await cloudinaryFileUpload(file.path);
           if (!result) {
-            throw new customError("Image upload failed", 500);
+            throw new customError(
+              "Image upload failed",
+              statusCodes.SERVER_ERROR,
+            );
           }
           return result.optimizeUrl;
         });
@@ -119,9 +135,9 @@ exports.updateBrand = asynchandeler(async (req, res) => {
       }
 
       await brand.save();
-      console.log(`✅ Background brand update completed: ${brand._id}`);
+      console.log(` Background brand update completed: ${brand._id}`);
     } catch (error) {
-      console.error(`❌ Background brand update failed:`, error.message);
+      console.error(` Background brand update failed:`, error.message);
     }
   })();
 });
@@ -130,21 +146,21 @@ exports.updateBrand = asynchandeler(async (req, res) => {
 exports.deleteBrand = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
-  // ✅ Step 1: Find the brand
+  //  Step 1: Find the brand
   const brand = await Brand.findOneAndDelete({ slug });
   if (!brand) {
-    throw new customError("Brand not found", 404);
+    throw new customError("Brand not found", statusCodes.NOT_FOUND);
   }
 
-  // ✅ Step 2: Send immediate response (non-blocking)
+  //  Step 2: Send immediate response (non-blocking)
   apiResponse.sendSuccess(
     res,
-    202,
+    statusCodes.OK,
     "Brand deletion is successfully being processed in the background",
-    { slug }
+    { slug },
   );
 
-  // ✅ Step 3: Background processing (fire-and-forget)
+  //  Step 3: Background processing (fire-and-forget)
   (async () => {
     try {
       if (brand.image?.length > 0) {
@@ -167,7 +183,7 @@ exports.deleteBrand = asynchandeler(async (req, res) => {
     } catch (error) {
       console.error(
         `❌ Background brand deletion failed: ${slug}`,
-        error.message
+        error.message,
       );
     }
   })();

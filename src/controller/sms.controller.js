@@ -5,15 +5,24 @@ const { sendSMS } = require("../helpers/sms");
 const User = require("../models/user.model");
 const Order = require("../models/order.model");
 const { default: axios } = require("axios");
+const { statusCodes } = require("../constant/constant");
 
 exports.sendSMS = asynchandeler(async (req, res) => {
   const { message, phoneNumber } = req.body;
 
   if (!message || !phoneNumber) {
-    throw new customError("Message and phone number are required", 400);
+    throw new customError(
+      "Message and phone number are required",
+      statusCodes.BAD_REQUEST,
+    );
   }
   const result = await sendSMS(phoneNumber, message);
-  return apiResponse.sendSuccess(res, 200, "SMS sent successfully", result);
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "SMS sent successfully",
+    result,
+  );
 });
 
 // @desc sendBulkSMS controller  parraller send a bluk amount of sms
@@ -21,28 +30,48 @@ exports.sendBulkSMS = asynchandeler(async (req, res) => {
   const { message, phoneNumber } = req.body;
 
   if (!message || !phoneNumber) {
-    throw new customError("Message and phone number are required", 400);
+    throw new customError(
+      "Message and phone number are required",
+      statusCodes.BAD_REQUEST,
+    );
   }
   const result = await sendSMS(phoneNumber, message);
-  return apiResponse.sendSuccess(res, 200, "SMS sent successfully", result);
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "SMS sent successfully",
+    result,
+  );
 });
 
 // @desc check sms balace
 exports.smsBlance = asynchandeler(async (req, res) => {
   const response = await axios.get(
-    `http://bulksmsbd.net/api/getBalanceApi?api_key=${process.env.BULK_SMS_API_KEY}`
+    `http://bulksmsbd.net/api/getBalanceApi?api_key=${process.env.BULK_SMS_API_KEY}`,
   );
   if (response.data.error) {
-    throw new customError(response.data.error, 400);
+    throw new customError(response.data.error, statusCodes.BAD_REQUEST);
   }
 
-  return apiResponse.sendSuccess(res, 202, "SMS balace", response.data);
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "SMS balace",
+    response.data,
+  );
 });
 
 // @desc get all user phone number
 exports.getAllUserPhoneNumber = asynchandeler(async (req, res) => {
   const users = await User.find().select("phone");
-  return apiResponse.sendSuccess(res, 200, "User fetched successfully", users);
+  if (!users || users.length === 0)
+    throw new customError("User not found", statusCodes.NOT_FOUND);
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "User fetched successfully",
+    users,
+  );
 });
 
 //@desc get all order phone number
@@ -51,10 +80,12 @@ exports.getAllOrderPhoneNumber = asynchandeler(async (req, res) => {
   const phoneNumbers = orders.map((order) => {
     return { _id: order._id, phone: order.shippingInfo.phone };
   });
+  if (!phoneNumbers || phoneNumbers.length === 0)
+    throw new customError("Order not found", statusCodes.NOT_FOUND);
   return apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Order fetched successfully",
-    phoneNumbers
+    phoneNumbers,
   );
 });

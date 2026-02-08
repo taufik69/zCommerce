@@ -1,6 +1,7 @@
 const { customError } = require("../lib/CustomError");
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
+const { statusCodes } = require("../constant/constant");
 
 const couponSchema = new mongoose.Schema({
   slug: { type: String, unique: true, trim: true },
@@ -18,7 +19,7 @@ const couponSchema = new mongoose.Schema({
 // make a slug using code
 couponSchema.pre("save", function (next) {
   if (this.isModified("code")) {
-    this.slug = slugify(this.code, { lower: true, strict: true });
+    this.slug = slugify(this.code, { lower: true, strict: true, trim: true });
   }
   next();
 });
@@ -37,6 +38,7 @@ couponSchema.pre("save", async function (next) {
       return next(
         new customError(
           `Coupon with slug ${this.slug} or code ${this.code} already exists`,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }

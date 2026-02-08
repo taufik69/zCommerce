@@ -2,6 +2,7 @@ const { customError } = require("../lib/CustomError");
 const CreateTransaction = require("../models/crateTransaction.model");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
+const { statusCodes } = require("../constant/constant");
 
 // create transaction controller
 exports.createTransaction = asynchandeler(async (req, res) => {
@@ -22,7 +23,7 @@ exports.createTransaction = asynchandeler(async (req, res) => {
     !transactionType ||
     !amount
   ) {
-    throw new customError("All fields are required", 400);
+    throw new customError("All fields are required", statusCodes.BAD_REQUEST);
   }
 
   const transaction = await CreateTransaction.create({
@@ -34,11 +35,14 @@ exports.createTransaction = asynchandeler(async (req, res) => {
     transactionType,
     amount,
   });
+  if (!transaction) {
+    throw new customError("Transaction not created", statusCodes.BAD_REQUEST);
+  }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.CREATED,
     "Transaction created successfully",
-    transaction
+    transaction,
   );
 });
 
@@ -49,10 +53,10 @@ exports.getAllTransaction = asynchandeler(async (req, res) => {
     .sort({ createdAt: -1 });
 
   if (!transactions.length) {
-    throw new customError("Transactions not found", 404);
+    throw new customError("Transactions not found", statusCodes.NOT_FOUND);
   }
 
-  // ✅ Generate serial numbers dynamically
+  //  Generate serial numbers dynamically
   const formattedTransactions = transactions.map((tx, index) => {
     // Convert index (0-based) to serial (1-based)
     const serial = index + 1;
@@ -62,15 +66,15 @@ exports.getAllTransaction = asynchandeler(async (req, res) => {
 
     return {
       ...tx.toObject(),
-      serialNumber, // ✅ Add new field
+      serialNumber, //  Add new field
     };
   });
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Transactions fetched successfully",
-    formattedTransactions
+    formattedTransactions,
   );
 });
 
@@ -78,16 +82,16 @@ exports.getAllTransaction = asynchandeler(async (req, res) => {
 exports.getSingleTransaction = asynchandeler(async (req, res) => {
   const { id } = req.params;
   const transaction = await CreateTransaction.findOne({ _id: id }).populate(
-    "account transactionCategory"
+    "account transactionCategory",
   );
   if (!transaction) {
-    throw new customError("Transaction not found", 404);
+    throw new customError("Transaction not found", statusCodes.NOT_FOUND);
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Transaction fetched successfully",
-    transaction
+    transaction,
   );
 });
 
@@ -96,13 +100,13 @@ exports.deleteTransaction = asynchandeler(async (req, res) => {
   const { id } = req.params;
   const transaction = await CreateTransaction.findOneAndDelete({ _id: id });
   if (!transaction) {
-    throw new customError("Transaction not found", 404);
+    throw new customError("Transaction not found", statusCodes.NOT_FOUND);
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Transaction deleted successfully",
-    transaction
+    transaction,
   );
 });
 
@@ -112,15 +116,15 @@ exports.updateTransaction = asynchandeler(async (req, res) => {
   const transaction = await CreateTransaction.findOneAndUpdate(
     { _id: id },
     { ...req.body },
-    { new: true }
+    { new: true },
   );
   if (!transaction) {
-    throw new customError("Transaction not found", 404);
+    throw new customError("Transaction not found", statusCodes.NOT_FOUND);
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Transaction updated successfully",
-    transaction
+    transaction,
   );
 });

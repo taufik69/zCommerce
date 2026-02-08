@@ -1,3 +1,4 @@
+const { statusCodes } = require("../constant/constant");
 const { customError } = require("../lib/CustomError");
 
 const validate = (schema, property = "body") => {
@@ -9,7 +10,7 @@ const validate = (schema, property = "body") => {
         field: e.path.join("."),
         message: e.message,
       }));
-      next(new customError(errors, 400));
+      next(new customError(errors, statusCodes.BAD_REQUEST));
     }
 
     req[property] = value;

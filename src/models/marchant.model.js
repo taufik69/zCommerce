@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const merchantSchema = new mongoose.Schema({
   merchantID: { type: String, required: true, unique: true },
@@ -25,7 +26,12 @@ merchantSchema.pre("save", async function (next) {
       existingMerchant &&
       existingMerchant._id.toString() !== this._id.toString()
     ) {
-      return next(new customError("Merchant ID or slug already exists", 400));
+      return next(
+        new customError(
+          "Merchant ID or slug already exists",
+          statusCodes.BAD_REQUEST,
+        ),
+      );
     }
 
     next();

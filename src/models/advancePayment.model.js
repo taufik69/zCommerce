@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const employeeAdvancePaymentSchema = new mongoose.Schema(
   {
@@ -132,7 +133,7 @@ employeeDesignationSchema.pre("save", async function (next) {
       return next(
         new customError(
           `Designation with slug ${this.slug} already exists`,
-          400,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }
@@ -197,7 +198,7 @@ departmentSchema.pre("save", async function (next) {
       return next(
         new customError(
           `Department with slug ${this.slug} already exists`,
-          400,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }
@@ -258,7 +259,10 @@ sectionSchema.pre("save", async function (next) {
       existingSection._id.toString() !== this._id.toString()
     ) {
       return next(
-        new customError(`Section with slug ${this.slug} already exists`, 400),
+        new customError(
+          `Section with slug ${this.slug} already exists`,
+          statusCodes.BAD_REQUEST,
+        ),
       );
     }
     next();

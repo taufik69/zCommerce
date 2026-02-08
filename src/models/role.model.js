@@ -2,6 +2,7 @@ const { string } = require("joi");
 const mongoose = require("mongoose");
 const slugify = require("slugify");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const roleSchema = new mongoose.Schema(
   {
@@ -28,7 +29,7 @@ roleSchema.pre("save", async function (next) {
       return next(
         new customError(
           `Role with slug ${this.slug} or name ${this.name} already exists`,
-          400,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }

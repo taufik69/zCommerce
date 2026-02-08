@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const categorySchema = new mongoose.Schema(
   {
@@ -66,7 +67,7 @@ categorySchema.pre("save", async function (next) {
       return next(
         new customError(
           `Category with slug ${this.slug} or ${this.name} already exists`,
-          400,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }

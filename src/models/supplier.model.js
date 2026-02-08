@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const supplierSchema = new mongoose.Schema(
   {
@@ -91,7 +92,7 @@ supplierSchema.pre("save", async function (next) {
       return next(
         new customError(
           `Supplier with supplierId ${this.supplierId} already exists.`,
-          400,
+          statusCodes.BAD_REQUEST,
         ),
       );
     }

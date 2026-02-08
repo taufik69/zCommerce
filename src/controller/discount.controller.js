@@ -7,6 +7,7 @@ const Category = require("../models/category.model");
 const Subcategory = require("../models/subcategory.model");
 const Product = require("../models/product.model");
 const validateDiscount = require("../validation/discount.validation");
+const { statusCodes } = require("../constant/constant");
 
 // @desc create a new discount
 exports.createDiscount = asynchandeler(async (req, res) => {
@@ -48,9 +49,9 @@ exports.createDiscount = asynchandeler(async (req, res) => {
 
   return apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.CREATED || 201,
     "Discount created successfully",
-    discount
+    discount,
   );
 });
 
@@ -59,6 +60,10 @@ exports.getAllDiscounts = asynchandeler(async (req, res) => {
   const discounts = await Discount.find()
     .populate("category subCategory product")
     .sort({ createdAt: -1 });
+
+  if (!discounts) {
+    throw new customError("Discount not found", statusCodes.NOT_FOUND);
+  }
 
   // serial add করা
   const discountsWithSerial = discounts.map((d, index) => {
@@ -70,9 +75,9 @@ exports.getAllDiscounts = asynchandeler(async (req, res) => {
   });
   return apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Discounts fetched successfully",
-    discountsWithSerial
+    discountsWithSerial,
   );
 });
 
@@ -80,12 +85,17 @@ exports.getAllDiscounts = asynchandeler(async (req, res) => {
 exports.getDiscountBySlug = asynchandeler(async (req, res) => {
   const slug = req.params.slug;
   const discount = await Discount.findOne({ slug }).populate(
-    "category subCategory product"
+    "category subCategory product",
   );
   if (!discount) {
-    throw new customError("Discount not found", 404);
+    throw new customError("Discount not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(res, 200, "Discount fetched successfully", discount);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Discount fetched successfully",
+    discount,
+  );
 });
 
 // @desc update a discount by slug
@@ -96,7 +106,7 @@ exports.updateDiscount = asynchandeler(async (req, res) => {
   // Find the discount by slug
   const discount = await Discount.findOne({ slug });
   if (!discount) {
-    throw new customError("Discount not found", 404);
+    throw new customError("Discount not found", statusCodes.NOT_FOUND);
   }
 
   // if category exist then add discount id into category model
@@ -106,7 +116,7 @@ exports.updateDiscount = asynchandeler(async (req, res) => {
     // first remove the previous discount id
     await Category.updateOne(
       { _id: discount.category },
-      { $set: { discount: null } }
+      { $set: { discount: null } },
     );
     category.discount = discount._id;
     await category.save();
@@ -116,7 +126,7 @@ exports.updateDiscount = asynchandeler(async (req, res) => {
   if (subcategory) {
     await Subcategory.updateOne(
       { _id: discount.subCategory },
-      { $set: { discount: null } }
+      { $set: { discount: null } },
     );
     subcategory.discount = discount._id;
     await subcategory.save();
@@ -126,7 +136,7 @@ exports.updateDiscount = asynchandeler(async (req, res) => {
   if (product) {
     await Product.updateOne(
       { _id: discount.product },
-      { $set: { discount: null } }
+      { $set: { discount: null } },
     );
     product.discount = discount._id;
     await product.save();
@@ -142,9 +152,9 @@ exports.updateDiscount = asynchandeler(async (req, res) => {
   // Send success response
   return apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Discount updated successfully",
-    discount
+    discount,
   );
 });
 
@@ -155,7 +165,7 @@ exports.deactivateDiscount = asynchandeler(async (req, res) => {
   // Find the discount by slug
   const discount = await Discount.findOne({ slug, isActive: true });
   if (!discount) {
-    throw new customError("Discount not found", 404);
+    throw new customError("Discount not found", statusCodes.NOT_FOUND);
   }
 
   // Deactivate the discount
@@ -165,9 +175,9 @@ exports.deactivateDiscount = asynchandeler(async (req, res) => {
   // Send success response
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Discount deactivated successfully",
-    discount
+    discount,
   );
 });
 
@@ -183,13 +193,21 @@ exports.getDiscountPagination = asynchandeler(async (req, res) => {
   const total = await Discount.countDocuments();
   const totalPages = Math.ceil(total / limit);
 
-  apiResponse.sendSuccess(res, 200, "Discounts fetched successfully", {
-    discounts,
-    page: parseInt(page),
-    limit: parseInt(limit),
-    total: parseInt(total),
-    totalPages: parseInt(totalPages),
-  });
+  if (!discounts || discounts.length === 0) {
+    throw new customError("Discounts not found", statusCodes.NOT_FOUND);
+  }
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Discounts fetched successfully",
+    {
+      discounts,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total: parseInt(total),
+      totalPages: parseInt(totalPages),
+    },
+  );
 });
 
 // @desc active discount  by slug
@@ -199,7 +217,7 @@ exports.activateDiscount = asynchandeler(async (req, res) => {
   // Find the discount by slug
   const discount = await Discount.findOne({ slug, isActive: false });
   if (!discount) {
-    throw new customError("Discount not found", 404);
+    throw new customError("Discount not found", statusCodes.NOT_FOUND);
   }
 
   // Activate the discount
@@ -209,9 +227,9 @@ exports.activateDiscount = asynchandeler(async (req, res) => {
   // Send success response
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Discount activated successfully",
-    discount
+    discount,
   );
 });
 
@@ -223,12 +241,12 @@ exports.deleteDiscount = asynchandeler(async (req, res) => {
   const discount = await Discount.findOneAndDelete({ slug });
   // now delete discount id from category model
   if (!discount) {
-    throw new customError("Discount not found", 404);
+    throw new customError("Discount not found", statusCodes.NOT_FOUND);
   }
   if (discount.category) {
     await Category.updateOne(
       { _id: discount.category },
-      { $set: { discount: null } }
+      { $set: { discount: null } },
     );
   }
 
@@ -236,17 +254,22 @@ exports.deleteDiscount = asynchandeler(async (req, res) => {
   if (discount.subCategory) {
     await Subcategory.updateOne(
       { _id: discount.subCategory },
-      { $set: { discount: null } }
+      { $set: { discount: null } },
     );
   }
   // now delete discount id from product model
   if (discount.product) {
     await Product.updateOne(
       { _id: discount.product },
-      { $set: { discount: null } }
+      { $set: { discount: null } },
     );
   }
 
   // Send success response
-  apiResponse.sendSuccess(res, 200, "Discount deleted successfully", discount);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Discount deleted successfully",
+    discount,
+  );
 });

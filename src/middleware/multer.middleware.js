@@ -1,7 +1,7 @@
 const multer = require("multer");
 const path = require("path");
 const { customError } = require("../lib/CustomError");
-const { log } = require("console");
+const { statusCodes } = require("../constant/constant");
 
 // Allowed file types
 const allowedExtensions = [".jpg", ".jpeg", ".png", ".webp"];
@@ -24,7 +24,7 @@ const fileFilter = (req, file, cb) => {
 
   if (!allowedExtensions.includes(ext)) {
     const error = new Error(
-      "Only image files (JPG, JPEG, PNG, WEBP) are allowed. GIFs and videos are not accepted."
+      "Only image files (JPG, JPEG, PNG, WEBP) are allowed. GIFs and videos are not accepted.",
     );
     error.statusCode = 400;
     return cb(error, false);
@@ -37,7 +37,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 15 * 1024 * 1024, // 15MB max size
+    fileSize: 10 * 1024 * 1024, // 15MB max size
   },
 });
 
@@ -49,9 +49,18 @@ const singleFileUpload = (fieldName) => (req, res, next) => {
 
   uploader(req, res, function (err) {
     if (err instanceof multer.MulterError) {
-      throw new customError("Multer error: " + err || "Multer error", 500);
+      console.log("multer error", "Multer error: " + err || "Multer error");
+      return next(
+        new customError(
+          "Multer error: " + err || "Multer error",
+          statusCodes.SERVER_ERROR,
+        ),
+      );
     } else if (err) {
-      throw new customError(err || "Multer error", 500);
+      console.log("Multer error: " + err);
+      return next(
+        new customError(err || "Multer error", statusCodes.SERVER_ERROR),
+      );
     }
     next();
   });
@@ -69,6 +78,7 @@ const multipleFileUpload =
       if (err instanceof multer.MulterError) {
         // Handle Multer-specific errors
         console.error("Multer multiple error:", err);
+
         return res.status(400).json({
           success: false,
           message: "Multer error: " + (err.message || "File upload error"),
@@ -89,20 +99,19 @@ const multipleFileUpload =
 const multipleFileUploadWithFields = (fields) => (req, res, next) => {
   const uploader = upload.fields(fields);
   uploader(req, res, function (err) {
+    console.log("multer error from multipleFileUploadWithFields", err);
     if (err instanceof multer.MulterError) {
-      // Handle Multer-specific errors
-      console.error("Multer multiple error:", err);
-      return res.status(400).json({
-        success: false,
-        message: "Multer error: " + (err.message || "File upload error"),
-      });
+      return next(
+        new customError(
+          "Multer error: " + err || "Multer error",
+          statusCodes.SERVER_ERROR,
+        ),
+      );
     } else if (err) {
-      // Handle other errors
-      console.error("File upload error:", err);
-      return res.status(500).json({
-        success: false,
-        message: err.message || "Internal Server Error",
-      });
+      console.log("multer error from multipleFileUploadWithFields", err);
+      return next(
+        new customError(err || "Multer error", statusCodes.SERVER_ERROR),
+      );
     }
     next();
   });

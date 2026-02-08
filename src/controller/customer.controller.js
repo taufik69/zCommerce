@@ -17,6 +17,7 @@ const {
   customerAdvancePaymentListDTO,
   customerAdvancePaymentDetailsDTO,
 } = require("../dtos/all.dto");
+const { statusCodes } = require("../constant/constant");
 
 // @desc create a new customer
 // @route POST /api/customers/create-customer
@@ -27,11 +28,14 @@ exports.createCustomer = asynchandeler(async (req, res) => {
     ...req.body,
     image: null,
   });
+  if (!customer) {
+    throw new customError("Customer creation failed", statusCodes.SERVER_ERROR);
+  }
 
   // Send Immediate Response (client won't wait for upload)
   apiResponse.sendSuccess(
     res,
-    202,
+    statusCodes.CREATED,
     "Customer creation started. Processing image in background...",
     customer.fullName,
   );
@@ -93,12 +97,16 @@ exports.getAllCustomers = asynchandeler(async (req, res) => {
   const customers = await customerModel.find(query).sort({ createdAt: -1 });
 
   if (!customers || customers.length === 0) {
-    return apiResponse.sendError(res, 404, "Customers not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Customers not found",
+    );
   }
 
   return apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Customers retrieved successfully",
     customerListDTO(customers),
   );
@@ -116,7 +124,11 @@ exports.updateCustomer = asynchandeler(async (req, res) => {
   const customer = await customerModel.findOne({ customerId });
 
   if (!customer) {
-    return apiResponse.sendError(res, 404, "Customer not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Customer not found",
+    );
   }
 
   // 2) Prevent forbidden updates
@@ -160,7 +172,7 @@ exports.updateCustomer = asynchandeler(async (req, res) => {
   // 5) Send response
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Customer updated successfully",
     updatedCustomer,
   );
@@ -171,9 +183,18 @@ exports.deleteCustomer = asynchandeler(async (req, res) => {
   const { customerId } = req.params;
   const customer = await customerModel.findOneAndDelete({ customerId });
   if (!customer) {
-    return apiResponse.sendError(res, 404, "Customer not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Customer not found",
+    );
   }
-  apiResponse.sendSuccess(res, 200, "Customer deleted successfully", customer);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Customer deleted successfully",
+    customer,
+  );
   // Delete  image from cludinary
   (async () => {
     try {
@@ -193,11 +214,15 @@ exports.createCustomerPaymentRecived = asynchandeler(async (req, res) => {
   const paymentRecived = new customerPaymentRecived(req.body);
   await paymentRecived.save();
   if (!paymentRecived) {
-    return apiResponse.sendError(res, 404, "Customer payment not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Customer payment not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.CREATED,
     "Customer payment recived successfully",
     customerPaymentDetailsDTO(paymentRecived),
   );
@@ -218,12 +243,16 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
     });
 
     if (!doc) {
-      return apiResponse.sendError(res, 404, "Customer payment not found");
+      return apiResponse.sendError(
+        res,
+        statusCodes.NOT_FOUND,
+        "Customer payment not found",
+      );
     }
 
     return apiResponse.sendSuccess(
       res,
-      200,
+      statusCodes.OK,
       "Customer payment retrieved successfully",
       customerPaymentDetailsDTO(doc),
     );
@@ -242,13 +271,17 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
   const docs = await customerPaymentRecived.find(query).sort({ createdAt: -1 });
 
   if (!docs || docs.length === 0) {
-    apiResponse.sendError(res, 404, "No customer payments found");
+    apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "No customer payments found",
+    );
   }
 
   //  Return list
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Customer payments retrieved successfully",
     customerPaymentListDTO(docs),
   );
@@ -265,11 +298,15 @@ exports.updateCustomerPaymentRecived = asynchandeler(async (req, res) => {
     { new: true, runValidators: true },
   );
   if (!paymentRecived) {
-    return apiResponse.sendError(res, 404, "Customer payment not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Customer payment not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Customer payment updated successfully",
     customerPaymentDetailsDTO(paymentRecived),
   );
@@ -284,11 +321,15 @@ exports.deleteCustomerPaymentRecived = asynchandeler(async (req, res) => {
     slug,
   });
   if (!paymentRecived) {
-    return apiResponse.sendError(res, 404, "Customer payment not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Customer payment not found",
+    );
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Customer payment deleted successfully",
     customerPaymentDetailsDTO(paymentRecived),
   );
@@ -302,13 +343,13 @@ exports.createCustomerAdvancePaymentRecived = asynchandeler(
     if (!paymentRecived) {
       return apiResponse.sendError(
         res,
-        401,
+        statusCodes.NOT_FOUND,
         "Customer advance payment not found",
       );
     }
     apiResponse.sendSuccess(
       res,
-      200,
+      statusCodes.CREATED,
       "Customer advance payment recived successfully",
       paymentRecived.customerName,
     );
@@ -330,12 +371,16 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
     });
 
     if (!doc) {
-      return apiResponse.sendError(res, 404, "Customer payment not found");
+      return apiResponse.sendError(
+        res,
+        statusCodes.NOT_FOUND,
+        "Customer payment not found",
+      );
     }
 
     return apiResponse.sendSuccess(
       res,
-      200,
+      statusCodes.OK,
       "Customer payment retrieved successfully",
       customerAdvancePaymentDetailsDTO(doc),
     );
@@ -356,13 +401,17 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
     .sort({ createdAt: -1 });
 
   if (!docs || docs.length === 0) {
-    apiResponse.sendError(res, 404, "No customer payments found");
+    apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "No customer payments found",
+    );
   }
 
   //  Return list
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Customer payments retrieved successfully",
     customerAdvancePaymentListDTO(docs),
   );
@@ -380,11 +429,15 @@ exports.updateCustomerAdvancePaymentRecived = asynchandeler(
       { new: true, runValidators: true },
     );
     if (!paymentRecived) {
-      return apiResponse.sendError(res, 404, "Customer payment not found");
+      return apiResponse.sendError(
+        res,
+        statusCodes.NOT_FOUND,
+        "Customer payment not found",
+      );
     }
     apiResponse.sendSuccess(
       res,
-      200,
+      statusCodes.OK,
       "Customer payment updated successfully",
       customerAdvancePaymentDetailsDTO(paymentRecived),
     );
@@ -401,11 +454,15 @@ exports.deleteCustomerAdvancePaymentRecived = asynchandeler(
       slug,
     });
     if (!paymentRecived) {
-      return apiResponse.sendError(res, 404, "Customer payment not found");
+      return apiResponse.sendError(
+        res,
+        statusCodes.NOT_FOUND,
+        "Customer payment not found",
+      );
     }
     apiResponse.sendSuccess(
       res,
-      200,
+      statusCodes.OK,
       "Customer payment deleted successfully",
       customerAdvancePaymentDetailsDTO(paymentRecived),
     );

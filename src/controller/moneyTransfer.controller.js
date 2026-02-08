@@ -2,6 +2,7 @@ const { customError } = require("../lib/CustomError");
 const MoneyTransfer = require("../models/moneyTransfer.model");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
+const { statusCodes } = require("../constant/constant");
 
 // create money transfer
 exports.createMoneyTransfer = asynchandeler(async (req, res) => {
@@ -17,7 +18,7 @@ exports.createMoneyTransfer = asynchandeler(async (req, res) => {
   if (!fromAccount || !toAccount || !amount) {
     throw new customError(
       "fromAccount, toAccount and amount are required",
-      400
+      statusCodes.BAD_REQUEST,
     );
   }
 
@@ -31,10 +32,18 @@ exports.createMoneyTransfer = asynchandeler(async (req, res) => {
   });
 
   if (!result) {
-    throw new customError("Money Transfer not created", 400);
+    throw new customError(
+      "Money Transfer not created",
+      statusCodes.SERVER_ERROR,
+    );
   }
 
-  apiResponse.sendSuccess(res, 200, "Money Transfer created", result);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    "Money Transfer created",
+    result,
+  );
 });
 
 // get all money transfer
@@ -44,9 +53,14 @@ exports.getAllMoneyTransfer = asynchandeler(async (req, res) => {
     .populate("toAccount")
     .sort({ createdAt: -1 });
   if (!result.length) {
-    throw new customError("Money Transfer not found", 400);
+    throw new customError("Money Transfer not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(res, 200, "Money Transfer fetched", result);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Money Transfer fetched",
+    result,
+  );
 });
 
 // get single money transfer
@@ -56,9 +70,14 @@ exports.getSingleMoneyTransfer = asynchandeler(async (req, res) => {
     .populate("fromAccount")
     .populate("toAccount");
   if (!result) {
-    throw new customError("Money Transfer not found", 400);
+    throw new customError("Money Transfer not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(res, 200, "Money Transfer fetched", result);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Money Transfer fetched",
+    result,
+  );
 });
 
 // update single money transfer
@@ -71,18 +90,28 @@ exports.updateMoneyTransfer = asynchandeler(async (req, res) => {
   if (!result) {
     throw new customError("Money Transfer not found", 400);
   }
-  apiResponse.sendSuccess(res, 200, "Money Transfer updated", result);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Money Transfer updated",
+    result,
+  );
 });
 
 // delete single money transfer
 exports.deleteMoneyTransfer = asynchandeler(async (req, res) => {
   const { id } = req.params;
   if (!id) {
-    throw new customError("Id is required", 400);
+    throw new customError("Id is required", statusCodes.BAD_REQUEST);
   }
   const result = await MoneyTransfer.findOneAndDelete({ _id: id });
   if (!result) {
-    throw new customError("Money Transfer not found", 400);
+    throw new customError("Money Transfer not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(res, 200, "Money Transfer deleted", result);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Money Transfer deleted",
+    result,
+  );
 });

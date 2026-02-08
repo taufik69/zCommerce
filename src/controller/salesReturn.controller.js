@@ -5,6 +5,7 @@ const SalesReturn = require("../models/salesReturn.model");
 const Product = require("../models/product.model");
 const Variant = require("../models/variant.model");
 const { validateByReturn } = require("../validation/salesReturn.validation");
+const { statusCodes } = require("../constant/constant");
 
 // @desc create a new sales return
 exports.createSalesReturn = asynchandeler(async (req, res) => {
@@ -21,7 +22,7 @@ exports.createSalesReturn = asynchandeler(async (req, res) => {
   if (data.product) {
     const product = await Product.findOne({ _id: data.product });
     if (!product) {
-      throw new customError("Product not found", 404);
+      throw new customError("Product not found", statusCodes.NOT_FOUND);
     }
     product.salesReturn.push(salesReturn._id);
     await product.save();
@@ -30,13 +31,18 @@ exports.createSalesReturn = asynchandeler(async (req, res) => {
     //   find the  variantid and push this sales return id
     const variant = await Variant.findOne({ _id: data.variant });
     if (!variant) {
-      throw new customError("Variant not found", 404);
+      throw new customError("Variant not found", statusCodes.NOT_FOUND);
     }
     variant.salesReturn.push(salesReturn._id);
     await variant.save();
   }
 
-  apiResponse.sendSuccess(res, 200, "Sales Return created", salesReturn);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    "Sales Return created",
+    salesReturn,
+  );
 });
 
 //@desc get all sales return
@@ -46,13 +52,13 @@ exports.getAllSalesReturn = asynchandeler(async (req, res) => {
     .populate("variant")
     .sort({ createdAt: -1 });
   if (!salesReturn || salesReturn.length === 0) {
-    throw new customError("No sales return found", 404);
+    throw new customError("No sales return found", statusCodes.NOT_FOUND);
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Sales Return fetched successfully",
-    salesReturn
+    salesReturn,
   );
 });
 
@@ -60,19 +66,19 @@ exports.getAllSalesReturn = asynchandeler(async (req, res) => {
 exports.getSingleSalesReturn = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   if (!slug) {
-    throw new customError("ID is required", 400);
+    throw new customError("ID is required", statusCodes.BAD_REQUEST);
   }
   const salesReturn = await SalesReturn.findOne({ slug })
     .populate("product")
     .populate("variant");
   if (!salesReturn) {
-    throw new customError("Sales Return not found", 404);
+    throw new customError("Sales Return not found", statusCodes.NOT_FOUND);
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Sales Return fetched successfully",
-    salesReturn
+    salesReturn,
   );
 });
 
@@ -82,13 +88,17 @@ exports.deleteSalesReturnBySlug = asynchandeler(async (req, res) => {
 
   const salesReturn = await SalesReturn.findOne({ slug });
   if (!salesReturn) {
-    return apiResponse.sendError(res, 404, "Sales Return not found");
+    return apiResponse.sendError(
+      res,
+      statusCodes.NOT_FOUND,
+      "Sales Return not found",
+    );
   }
   // delete sales return id from product model
   if (salesReturn.product) {
     const product = await Product.findOne({ _id: salesReturn.product });
     if (!product) {
-      throw new customError("Product not found", 404);
+      throw new customError("Product not found", statusCodes.NOT_FOUND);
     }
     product.salesReturn = product.salesReturn.pull(salesReturn._id);
     await product.save();
@@ -97,13 +107,18 @@ exports.deleteSalesReturnBySlug = asynchandeler(async (req, res) => {
   if (salesReturn.variant) {
     const variant = await Variant.findOne({ _id: salesReturn.variant });
     if (!variant) {
-      throw new customError("Variant not found", 404);
+      throw new customError("Variant not found", statusCodes.NOT_FOUND);
     }
     variant.salesReturn = variant.salesReturn.pull(salesReturn._id);
     await variant.save();
   }
   await SalesReturn.findByIdAndDelete(salesReturn._id);
-  apiResponse.sendSuccess(res, 200, "Sales Return deleted successfully");
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Sales Return deleted successfully",
+    null,
+  );
 });
 
 //update salesReturn
@@ -114,7 +129,7 @@ exports.updateSalesReturn = asynchandeler(async (req, res) => {
   // Find existing sales return
   const salesReturn = await SalesReturn.findOne({ slug });
   if (!salesReturn) {
-    throw new customError("Sales Return not found", 404);
+    throw new customError("Sales Return not found", statusCodes.NOT_FOUND);
   }
 
   /** -----------------------------------
@@ -170,9 +185,9 @@ exports.updateSalesReturn = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Sales Return updated successfully",
-    salesReturn
+    salesReturn,
   );
 });
 
@@ -183,7 +198,7 @@ exports.deleteSalesReturn = asynchandeler(async (req, res) => {
   // Find the sales return
   const salesReturn = await SalesReturn.findOne({ slug });
   if (!salesReturn) {
-    throw new customError("Sales Return not found", 404);
+    throw new customError("Sales Return not found", statusCodes.NOT_FOUND);
   }
 
   /** ------------------------------
@@ -193,7 +208,7 @@ exports.deleteSalesReturn = asynchandeler(async (req, res) => {
     await Product.findByIdAndUpdate(
       salesReturn.product,
       { $pull: { salesReturn: salesReturn._id } },
-      { new: true }
+      { new: true },
     );
   }
 
@@ -204,12 +219,16 @@ exports.deleteSalesReturn = asynchandeler(async (req, res) => {
     await Variant.findByIdAndUpdate(
       salesReturn.variant,
       { $pull: { salesReturn: salesReturn._id } },
-      { new: true }
+      { new: true },
     );
   }
 
   // Delete sales return
   await SalesReturn.findOneAndDelete({ slug });
 
-  apiResponse.sendSuccess(res, 200, "Sales Return deleted successfully");
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Sales Return deleted successfully",
+  );
 });

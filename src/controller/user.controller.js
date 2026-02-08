@@ -12,7 +12,7 @@ const {
   cloudinaryFileUpload,
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
-
+const { statusCodes } = require("../constant/constant");
 // user registraion/ or add user
 exports.registerUser = asynchandeler(async (req, res) => {
   // Validate input
@@ -22,7 +22,10 @@ exports.registerUser = asynchandeler(async (req, res) => {
   // Check if user already exists
   const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
   if (existingUser) {
-    throw new customError("Email or phone already in use", 409);
+    throw new customError(
+      "Email or phone already in use",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   // Create user
@@ -46,12 +49,17 @@ exports.registerUser = asynchandeler(async (req, res) => {
     })
     .populate("permissions")
     .select(
-      "-password -__v -resetPasswordToken -resetPasswordExpires -updatedAt -wishList -cart -newsLetterSubscribe -lastlogin -lastLogout -createdAt -refreshToken -twoFactorEnabled -newsLetterSubscribe -isEmailVerified -isPhoneVerified"
+      "-password -__v -resetPasswordToken -resetPasswordExpires -updatedAt -wishList -cart -newsLetterSubscribe -lastlogin -lastLogout -createdAt -refreshToken -twoFactorEnabled -newsLetterSubscribe -isEmailVerified -isPhoneVerified",
     );
   userObj.isEmailVerified = false;
   userObj.isPhoneVerified = false;
   await userObj.save();
-  return apiResponse.sendSuccess(res, 201, "Registration successful", userObj);
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    "Registration successful",
+    userObj,
+  );
 });
 
 // user login and send a refresh token and access token
@@ -62,15 +70,15 @@ exports.login = asynchandeler(async (req, res) => {
     .populate("roles")
     .populate("permissions.permission")
     .select(
-      "-__v -wishList -cart -newsLetterSubscribe  -lastLogout -createdAt  -twoFactorEnabled -newsLetterSubscribe -isEmailVerified -isPhoneVerified -roles -permission"
+      "-__v -wishList -cart -newsLetterSubscribe  -lastLogout -createdAt  -twoFactorEnabled -newsLetterSubscribe -isEmailVerified -isPhoneVerified -roles -permission",
     );
   if (!user) {
-    throw new customError("User not found", 404);
+    throw new customError("User not found", statusCodes.NOT_FOUND);
   }
   //check password
   const isPasswordMatch = await user.comparePassword(password);
   if (!isPasswordMatch) {
-    throw new customError("Invalid credentials", 401);
+    throw new customError("Invalid credentials", statusCodes.BAD_REQUEST);
   }
 
   // generate access token and refresh token
@@ -102,7 +110,7 @@ exports.login = asynchandeler(async (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
-  return apiResponse.sendSuccess(res, 200, "Login successful", {
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Login successful", {
     accessToken,
     user: userData,
   });
@@ -113,29 +121,34 @@ exports.refreshToken = asynchandeler(async (req, res) => {
   const refreshToken =
     req.cookies.refreshToken.trim() || req.headers["x-refresh-token"].trim();
   if (!refreshToken) {
-    throw new customError("Refresh token not found", 401);
+    throw new customError("Refresh token not found", statusCodes.UNAUTHORIZED);
   }
 
   // check refresh token in database
   const user = await User.findOne({ refreshToken });
   if (!user) {
-    throw new customError("Invalid refresh token", 401);
+    throw new customError("Invalid refresh token", statusCodes.UNAUTHORIZED);
   }
   // vefiy token using
   const decoded = jwt.verify(
     user.refreshToken,
-    process.env.REFRESH_TOKEN_SCCERET
+    process.env.REFRESH_TOKEN_SCCERET,
   );
   if (!decoded) {
-    throw new customError("Invalid refresh token", 401);
+    throw new customError("Invalid refresh token", statusCodes.UNAUTHORIZED);
   }
 
   // generate access token and refresh token
   const accessToken = await user.generateJwtAccessToken();
 
-  return apiResponse.sendSuccess(res, 200, "Refresh token send successful", {
-    accessToken,
-  });
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Refresh token send successful",
+    {
+      accessToken,
+    },
+  );
 });
 
 //logout user
@@ -143,21 +156,21 @@ exports.logout = asynchandeler(async (req, res) => {
   const refreshToken =
     req.cookies.refreshToken.trim() || req.headers["x-refresh-token"].trim();
   if (!refreshToken) {
-    throw new customError("Refresh token not found", 401);
+    throw new customError("Refresh token not found", statusCodes.UNAUTHORIZED);
   }
 
   // check refresh token in database
   const user = await User.findOne({ refreshToken });
   if (!user) {
-    throw new customError("Invalid refresh token", 401);
+    throw new customError("Invalid refresh token", statusCodes.UNAUTHORIZED);
   }
   // vefiy token using
   const decoded = jwt.verify(
     user.refreshToken,
-    process.env.REFRESH_TOKEN_SCCERET
+    process.env.REFRESH_TOKEN_SCCERET,
   );
   if (!decoded) {
-    throw new customError("Invalid refresh token", 401);
+    throw new customError("Invalid refresh token", statusCodes.UNAUTHORIZED);
   }
 
   // delete refresh token from database
@@ -171,13 +184,13 @@ exports.logout = asynchandeler(async (req, res) => {
     sameSite: "none",
   });
 
-  apiResponse.sendSuccess(res, 200, "Logout successful");
+  apiResponse.sendSuccess(res, statusCodes.OK, "Logout successful");
 });
 
 // send email verification
 exports.sendEmailVerification = asynchandeler(async (req, res) => {
   const user = await User.findOne({ email: req.body.email });
-  if (!user) throw new customError("User not found", 404);
+  if (!user) throw new customError("User not found", statusCodes.NOT_FOUND);
 
   // Generate token
   const token = crypto.randomBytes(32).toString("hex");
@@ -201,7 +214,7 @@ exports.sendEmailVerification = asynchandeler(async (req, res) => {
     html: `<a href="${verifyUrl}">Click to verify your email</a>`,
   });
 
-  apiResponse.sendSuccess(res, 200, "Verification email sent");
+  apiResponse.sendSuccess(res, statusCodes.OK, "Verification email sent");
 });
 
 // verify email
@@ -212,21 +225,22 @@ exports.verifyEmail = asynchandeler(async (req, res) => {
     resetPasswordToken: token,
     resetPasswordExpires: { $gt: Date.now() },
   });
-  if (!user) throw new customError("Invalid or expired token", 400);
+  if (!user)
+    throw new customError("Invalid or expired token", statusCodes.BAD_REQUEST);
 
   user.isEmailVerified = true;
   user.resetPasswordToken = undefined;
   user.resetPasswordExpires = undefined;
   await user.save();
 
-  apiResponse.sendSuccess(res, 200, "Email verified successfully");
+  apiResponse.sendSuccess(res, statusCodes.OK, "Email verified successfully");
 });
 
 //forgot password
 exports.forgotPassword = asynchandeler(async (req, res) => {
   const { email } = req.body;
   const user = await User.findOne({ email });
-  if (!user) throw new customError("User not found", 404);
+  if (!user) throw new customError("User not found", statusCodes.NOT_FOUND);
 
   const token = crypto.randomBytes(32).toString("hex");
   user.resetPasswordToken = token;
@@ -249,7 +263,7 @@ exports.forgotPassword = asynchandeler(async (req, res) => {
     html: `<a href="${resetUrl}">Click to reset your password</a>`,
   });
 
-  apiResponse.sendSuccess(res, 200, "Password reset email sent");
+  apiResponse.sendSuccess(res, statusCodes.OK, "Password reset email sent");
 });
 
 // reset password
@@ -260,20 +274,21 @@ exports.resetPassword = asynchandeler(async (req, res) => {
     resetPasswordToken: token,
     resetPasswordExpires: { $gt: Date.now() },
   });
-  if (!user) throw new customError("Invalid or expired token", 400);
+  if (!user)
+    throw new customError("Invalid or expired token", statusCodes.BAD_REQUEST);
 
   user.password = newPassword;
   user.resetPasswordToken = undefined;
   user.resetPasswordExpires = undefined;
   await user.save();
 
-  apiResponse.sendSuccess(res, 200, "Password reset successful");
+  apiResponse.sendSuccess(res, statusCodes.OK, "Password reset successful");
 });
 
 //change paassword
 exports.changePassword = asynchandeler(async (req, res) => {
   const user = await User.findById(req.user._id);
-  if (!user) throw new customError("User not found", 404);
+  if (!user) throw new customError("User not found", statusCodes.NOT_FOUND);
 
   const { oldPassword, newPassword } = req.body;
 
@@ -281,32 +296,43 @@ exports.changePassword = asynchandeler(async (req, res) => {
   if (!/^(?=.*\d)(?=.*[a-zA-Z]).{8,}$/.test(newPassword)) {
     throw new customError(
       "Password must contain at least 8 characters, including at least one letter and one number",
-      400
+      statusCodes.BAD_REQUEST,
     );
   }
 
   if (!(await user.comparePassword(oldPassword))) {
-    throw new customError("Old password is incorrect", 400);
+    throw new customError("Old password is incorrect", statusCodes.BAD_REQUEST);
   }
 
   user.password = newPassword;
   await user.save();
 
-  return apiResponse.sendSuccess(res, 200, "Password changed successfully");
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Password changed successfully",
+  );
 });
 
 // get all user
 exports.getAllUser = asynchandeler(async (_, res) => {
   const users = await User.find()
     .select(
-      "-__v -password -refreshToken  -createdAt  -twoFactorEnabled -newsLetterSubscribe "
+      "-__v -password -refreshToken  -createdAt  -twoFactorEnabled -newsLetterSubscribe ",
     )
     .populate([{ path: "roles" }])
     .populate("wishList")
     .populate("permissions")
     .lean()
     .sort({ createdAt: -1 });
-  return apiResponse.sendSuccess(res, 200, "User fetched successfully", users);
+  if (!users || users.length === 0)
+    throw new customError("User not found", statusCodes.NOT_FOUND);
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "User fetched successfully",
+    users,
+  );
 });
 
 // get single user using email or phone
@@ -314,7 +340,7 @@ exports.getUserbyEmailOrPhone = asynchandeler(async (req, res) => {
   const { email, phone } = req.query;
   const user = await User.findOne({ $or: [{ email }, { phone }] })
     .select(
-      "-__v -password -refreshToken  -createdAt  -twoFactorEnabled -newsLetterSubscribe "
+      "-__v -password -refreshToken  -createdAt  -twoFactorEnabled -newsLetterSubscribe ",
     )
     .populate([
       { path: "roles" },
@@ -322,15 +348,26 @@ exports.getUserbyEmailOrPhone = asynchandeler(async (req, res) => {
       { path: "wishList" },
       { path: "cart" },
     ]);
-  if (!user) throw new customError("User not found", 404);
-  apiResponse.sendSuccess(res, 200, "User fetched successfully", user);
+  if (!user) throw new customError("User not found", statusCodes.NOT_FOUND);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "User fetched successfully",
+    user,
+  );
 });
 
 //get me routes
 exports.getMe = asynchandeler(async (req, res) => {
   const user = req.user;
+  if (!user) throw new customError("User not found", statusCodes.NOT_FOUND);
 
-  apiResponse.sendSuccess(res, 200, "User fetched successfully", user);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "User fetched successfully",
+    user,
+  );
 });
 
 // search a user andd add permissin in  permission array
@@ -339,20 +376,26 @@ exports.addPermissionToUser = asynchandeler(async (req, res) => {
 
   // Check if user exists
   const user = await User.findById(userId);
-  if (!user) throw new customError("User not found", 404);
+  if (!user) throw new customError("User not found", statusCodes.NOT_FOUND);
 
   // Check if permission exists
   const permission = await Permission.findById(permissionId);
-  if (!permission) throw new customError("Permission not found", 404);
+  if (!permission)
+    throw new customError("Permission not found", statusCodes.NOT_FOUND);
 
   // Add permission to user's permissions array
   user.permissions.push(permission._id);
   await user.save();
 
-  apiResponse.sendSuccess(res, 200, "Permission added successfully", {
-    user,
-    permission,
-  });
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Permission added successfully",
+    {
+      user,
+      permission,
+    },
+  );
 });
 // remove permission from user
 exports.removePermissionFromUser = asynchandeler(async (req, res) => {
@@ -360,39 +403,53 @@ exports.removePermissionFromUser = asynchandeler(async (req, res) => {
 
   // Check if user exists
   const user = await User.findById(userId);
-  if (!user) throw new customError("User not found", 404);
+  if (!user) throw new customError("User not found", statusCodes.NOT_FOUND);
 
   // Check if permission exists
   const permission = await Permission.findById(permissionId);
-  if (!permission) throw new customError("Permission not found", 404);
+  if (!permission)
+    throw new customError("Permission not found", statusCodes.NOT_FOUND);
 
   // Remove permission from user's permissions array
   user.permissions = user.permissions.filter(
-    (perm) => perm.toString() !== permission._id.toString()
+    (perm) => perm.toString() !== permission._id.toString(),
   );
   await user.save();
 
-  apiResponse.sendSuccess(res, 200, "Permission removed successfully", {
-    user,
-    permission,
-  });
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Permission removed successfully",
+    {
+      user,
+      permission,
+    },
+  );
 });
 
 // is SuperAdmin
 exports.isSuperAdmin = asynchandeler(async (req, res) => {
   const { email, password, phone } = req.body;
   if (!email && !phone) {
-    throw new customError("Email or phone is required", 400);
+    throw new customError(
+      "Email or phone is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
   const user = await User.findOne({ $or: [{ email }, { phone }] });
   if (!user) {
-    throw new customError("User not found", 404);
+    throw new customError("User not found", statusCodes.NOT_FOUND);
   }
 
   const isSuperAdmin = user?.roles?.some((role) => role.slug === "superadmin");
-  return apiResponse.sendSuccess(res, 200, "User fetched successfully", {
-    isSuperAdmin,
-  });
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "User fetched successfully",
+    {
+      isSuperAdmin,
+    },
+  );
 });
 
 // add user
@@ -419,13 +476,13 @@ exports.addUser = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.CREATED,
     "User created successfully (image uploading in background)",
     {
       _id: user._id,
       name: user.name,
       email: user.email,
-    }
+    },
   );
 });
 
@@ -433,21 +490,21 @@ exports.addUser = asynchandeler(async (req, res) => {
 exports.getUserAddedByAdmin = asynchandeler(async (req, res) => {
   const users = await User.find({})
     .select(
-      "-__v -password -refreshToken -createdAt -twoFactorEnabled -newsLetterSubscribe"
+      "-__v -password -refreshToken -createdAt -twoFactorEnabled -newsLetterSubscribe",
     )
     .populate("roles");
 
   // filter users added by admin and roles array have some value
 
   const filteredUsers = users.filter(
-    (user) => user.roles && user.roles.length > 0
+    (user) => user.roles && user.roles.length > 0,
   );
-  console.log("req.user._id:", filteredUsers);
+
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Users fetched successfully",
-    filteredUsers
+    filteredUsers,
   );
 });
 
@@ -456,48 +513,51 @@ exports.updateUser = asynchandeler(async (req, res) => {
   const { id } = req.params;
   const data = req.body;
 
-  // ✅ Manual basic field validation
+  //  Manual basic field validation
   const requiredFields = ["name", "email", "phone"];
   for (const field of requiredFields) {
     if (!data[field] || data[field].toString().trim() === "") {
-      throw new customError(`${field} is required`, 400);
+      throw new customError(`${field} is required`, statusCodes.BAD_REQUEST);
     }
   }
 
-  // ✅ Prepare update object
+  //  Prepare update object
   const updateData = {
     name: data.name,
     email: data.email,
     phone: data.phone,
   };
 
-  // ✅ Add password only if given
+  //  Add password only if given
   if (data.password && data.password.trim() !== "") {
     updateData.password = data.password;
   }
 
-  // ✅ Replace roles array if new role given
+  //  Replace roles array if new role given
   if (data.role) {
     updateData.roles = [data.role];
   }
 
-  // ✅ Handle image upload & old image deletion
+  //  Handle image upload & old image deletion
   if (req.file) {
     const validTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
     if (!validTypes.includes(req.file.mimetype)) {
       throw new customError(
         "Invalid image format. Only JPG, PNG, and WEBP are allowed.",
-        400
+        statusCodes.BAD_REQUEST,
       );
     }
     if (req.file.size > 2 * 1024 * 1024) {
-      throw new customError("Image size should be less than 2MB.", 400);
+      throw new customError(
+        "Image size should be less than 2MB.",
+        statusCodes.BAD_REQUEST,
+      );
     }
 
     // Find existing user to get old image
     const existingUser = await User.findById(id);
     if (!existingUser) {
-      throw new customError("User not found", 404);
+      throw new customError("User not found", statusCodes.NOT_FOUND);
     }
 
     // Delete old image from Cloudinary if it exists
@@ -514,7 +574,7 @@ exports.updateUser = asynchandeler(async (req, res) => {
     updateData.image = upload.optimizeUrl;
   }
 
-  // ✅ Update user in DB
+  //  Update user in DB
   const updatedUser = await User.findByIdAndUpdate(id, updateData, {
     new: true,
     runValidators: true,
@@ -522,14 +582,19 @@ exports.updateUser = asynchandeler(async (req, res) => {
     .populate("roles")
     .populate("permissions")
     .select(
-      "-password -__v -resetPasswordToken -resetPasswordExpires -updatedAt -wishList -cart -newsLetterSubscribe -lastlogin -lastLogout -createdAt -refreshToken -twoFactorEnabled -isEmailVerified -isPhoneVerified"
+      "-password -__v -resetPasswordToken -resetPasswordExpires -updatedAt -wishList -cart -newsLetterSubscribe -lastlogin -lastLogout -createdAt -refreshToken -twoFactorEnabled -isEmailVerified -isPhoneVerified",
     );
 
   if (!updatedUser) {
-    throw new customError("User not found", 404);
+    throw new customError("User not found", statusCodes.NOT_FOUND);
   }
 
-  apiResponse.sendSuccess(res, 200, "User updated successfully", updatedUser);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "User updated successfully",
+    updatedUser,
+  );
 });
 
 // delte user
@@ -539,7 +604,7 @@ exports.deleteUser = asynchandeler(async (req, res) => {
   // Find user first
   const user = await User.findById(id);
   if (!user) {
-    throw new customError("User not found", 404);
+    throw new customError("User not found", statusCodes.NOT_FOUND);
   }
 
   // Delete image from Cloudinary if exists
@@ -554,5 +619,10 @@ exports.deleteUser = asynchandeler(async (req, res) => {
   // Delete user from DB
   await User.findByIdAndDelete(id);
 
-  apiResponse.sendSuccess(res, 200, "User deleted successfully", user);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "User deleted successfully",
+    user,
+  );
 });

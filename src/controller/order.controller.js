@@ -17,6 +17,7 @@ const { orderTemplate } = require("../emailTemplate/orderTemplate");
 
 const { sendSMS } = require("../helpers/sms");
 const { getIO } = require("../socket/socket");
+const { statusCodes } = require("../constant/constant");
 
 // applyDeliveryCharge
 const applyDeliveryCharge = async (deliveryChargeID) => {
@@ -32,14 +33,18 @@ const applyCouponDiscount = async (code, subtotal) => {
     return { discountedAmount: subtotal, discountAmount: 0, coupon: null };
 
   const coupon = await Coupon.findOne({ code, isActive: true });
-  if (!coupon) throw new customError("Invalid or expired coupon", 400);
+  if (!coupon)
+    throw new customError("Invalid or expired coupon", statusCodes.BAD_REQUEST);
 
   const now = new Date();
   if (coupon.expiry && now > coupon.expiry)
-    throw new customError("Coupon expired", 400);
+    throw new customError("Coupon expired", statusCodes.BAD_REQUEST);
 
   if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit)
-    throw new customError("Coupon usage limit exceeded", 400);
+    throw new customError(
+      "Coupon usage limit exceeded",
+      statusCodes.BAD_REQUEST,
+    );
 
   let discountAmount = 0;
   if (coupon.discountType === "percentage") {
@@ -78,7 +83,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
   });
 
   if (!cart || !cart.items || cart.items.length === 0) {
-    throw new customError("No items in the cart", 400);
+    throw new customError("No items in the cart", statusCodes.BAD_REQUEST);
   }
 
   // Step 2: Calculate subtotal & Check stock
@@ -90,13 +95,14 @@ exports.createOrder = asynchandeler(async (req, res) => {
     // if product exist
     if (item.product) {
       const product = await Product.findById(item.product).populate(
-        "category subcategory brand"
+        "category subcategory brand",
       );
-      if (!product) throw new customError(`Product not found`, 404);
+      if (!product)
+        throw new customError(`Product not found`, statusCodes.NOT_FOUND);
       if (product?.stock < item?.quantity) {
         throw new customError(
           `${product.name} does not have enough stock`,
-          400
+          statusCodes.BAD_REQUEST,
         );
       }
       totalProductInfo.push({
@@ -119,12 +125,13 @@ exports.createOrder = asynchandeler(async (req, res) => {
     if (item.variant) {
       const variant = await Variant.findById(item.variant).populate("product");
 
-      if (!variant) throw new customError(`Variant not found`, 404);
+      if (!variant)
+        throw new customError(`Variant not found`, statusCodes.NOT_FOUND);
 
       if (variant.stockVariant < item.quantity) {
         throw new customError(
           `${variant.variantName} does not have enough stock from variant`,
-          400
+          statusCodes.BAD_REQUEST,
         );
       }
       totalProductInfo.push({
@@ -151,7 +158,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
   // Step 4: Delivery Charge
   const deliveryChargeAmount = await applyDeliveryCharge(deliveryCharge);
   if (!deliveryChargeAmount)
-    throw new customError("Invalid delivery type", 400);
+    throw new customError("Invalid delivery type", statusCodes.BAD_REQUEST);
 
   // Step 5: Final Total
   const finalAmount = couponCode
@@ -193,7 +200,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
         if (item.product.stock < item.quantity) {
           throw new customError(
             `${item.product.name} does not have enough stock`,
-            400
+            400,
           );
         }
         stockUpdatePromises.push(
@@ -201,8 +208,8 @@ exports.createOrder = asynchandeler(async (req, res) => {
             { _id: item.product },
             {
               $inc: { stock: -item.quantity, totalSales: item.quantity },
-            }
-          )
+            },
+          ),
         );
       }
       // Variant stock update
@@ -210,7 +217,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
         if (item.variant.stockVariant < item.quantity) {
           throw new customError(
             `${item.variant.variantName} does not have enough stock from variant`,
-            400
+            400,
           );
         }
         stockUpdatePromises.push(
@@ -218,8 +225,8 @@ exports.createOrder = asynchandeler(async (req, res) => {
             { _id: item.variant },
             {
               $inc: { stockVariant: -item.quantity, totalSales: item.quantity },
-            }
-          )
+            },
+          ),
         );
       }
     }
@@ -247,15 +254,15 @@ exports.createOrder = asynchandeler(async (req, res) => {
         order,
         shippingInfo,
         invoice,
-        totalProductInfo
+        totalProductInfo,
       );
       const data = await sendEmail(
         shippingInfo?.email,
         "Order Confirmation",
-        orderTemplateHtml
+        orderTemplateHtml,
       );
       if (!data) {
-        throw new customError("Failed to send email", 500);
+        throw new customError("Failed to send email", statusCodes.SERVER_ERROR);
       }
     }
 
@@ -290,7 +297,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
         ipn_url: `${process.env.BACKEND_URL}/payment/ipn`,
         product_name:
           (totalProductInfo && totalProductInfo?.map((item) => item.name)).join(
-            ","
+            ",",
           ) || "Computer.",
         product_category: "Electronic",
         product_profile: "general",
@@ -310,7 +317,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
       const sslcz = new SSLCommerzPayment(
         process.env.SSLC_STORE_ID,
         process.env.SSLC_STORE_PASSWORD,
-        is_live
+        is_live,
       );
       const response = await sslcz.init(data);
       // Redirect the user to payment gateway
@@ -324,13 +331,23 @@ exports.createOrder = asynchandeler(async (req, res) => {
         order: order,
       });
       // return res.status(301).redirect(response.GatewayPageURL);
-      apiResponse.sendSuccess(res, 201, "Order placed successfully", {
-        url: response.GatewayPageURL,
-        order,
-      });
+      apiResponse.sendSuccess(
+        res,
+        statusCodes.CREATED,
+        "Order placed successfully",
+        {
+          url: response.GatewayPageURL,
+          order,
+        },
+      );
     } else {
       // Final success response
-      apiResponse.sendSuccess(res, 201, "Order placed successfully", order);
+      apiResponse.sendSuccess(
+        res,
+        statusCodes.CREATED,
+        "Order placed successfully",
+        order,
+      );
     }
   } catch (error) {
     console.log(error);
@@ -346,8 +363,8 @@ exports.createOrder = asynchandeler(async (req, res) => {
               { _id: item.product },
               {
                 $inc: { stock: -item.quantity, totalSales: item.quantity },
-              }
-            )
+              },
+            ),
           );
         }
         // Variant stock update
@@ -360,8 +377,8 @@ exports.createOrder = asynchandeler(async (req, res) => {
                   stockVariant: -item.quantity,
                   totalSales: item.quantity,
                 },
-              }
-            )
+              },
+            ),
           );
         }
       }
@@ -372,7 +389,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
       if (coupon) {
         await Coupon.updateOne(
           { _id: coupon._id },
-          { $inc: { usedCount: -1 } }
+          { $inc: { usedCount: -1 } },
         );
         console.log("Coupon usage rolled back due to error.");
       }
@@ -381,7 +398,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
       await Order.deleteOne({ _id: order._id });
       console.log("Incomplete order deleted.");
     }
-    throw new customError(error.message, 500);
+    throw new customError(error.message, statusCodes.SERVER_ERROR);
   }
 });
 
@@ -394,7 +411,12 @@ exports.getAllOrders = asynchandeler(async (req, res) => {
     .populate("coupon")
     .sort({ createdAt: -1 })
     .lean();
-  apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Orders fetched successfully",
+    orders,
+  );
 });
 
 //@desc get single order
@@ -407,9 +429,14 @@ exports.getSingleOrder = asynchandeler(async (req, res) => {
     .sort({ createdAt: -1 })
     .lean();
   if (!singleOrder) {
-    throw new customError("Order not found", 404);
+    throw new customError("Order not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(res, 200, "Order fetched successfully", singleOrder);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Order fetched successfully",
+    singleOrder,
+  );
 });
 
 //@desc find oder by id and update orderStatus
@@ -419,7 +446,7 @@ exports.updateOrder = asynchandeler(async (req, res) => {
 
   const singleOrder = await Order.findOne({ _id: id });
   if (!singleOrder) {
-    throw new customError("Order not found", 404);
+    throw new customError("Order not found", statusCodes.NOT_FOUND);
   }
 
   // if orderStatus is Cancelled then rollback stock
@@ -433,8 +460,8 @@ exports.updateOrder = asynchandeler(async (req, res) => {
           Product.updateOne(
             { _id: item.product._id },
             { $inc: { stock: item.quantity, totalSales: -item.quantity } },
-            { new: true }
-          )
+            { new: true },
+          ),
         );
       }
 
@@ -446,8 +473,8 @@ exports.updateOrder = asynchandeler(async (req, res) => {
             {
               $inc: { stockVariant: item.quantity, totalSales: -item.quantity },
             },
-            { new: true }
-          )
+            { new: true },
+          ),
         );
       }
     }
@@ -467,7 +494,12 @@ exports.updateOrder = asynchandeler(async (req, res) => {
 
   await singleOrder.save();
 
-  apiResponse.sendSuccess(res, 200, "Order updated successfully", singleOrder);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Order updated successfully",
+    singleOrder,
+  );
 });
 
 // fiter order using datewise like today and yesterday last 7 days last month
@@ -495,9 +527,19 @@ exports.filterOrderdatewise = asynchandeler(async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
+    apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Orders fetched successfully",
+      orders,
+    );
   } catch (err) {
-    apiResponse.sendError(res, 500, "Error fetching orders", err.message);
+    apiResponse.sendError(
+      res,
+      statusCodes.SERVER_ERROR,
+      "Error fetching orders",
+      err.message,
+    );
   }
 });
 
@@ -511,9 +553,14 @@ exports.trackOrder = asynchandeler(async (req, res) => {
     .sort({ createdAt: -1 })
     .lean();
   if (!order) {
-    throw new customError("Order not found", 404);
+    throw new customError("Order not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(res, 200, "Order fetched successfully", order);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Order fetched successfully",
+    order,
+  );
 });
 
 // delete order when delete order then rollback stock and coupon usage and also delete invoice
@@ -522,7 +569,7 @@ exports.deleteOrder = asynchandeler(async (req, res) => {
   const { id } = req.params;
   const singleOrder = await Order.findOne({ _id: id });
   if (!singleOrder) {
-    throw new customError("Order not found", 404);
+    throw new customError("Order not found", statusCodes.NOT_FOUND);
   }
 
   // Rollback stock
@@ -534,8 +581,8 @@ exports.deleteOrder = asynchandeler(async (req, res) => {
         Product.updateOne(
           { _id: item.product._id },
           { $inc: { stock: item.quantity, totalSales: -item.quantity } },
-          { new: true }
-        )
+          { new: true },
+        ),
       );
     }
     // Variant stock update
@@ -544,8 +591,8 @@ exports.deleteOrder = asynchandeler(async (req, res) => {
         Variant.updateOne(
           { _id: item.variant._id },
           { $inc: { stockVariant: item.quantity, totalSales: -item.quantity } },
-          { new: true }
-        )
+          { new: true },
+        ),
       );
     }
   }
@@ -554,7 +601,7 @@ exports.deleteOrder = asynchandeler(async (req, res) => {
   if (singleOrder.coupon) {
     await Coupon.updateOne(
       { _id: singleOrder.coupon },
-      { $inc: { usedCount: -1 } }
+      { $inc: { usedCount: -1 } },
     );
   }
   // Delete the order
@@ -562,7 +609,12 @@ exports.deleteOrder = asynchandeler(async (req, res) => {
   // Also delete associated invoice
   await Invoice.deleteOne({ order: id });
 
-  apiResponse.sendSuccess(res, 200, "Order deleted successfully", null);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Order deleted successfully",
+    null,
+  );
 });
 
 // get all pending courier
@@ -573,7 +625,12 @@ exports.getAllPendingOrders = asynchandeler(async (req, res) => {
     .populate("coupon")
     .sort({ createdAt: -1 })
     .lean();
-  apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Orders fetched successfully",
+    orders,
+  );
 });
 
 // search order by invoiceId or orderid (_id)
@@ -586,7 +643,12 @@ exports.searchOrder = asynchandeler(async (req, res) => {
     .populate("deliveryCharge")
     .populate("coupon")
     .lean();
-  apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Orders fetched successfully",
+    orders,
+  );
 });
 
 // get total order count pending order  shipped order hold order  deliverd order canclled order courier pending order
@@ -604,9 +666,9 @@ exports.getOrderStatusCount = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     " Order Status Count fetched successfully",
-    { orderCount, totalOrder }
+    { orderCount, totalOrder },
   );
 });
 
@@ -621,25 +683,31 @@ exports.getOrderCountAndAmount = asynchandeler(async (req, res) => {
       },
     },
   ]);
+  if (!orderCountAndAmount) {
+    throw new customError("Order not found", statusCodes.NOT_FOUND);
+  }
   const totalOrder = await Order.countDocuments();
+  if (!totalOrder) {
+    throw new customError("Order not found", statusCodes.NOT_FOUND);
+  }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Order count and amount fetched successfully",
-    { orderCountAndAmount, totalOrder }
+    { orderCountAndAmount, totalOrder },
   );
 });
 
 // date wise totalOrder
 exports.getTodayOrderCountAndAmount = asynchandeler(async (req, res) => {
-  // 1️⃣ Get today's date range
+  // 1️ Get today's date range
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0); // today 00:00:00
 
   const endOfDay = new Date();
   endOfDay.setHours(23, 59, 59, 999); // today 23:59:59
 
-  // 2️⃣ Aggregate today's orders by status
+  // 2️ Aggregate today's orders by status
   const orderCountAndAmount = await Order.aggregate([
     {
       $match: {
@@ -655,17 +723,17 @@ exports.getTodayOrderCountAndAmount = asynchandeler(async (req, res) => {
     },
   ]);
 
-  // 3️⃣ Total orders today
+  // 3️ Total orders today
   const todaytotalOrder = await Order.countDocuments({
     createdAt: { $gte: startOfDay, $lte: endOfDay },
   });
 
-  // 4️⃣ Send response
+  // 4️ Send response
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Today's order count and amount fetched successfully",
-    { orderCountAndAmount, todaytotalOrder }
+    { orderCountAndAmount, todaytotalOrder },
   );
 });
 
@@ -684,7 +752,15 @@ exports.getCourierInfo = asynchandeler(async (req, res) => {
     .sort({ createdAt: -1 })
     .lean();
 
-  apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
+  if (!orders) {
+    throw new customError("Order not found", statusCodes.NOT_FOUND);
+  }
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Orders fetched successfully",
+    orders,
+  );
 });
 
 // getDeliveryBoyOrders
@@ -695,5 +771,13 @@ exports.getDeliveryBoyOrders = asynchandeler(async (_, res) => {
     .populate("coupon")
     .sort({ createdAt: -1 })
     .lean();
-  apiResponse.sendSuccess(res, 200, "Orders fetched successfully", orders);
+  if (!orders) {
+    throw new customError("Order not found", statusCodes.NOT_FOUND);
+  }
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Orders fetched successfully",
+    orders,
+  );
 });

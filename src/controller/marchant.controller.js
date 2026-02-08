@@ -3,6 +3,7 @@ const Merchant = require("../models/marchant.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { validateMerchant } = require("../validation/marchant.validation");
+const { statusCodes } = require("../constant/constant");
 
 // @desc create a new merchant
 exports.createMerchant = asynchandeler(async (req, res) => {
@@ -10,14 +11,17 @@ exports.createMerchant = asynchandeler(async (req, res) => {
   const newMerchant = new Merchant(merchantData);
   await newMerchant.save();
   if (!newMerchant) {
-    throw new customError("Failed to create merchant", 500);
+    throw new customError(
+      "Failed to create merchant",
+      statusCodes.SERVER_ERROR,
+    );
   }
 
   apiResponse.sendSuccess(
     res,
-    201,
+    statusCodes.CREATED,
     "Merchant created successfully",
-    newMerchant
+    newMerchant,
   );
 });
 
@@ -25,14 +29,19 @@ exports.createMerchant = asynchandeler(async (req, res) => {
 exports.getAllMerchants = asynchandeler(async (req, res) => {
   const merchants = await Merchant.find({}).sort({ createdAt: -1 });
   if (!merchants || merchants?.length === 0) {
-    return apiResponse.sendSuccess(res, 200, "No merchants found", []);
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "No merchants found",
+      [],
+    );
   }
 
   apiResponse.sendSuccess(
     res,
     200,
     "Merchants retrieved successfully",
-    merchants
+    merchants,
   );
 });
 
@@ -41,13 +50,13 @@ exports.getMerchantById = asynchandeler(async (req, res) => {
   const { id } = req.params;
   const merchant = await Merchant.findById(id);
   if (!merchant) {
-    throw new customError("Merchant not found", 404);
+    throw new customError("Merchant not found", statusCodes.NOT_FOUND);
   }
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Merchant retrieved successfully",
-    merchant
+    merchant,
   );
 });
 
@@ -60,14 +69,17 @@ exports.updateMerchantById = asynchandeler(async (req, res) => {
   });
 
   if (!updatedMerchant) {
-    throw new customError("Failed to update merchant", 500);
+    throw new customError(
+      "Failed to update merchant",
+      statusCodes.SERVER_ERROR,
+    );
   }
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Merchant updated successfully",
-    updatedMerchant
+    updatedMerchant,
   );
 });
 
@@ -76,13 +88,16 @@ exports.deleteMerchantById = asynchandeler(async (req, res) => {
   const { id } = req.params;
   const deletedMerchant = await Merchant.findByIdAndDelete(id);
   if (!deletedMerchant) {
-    throw new customError("Failed to delete merchant", 500);
+    throw new customError(
+      "Failed to delete merchant",
+      statusCodes.SERVER_ERROR,
+    );
   }
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Merchant deleted successfully",
-    deletedMerchant
+    deletedMerchant,
   );
 });

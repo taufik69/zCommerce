@@ -3,19 +3,26 @@ const WishList = require("../models/wishList.model");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { getIO } = require("../socket/socket");
+const { statusCodes } = require("../constant/constant");
 //@desc add to wishlist
 exports.addToWishlist = asynchandeler(async (req, res) => {
   const { productId, variantId } = req.body;
 
   if (!productId && !variantId) {
-    throw new customError("Product ID or Variant ID is required", 400);
+    throw new customError(
+      "Product ID or Variant ID is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   const userId = req?.user?._id || req?.body?.userId || null;
   const guestId = req?.body?.guestId || null;
 
   if (!userId && !guestId) {
-    throw new customError("User or Guest ID is required", 400);
+    throw new customError(
+      "User or Guest ID is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   // Find wishlist
@@ -40,7 +47,12 @@ exports.addToWishlist = asynchandeler(async (req, res) => {
       message: "🛒 Product added to your wishlist successfully",
       wishlist: wishlist,
     });
-    apiResponse.sendSuccess(res, 201, "Wishlist created", wishlist);
+    apiResponse.sendSuccess(
+      res,
+      statusCodes.CREATED,
+      "Wishlist created",
+      wishlist,
+    );
   }
 
   // Check if the item (product or variant) already exists
@@ -54,14 +66,19 @@ exports.addToWishlist = asynchandeler(async (req, res) => {
   });
 
   if (alreadyExists) {
-    throw new customError("Item already in wishlist", 400);
+    throw new customError("Item already in wishlist", statusCodes.BAD_REQUEST);
   }
 
   // Add new item to wishlist
   wishlist.items.push(newItem);
   await wishlist.save();
 
-  apiResponse.sendSuccess(res, 200, "Item added to wishlist", wishlist);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    "Item added to wishlist",
+    wishlist,
+  );
 });
 
 // @desc get all useList using guestid or userid and populate product
@@ -71,7 +88,10 @@ exports.getAllUserWishlist = asynchandeler(async (req, res) => {
   const guestId = req?.query?.guestId || null;
 
   if (!userId && !guestId) {
-    throw new customError("User or Guest ID is required", 400);
+    throw new customError(
+      "User or Guest ID is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   const query = userId ? { user: userId } : { guestId };
@@ -87,16 +107,21 @@ exports.getAllUserWishlist = asynchandeler(async (req, res) => {
     .lean();
 
   if (!wishlist) {
-    throw new customError("Wishlist not found", 404);
+    throw new customError("Wishlist not found", statusCodes.NOT_FOUND);
   }
 
- const io = getIO();
+  const io = getIO();
   io.to(userId || guestId).emit("getwishlist", {
     message: "📋 Wishlist fetched successfully",
     wishlist: wishlist,
   });
 
-  apiResponse.sendSuccess(res, 200, "Wishlist fetched successfully", wishlist);
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Wishlist fetched successfully",
+    wishlist,
+  );
 });
 
 //@desc delete wishlist  by guest id or  userId
@@ -104,23 +129,28 @@ exports.getAllUserWishlist = asynchandeler(async (req, res) => {
 exports.deleteWishlistItem = asynchandeler(async (req, res) => {
   const { productId, variantId } = req.body;
 
-
   if (!productId && !variantId) {
-    throw new customError("Product ID or Variant ID is required", 400);
+    throw new customError(
+      "Product ID or Variant ID is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   const userId = req?.user?._id || req?.body?.userId || null;
   const guestId = req?.body?.guestId || null;
 
   if (!userId && !guestId) {
-    throw new customError("User or Guest ID is required", 400);
+    throw new customError(
+      "User or Guest ID is required",
+      statusCodes.BAD_REQUEST,
+    );
   }
 
   const query = userId ? { user: userId } : { guestId };
 
   const wishlist = await WishList.findOne(query);
   if (!wishlist) {
-    throw new customError("Wishlist not found", 404);
+    throw new customError("Wishlist not found", statusCodes.NOT_FOUND);
   }
 
   // Filter out the matching item
@@ -144,8 +174,8 @@ exports.deleteWishlistItem = asynchandeler(async (req, res) => {
 
   apiResponse.sendSuccess(
     res,
-    200,
+    statusCodes.OK,
     "Wishlist item deleted successfully",
-    wishlist
+    wishlist,
   );
 });

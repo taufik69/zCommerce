@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const purchaseSchema = new mongoose.Schema(
   {
@@ -113,7 +114,12 @@ purchaseSchema.pre("save", async function (next) {
       existingInvoiceNumber &&
       existingInvoiceNumber._id.toString() !== this._id.toString()
     ) {
-      return next(new customError("Invoice Number already exists", 400));
+      return next(
+        new customError(
+          "Invoice Number already exists",
+          statusCodes.BAD_REQUEST,
+        ),
+      );
     }
     next();
   } catch (error) {
