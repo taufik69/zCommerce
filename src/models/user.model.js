@@ -1,3 +1,4 @@
+require("dotenv").config();
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -102,14 +103,14 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 // Generate JWT token
 userSchema.methods.generateJwtRefreshToken = function () {
   try {
-    if (!process.env.REFRESH_TOKEN_SECRET) {
+    if (!process.env.REFRESH_TOKEN_SCCERET) {
       throw new customError(
         "Refresh token secret is not defined",
         statusCodes.SERVER_ERROR,
       );
     }
 
-    return jwt.sign({ id: this._id }, process.env.REFRESH_TOKEN_SECRET, {
+    return jwt.sign({ id: this._id }, process.env.REFRESH_TOKEN_SCCERET, {
       expiresIn: process.env.REFRESH_TOKEN_EXPIRY || "7d",
     });
   } catch (error) {

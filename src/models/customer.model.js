@@ -3,6 +3,66 @@ const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
 
 const { default: slugify } = require("slugify");
+const customerTypeSchema = mongoose.Schema({
+  customerType: {
+    type: String,
+    trim: true,
+    default: "",
+    // example enum if you want:
+    // enum: ["regular", "wholesale", "vip", ""],
+  },
+  slug: {
+    type: String,
+  },
+});
+
+// make a slug
+customerTypeSchema.pre("save", function (next) {
+  if (this.isModified("customerType")) {
+    this.slug = slugify(this.customerType, {
+      lower: true,
+      strict: true,
+      trim: true,
+    });
+  }
+  next();
+});
+
+// check if slug already exist or not
+customerTypeSchema.pre("save", async function (next) {
+  try {
+    const existing = await this.constructor.findOne({ slug: this.slug });
+    if (existing && existing._id.toString() !== this._id.toString()) {
+      return next(
+        new customError(
+          `Customer type with name "${this.customerType}" already exists`,
+          statusCodes.BAD_REQUEST,
+        ),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+//when findoneandupdate then update the slug
+customerTypeSchema.pre("findOneAndUpdate", async function (next) {
+  const update = this.getUpdate();
+  if (update.customerType) {
+    update.slug = slugify(update.customerType, {
+      lower: true,
+      strict: true,
+      trim: true,
+    });
+  }
+  next();
+});
+
+const CustomerType =
+  mongoose.models.CustomerType ||
+  mongoose.model("CustomerType", customerTypeSchema);
+
 const customerSchema = new mongoose.Schema(
   {
     customerId: {
@@ -421,6 +481,7 @@ const customerAdvancePaymentModel =
   mongoose.model("CustomerAdvancePayment", customerAdvancePaymentSchema);
 
 module.exports = {
+  CustomerType,
   customerModel,
   customerPaymentRecived,
   customerAdvancePaymentModel,

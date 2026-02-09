@@ -5,6 +5,7 @@ const {
   customerModel,
   customerPaymentRecived,
   customerAdvancePaymentModel,
+  CustomerType,
 } = require("../models/customer.model");
 const {
   cloudinaryFileUpload,
@@ -18,6 +19,97 @@ const {
   customerAdvancePaymentDetailsDTO,
 } = require("../dtos/all.dto");
 const { statusCodes } = require("../constant/constant");
+
+// @desc crate CustomerType document
+// @route POST /api/customers/create-customertype
+// @access Private
+exports.createCustomerType = asynchandeler(async (req, res) => {
+  if (!req.body.customerType) {
+    throw new customError(
+      "Customer Type name is required",
+      statusCodes.BAD_REQUEST,
+    );
+  }
+  const customerType = await CustomerType.create(req.body);
+  if (!customerType) {
+    throw new customError(
+      "Customer Type creation failed",
+      statusCodes.SERVER_ERROR,
+    );
+  }
+
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    "Customer Type created successfully",
+    customerType,
+  );
+});
+
+// @desc get all customers
+// @route GET /api/customers/get-customers
+// @access Private
+exports.getAllCustomersTypes = asynchandeler(async (req, res) => {
+  let { slug } = req.query;
+  if (slug) {
+    const customer = await CustomerType.findOne({ slug });
+    if (!customer) {
+      throw new customError("Customer not found", statusCodes.NOT_FOUND);
+    }
+    apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Customer fetched successfully",
+      customer,
+    );
+  }
+  const customers = await CustomerType.find();
+  if (!customers || customers.length === 0) {
+    throw new customError("No customer found", statusCodes.NOT_FOUND);
+  }
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Customers fetched successfully",
+    customers,
+  );
+});
+
+//@desc update customerType
+// @route PUT /api/customers/update-customertype/:customerTypeId
+// @access Private
+exports.updateCustomerType = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const customerType = await CustomerType.findOneAndUpdate({ slug }, req.body, {
+    new: true,
+  });
+  if (!customerType) {
+    throw new customError("Customer Type not found", statusCodes.NOT_FOUND);
+  }
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Customer Type updated successfully",
+    customerType,
+  );
+});
+
+// @desc delete customerType
+// @route DELETE /api/customers/delete-customertype/:customerTypeId
+// @access Private
+exports.deleteCustomerType = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const customerType = await CustomerType.findOneAndDelete({ slug });
+  if (!customerType) {
+    throw new customError("Customer Type not found", statusCodes.NOT_FOUND);
+  }
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Customer Type deleted successfully",
+    customerType,
+  );
+});
 
 // @desc create a new customer
 // @route POST /api/customers/create-customer

@@ -12,14 +12,25 @@ const {
   updateCustomerAdvancePaymentSchema,
 } = require("../../validation/customer.validation");
 
+// customer type api
+
+_.route("/create-customertype").post(customerController.createCustomerType);
+_.route("/get-customertypes").get(customerController.getAllCustomersTypes);
+_.route("/update-customertype/:slug").put(
+  customerController.updateCustomerType,
+);
+
+_.route("/delete-customertype/:slug").delete(
+  customerController.deleteCustomerType,
+);
+
+// customer api
 _.route("/create-customer").post(
   multipleFileUpload("image", 1),
   validateCustomerCreate,
   customerController.createCustomer,
 );
-
 _.route("/get-customers").get(customerController.getAllCustomers);
-
 _.route("/update-customer/:customerId").put(
   multipleFileUpload("image", 1),
   validateCustomerUpdate,
