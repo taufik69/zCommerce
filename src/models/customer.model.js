@@ -63,6 +63,8 @@ const CustomerType =
   mongoose.models.CustomerType ||
   mongoose.model("CustomerType", customerTypeSchema);
 
+// customer model
+
 const customerSchema = new mongoose.Schema(
   {
     customerId: {
@@ -247,29 +249,17 @@ const customerModel =
 
 const customerPaymentRecivedSchema = new mongoose.Schema(
   {
-    customerName: {
-      type: String,
-      required: [true, "Customer name is required"],
+    customer: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: [true, "Customer id is required"],
       trim: true,
-    },
-
-    slug: {
-      type: String,
-      unique: true,
-      lowercase: true,
-      trim: true,
+      ref: "Customer",
     },
 
     referenceInvoice: {
       type: String,
       trim: true,
       default: "",
-    },
-
-    dueBalance: {
-      type: Number,
-      default: 0,
-      min: 0,
     },
 
     paidAmount: {
@@ -321,50 +311,6 @@ const customerPaymentRecivedSchema = new mongoose.Schema(
   },
 );
 
-/**
- * Generate slug from customerName
- */
-customerPaymentRecivedSchema.pre("save", function (next) {
-  if (this.isModified("customerName")) {
-    this.slug = slugify(this.customerName, {
-      lower: true,
-      strict: true,
-      trim: true,
-    });
-  }
-  next();
-});
-
-/**
- * Ensure slug uniqueness
- */
-customerPaymentRecivedSchema.pre("save", async function (next) {
-  try {
-    const existing = await this.constructor.findOne({ slug: this.slug });
-
-    if (existing && existing._id.toString() !== this._id.toString()) {
-      return next(
-        new customError(
-          `Customer payment with name "${this.customerName}" already exists`,
-          statusCodes.BAD_REQUEST,
-        ),
-      );
-    }
-
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
-
-// when update then also update slug
-customerPaymentRecivedSchema.pre("findOneAndUpdate", async function (next) {
-  const update = this.getUpdate();
-  if (update.customerName) {
-    update.slug = slugify(update.customerName, { lower: true });
-  }
-  next();
-});
 const customerPaymentRecived =
   mongoose.models.CustomerPaymentRecived ||
   mongoose.model("CustomerPaymentRecived", customerPaymentRecivedSchema);
@@ -373,10 +319,11 @@ const customerPaymentRecived =
 
 const customerAdvancePaymentSchema = new mongoose.Schema(
   {
-    customerName: {
-      type: String,
+    customer: {
+      type: mongoose.Schema.Types.ObjectId,
       required: [true, "Customer name is required"],
       trim: true,
+      ref: "Customer",
     },
     slug: {
       type: String,

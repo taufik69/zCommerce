@@ -19,6 +19,7 @@ const {
   customerAdvancePaymentDetailsDTO,
 } = require("../dtos/all.dto");
 const { statusCodes } = require("../constant/constant");
+const { default: mongoose } = require("mongoose");
 
 // @desc crate CustomerType document
 // @route POST /api/customers/create-customertype
@@ -303,21 +304,75 @@ exports.deleteCustomer = asynchandeler(async (req, res) => {
 
 // customer payment recived controller
 exports.createCustomerPaymentRecived = asynchandeler(async (req, res) => {
-  const paymentRecived = new customerPaymentRecived(req.body);
-  await paymentRecived.save();
-  if (!paymentRecived) {
-    return apiResponse.sendError(
+  const session = await mongoose.startSession();
+  try {
+    const customerid = req.body.customer;
+
+    const paidAmount = Number(req.body.paidAmount || 0);
+    const lessAmount = Number(req.body.lessAmount || 0);
+    const cashBack = Number(req.body.cashBack || 0);
+    const totalReduce = paidAmount + lessAmount + cashBack;
+
+    if (!customerid) {
+      throw new customError("Customer id is required", statusCodes.BAD_REQUEST);
+    }
+    if (totalReduce <= 0) {
+      throw new customError(
+        "Paid amount must be greater than 0",
+        statusCodes.BAD_REQUEST,
+      );
+    }
+
+    let paymentDoc;
+
+    await session.withTransaction(async () => {
+      // 1) customer read (locked in txn snapshot)
+      const customer = await customerModel
+        .findById(customerid)
+        .session(session);
+      if (!customer)
+        throw new customError("Customer not found", statusCodes.NOT_FOUND);
+
+      const currentDue = Number(customer.openingDues || 0);
+      if (totalReduce > currentDue) {
+        throw new customError(
+          `Opening due not enough. Current: ${currentDue}`,
+          statusCodes.BAD_REQUEST,
+        );
+      }
+
+      // 2) payment accumulate (single doc per customer)
+      paymentDoc = await customerPaymentRecived.findOneAndUpdate(
+        { customer: customerid },
+        {
+          $inc: { paidAmount, lessAmount, cashBack },
+          $set: {
+            paymentMode: req.body.paymentMode,
+            remarks: req.body.remarks,
+            date: req.body.date,
+            referenceInvoice: req.body.referenceInvoice,
+          },
+        },
+        { new: true, upsert: true, runValidators: true, session },
+      );
+
+      // 3) due reduce
+      customer.openingDues = currentDue - totalReduce;
+      await customer.save({ session });
+    });
+
+    session.endSession();
+
+    apiResponse.sendSuccess(
       res,
-      statusCodes.NOT_FOUND,
-      "Customer payment not found",
+      statusCodes.CREATED,
+      "Customer payment received successfully",
+      customerPaymentDetailsDTO(paymentDoc),
     );
+  } catch (err) {
+    session.endSession();
+    throw err; // asyncHandler -> global middleware asyncHandler -> global error middleware
   }
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.CREATED,
-    "Customer payment recived successfully",
-    customerPaymentDetailsDTO(paymentRecived),
-  );
 });
 
 // @desc Get customer payments
