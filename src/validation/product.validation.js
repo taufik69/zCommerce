@@ -1,5 +1,6 @@
 const joi = require("joi");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const productSchema = joi
   .object({
@@ -71,39 +72,64 @@ const productSchema = joi
   })
   .options({ abortEarly: false, allowUnknown: true }); // Allow extra fields, only validate required
 
-const validateProduct = async (req) => {
+const validateProduct = async (req, res, next) => {
   try {
     const value = await productSchema.validateAsync(req.body);
 
     // Manual image validation (if needed)
     if (!req.files) {
-      throw new customError("Please provide at least one image", 400);
+      return next(
+        new customError(
+          "Please provide at least one image",
+          statusCodes.BAD_REQUEST,
+        ),
+      );
     }
     if (!req.files.image || req.files.image[0].fieldname !== "image") {
-      throw new customError("Please provide both image files", 400);
+      return next(
+        new customError(
+          "Please provide a valid image name fieldName (image)",
+          statusCodes.BAD_REQUEST,
+        ),
+      );
     }
     if (req.files.image.length === 0) {
-      throw new customError("Image cannot be empty", 400);
+      return next(
+        new customError(
+          "Please provide at least one image",
+          statusCodes.BAD_REQUEST,
+        ),
+      );
     }
+
     if (req.files.image.length > 10) {
-      throw new customError("You can upload a maximum of 10 images", 400);
+      return next(
+        new customError(
+          "You can upload a maximum of 10 images",
+          statusCodes.BAD_REQUEST,
+        ),
+      );
     }
-    if (req.files.image[0].size > 1 * 1024 * 1024) {
-      throw new customError("Image size should be less than 15MB", 400);
+
+    if (req?.files?.image[0].size > 1 * 1024 * 1024) {
+      return next(
+        new customError(
+          "Image size should be less than 15MB",
+          statusCodes.BAD_REQUEST,
+        ),
+      );
     }
 
     return value;
   } catch (error) {
     console.log("Product Validation error:", error);
 
-    console.log(
-      "Product Validation error: " +
-        error?.details?.map((err) => err.message).join(", ")
-    );
-    throw new customError(
-      "Product Validation error: " +
-        error?.details?.map((err) => err.message).join(", "),
-      400
+    return next(
+      new customError(
+        "Product Validation error: " +
+          error?.details?.map((err) => err.message).join(", "),
+        400,
+      ),
     );
   }
 };

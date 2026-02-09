@@ -356,7 +356,7 @@ exports.createCustomerPaymentRecived = asynchandeler(async (req, res) => {
         { new: true, upsert: true, runValidators: true, session },
       );
 
-      // 3) due reduce
+      //  due reduce
       customer.openingDues = currentDue - totalReduce;
       await customer.save({ session });
     });

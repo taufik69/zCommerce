@@ -17,9 +17,9 @@ const { populate } = require("../models/purchase.model");
 const { statusCodes } = require("../constant/constant");
 
 // Create a new product (only required fields)
-exports.createProduct = asynchandeler(async (req, res) => {
+exports.createProduct = asynchandeler(async (req, res, next) => {
   //  Step 1: Validate required fields
-  const value = await validateProduct(req);
+  const value = await validateProduct(req, res, next);
   const {
     name,
     description,
@@ -610,7 +610,7 @@ exports.getRelatedProducts = asynchandeler(async (req, res) => {
 // Get all Discounted Products (Product + Variant)
 exports.getDiscountProducts = asynchandeler(async (req, res) => {
   // ==============================
-  // 1️⃣ Find discounted main products
+  // 1️ Find discounted main products
   // ==============================
   const products = await Product.find({ discount: { $ne: null } })
     .populate("brand variant discount")
@@ -654,12 +654,12 @@ exports.getDiscountProducts = asynchandeler(async (req, res) => {
   }
 
   // =============================
-  // 3️⃣Merge both product lists
+  // 3️Merge both product lists
   // ==============================
   const allDiscountedProducts = [...products, ...variantDiscountedProducts];
 
   // ==============================
-  // 4️⃣ Send success response
+  // 4️ Send success response
   // ==============================
   apiResponse.sendSuccess(
     res,
