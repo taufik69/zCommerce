@@ -74,11 +74,8 @@ const customerSchema = new mongoose.Schema(
     },
 
     customerType: {
-      type: String,
-      trim: true,
-      default: "",
-      // example enum if you want:
-      // enum: ["regular", "wholesale", "vip", ""],
+      type: mongoose.Types.ObjectId,
+      ref: "CustomerType",
     },
 
     fullName: {
