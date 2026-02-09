@@ -325,9 +325,6 @@ const customerAdvancePaymentSchema = new mongoose.Schema(
       trim: true,
       ref: "Customer",
     },
-    slug: {
-      type: String,
-    },
 
     // form shows current balance (optional store)
     balance: {
@@ -338,7 +335,6 @@ const customerAdvancePaymentSchema = new mongoose.Schema(
 
     paidAmount: {
       type: Number,
-
       min: [0, "Paid amount cannot be negative"],
     },
 
@@ -355,7 +351,6 @@ const customerAdvancePaymentSchema = new mongoose.Schema(
 
     date: {
       type: Date,
-      default: Date.now,
     },
 
     remarks: {
@@ -378,48 +373,6 @@ const customerAdvancePaymentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// make a slug
-customerAdvancePaymentSchema.pre("save", function (next) {
-  if (this.isModified("customerName")) {
-    this.slug = slugify(this.customerName, {
-      lower: true,
-      strict: true,
-      trim: true,
-    });
-  }
-  next();
-});
-
-// check this slug already exist or not
-customerAdvancePaymentSchema.pre("save", async function (next) {
-  try {
-    const existing = await this.constructor.findOne({ slug: this.slug });
-    if (existing && existing._id.toString() !== this._id.toString()) {
-      return next(
-        new customError(
-          `Customer advance payment with name "${this.customerName}" already exists`,
-          statusCodes.BAD_REQUEST,
-        ),
-      );
-    }
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
-
-// when update then also update slug
-customerAdvancePaymentSchema.pre("findOneAndUpdate", async function (next) {
-  const update = this.getUpdate();
-  if (update.customerName) {
-    update.slug = slugify(update.customerName, {
-      lower: true,
-      strict: true,
-      trim: true,
-    });
-  }
-  next();
-});
 const customerAdvancePaymentModel =
   mongoose.models.CustomerAdvancePayment ||
   mongoose.model("CustomerAdvancePayment", customerAdvancePaymentSchema);

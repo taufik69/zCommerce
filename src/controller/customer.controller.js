@@ -316,7 +316,7 @@ exports.createCustomerPaymentRecived = asynchandeler(async (req, res) => {
     if (!customerid) {
       throw new customError("Customer id is required", statusCodes.BAD_REQUEST);
     }
-    if (totalReduce <= 0) {
+    if (totalReduce < 0) {
       throw new customError(
         "Paid amount must be greater than 0",
         statusCodes.BAD_REQUEST,
@@ -438,34 +438,108 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
 //@route PUT /api/update-customer-payment-reviced
 //@param slug
 exports.updateCustomerPaymentRecived = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-  const paymentRecived = await customerPaymentRecived.findOneAndUpdate(
-    { slug },
-    req.body,
-    { new: true, runValidators: true },
-  );
-  if (!paymentRecived) {
-    return apiResponse.sendError(
+  const session = await mongoose.startSession();
+
+  try {
+    const { customer } = req.params;
+
+    let updatedDoc;
+
+    await session.withTransaction(async () => {
+      // 1) existing payment doc read (inside txn)
+      const existing = await customerPaymentRecived
+        .findOne({ customer })
+        .session(session);
+
+      if (!existing) {
+        throw new customError(
+          "Customer payment not found",
+          statusCodes.NOT_FOUND,
+        );
+      }
+
+      // 2) customer read
+      const customerDoc = await customerModel
+        .findById(customer)
+        .session(session);
+      if (!customerDoc) {
+        throw new customError("Customer not found", statusCodes.NOT_FOUND);
+      }
+
+      // old totals
+      const oldPaid = Number(existing.paidAmount || 0);
+      const oldLess = Number(existing.lessAmount || 0);
+      const oldCashBack = Number(existing.cashBack || 0);
+      const oldTotal = oldPaid + oldLess + oldCashBack;
+
+      // new totals (if field not provided, keep old)
+      const newPaid =
+        req.body.paidAmount !== undefined
+          ? Number(req.body.paidAmount || 0)
+          : oldPaid;
+      const newLess =
+        req.body.lessAmount !== undefined
+          ? Number(req.body.lessAmount || 0)
+          : oldLess;
+      const newCashBack =
+        req.body.cashBack !== undefined
+          ? Number(req.body.cashBack || 0)
+          : oldCashBack;
+      const newTotal = newPaid + newLess + newCashBack;
+
+      // 3) delta: positive হলে due কমবে, negative হলে due বাড়বে
+      const delta = newTotal - oldTotal;
+
+      // due check only when delta increases payment
+      const currentDue = Number(customerDoc.openingDues || 0);
+      if (delta > 0 && delta > currentDue) {
+        throw new customError(
+          `Opening due not enough. Current: ${currentDue}`,
+          statusCodes.BAD_REQUEST,
+        );
+      }
+
+      // 4) update payment doc (set exact values)
+      updatedDoc = await customerPaymentRecived.findOneAndUpdate(
+        { customer },
+        {
+          $set: {
+            ...req.body, // paymentMode, remarks, date, referenceInvoice etc.
+            paidAmount: newPaid,
+            lessAmount: newLess,
+            cashBack: newCashBack,
+          },
+        },
+        { new: true, runValidators: true, session },
+      );
+
+      // 5) adjust customer due by delta
+      // delta > 0 => due কমবে, delta < 0 => due বাড়বে
+      customerDoc.openingDues = currentDue - delta;
+      await customerDoc.save({ session });
+    });
+
+    session.endSession();
+
+    return apiResponse.sendSuccess(
       res,
-      statusCodes.NOT_FOUND,
-      "Customer payment not found",
+      statusCodes.OK,
+      "Customer payment updated successfully",
+      customerPaymentDetailsDTO(updatedDoc),
     );
+  } catch (err) {
+    session.endSession();
+    throw err;
   }
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Customer payment updated successfully",
-    customerPaymentDetailsDTO(paymentRecived),
-  );
 });
 
 // @desc delete  customer payment recived
 //@route DELETE /api/delete-customer-payment-reviced
 //@param slug
 exports.deleteCustomerPaymentRecived = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
+  const { customer } = req.params;
   const paymentRecived = await customerPaymentRecived.findOneAndDelete({
-    slug,
+    customer,
   });
   if (!paymentRecived) {
     return apiResponse.sendError(
@@ -485,20 +559,68 @@ exports.deleteCustomerPaymentRecived = asynchandeler(async (req, res) => {
 // customerAdvancePayment controlle
 exports.createCustomerAdvancePaymentRecived = asynchandeler(
   async (req, res) => {
-    const paymentRecived = new customerAdvancePaymentModel(req.body);
-    await paymentRecived.save();
-    if (!paymentRecived) {
+    const customerId = req.body.customer;
+
+    const paidInput = Number(req.body.paidAmount || 0);
+    const cashBackInput = Number(req.body.advanceCashBack || 0);
+
+    if (!customerId) {
       return apiResponse.sendError(
         res,
-        statusCodes.NOT_FOUND,
-        "Customer advance payment not found",
+        statusCodes.BAD_REQUEST,
+        "Customer is required",
       );
     }
-    apiResponse.sendSuccess(
+
+    // existing doc
+    const existing = await customerAdvancePaymentModel.findOne({
+      customer: customerId,
+    });
+
+    const oldPaid = existing?.paidAmount || 0;
+    const oldCashBack = existing?.advanceCashBack || 0;
+    const oldBalance = existing?.balance || 0;
+
+    // prevent extra cashback
+    if (cashBackInput > oldBalance) {
+      return apiResponse.sendError(
+        res,
+        statusCodes.BAD_REQUEST,
+        `Advance balance not enough. Current: ${oldBalance}`,
+      );
+    }
+
+    // new totals
+    let newPaid = oldPaid + paidInput;
+    let newCashBack = oldCashBack + cashBackInput;
+    let newBalance = newPaid - newCashBack;
+
+    //  Reset rule
+    if (newBalance === 0) {
+      newPaid = 0;
+      newCashBack = 0;
+    }
+
+    const doc = await customerAdvancePaymentModel.findOneAndUpdate(
+      { customer: customerId },
+      {
+        $set: {
+          paidAmount: newPaid,
+          advanceCashBack: newCashBack,
+          balance: newBalance,
+          paymentMode: req.body.paymentMode,
+          date: req.body.date,
+          remarks: req.body.remarks,
+        },
+      },
+      { new: true, upsert: true, runValidators: true },
+    );
+
+    return apiResponse.sendSuccess(
       res,
       statusCodes.CREATED,
-      "Customer advance payment recived successfully",
-      paymentRecived.customerName,
+      "Customer advance payment updated successfully",
+      customerAdvancePaymentDetailsDTO(doc),
     );
   },
 );
@@ -564,41 +686,14 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
   );
 });
 
-// @desc update customer payment recived
-//@route PUT /api/update-customer-payment-reviced
-//@param slug
-exports.updateCustomerAdvancePaymentRecived = asynchandeler(
-  async (req, res) => {
-    const { slug } = req.params;
-    const paymentRecived = await customerAdvancePaymentModel.findOneAndUpdate(
-      { slug },
-      req.body,
-      { new: true, runValidators: true },
-    );
-    if (!paymentRecived) {
-      return apiResponse.sendError(
-        res,
-        statusCodes.NOT_FOUND,
-        "Customer payment not found",
-      );
-    }
-    apiResponse.sendSuccess(
-      res,
-      statusCodes.OK,
-      "Customer payment updated successfully",
-      customerAdvancePaymentDetailsDTO(paymentRecived),
-    );
-  },
-);
-
 // @desc delete  customer payment recived
 //@route DELETE /api/delete-customer-payment-reviced
 //@param slug
 exports.deleteCustomerAdvancePaymentRecived = asynchandeler(
   async (req, res) => {
-    const { slug } = req.params;
+    const { customer } = req.params;
     const paymentRecived = await customerAdvancePaymentModel.findOneAndDelete({
-      slug,
+      customer,
     });
     if (!paymentRecived) {
       return apiResponse.sendError(

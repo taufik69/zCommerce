@@ -6,11 +6,7 @@ const validate = (schema, property = "body") => {
     const { error, value } = schema.validate(req[property]);
 
     if (error) {
-      let errors = error.details.map((e) => ({
-        field: e.path.join("."),
-        message: e.message,
-      }));
-      next(new customError(errors, statusCodes.BAD_REQUEST));
+      next(new customError(error.message, statusCodes.BAD_REQUEST));
     }
 
     req[property] = value;

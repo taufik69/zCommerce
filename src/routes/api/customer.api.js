@@ -50,10 +50,10 @@ _.route("/get-customer-payment-recived").get(
   customerController.getCustomerPaymentReviced,
 );
 
-_.route("/update-customer-payment-recived/:slug").put(
+_.route("/update-customer-payment-recived/:customer").put(
   customerController.updateCustomerPaymentRecived,
 );
-_.route("/delete-customer-payment-recived/:slug").delete(
+_.route("/delete-customer-payment-recived/:customer").delete(
   customerController.deleteCustomerPaymentRecived,
 );
 
@@ -67,11 +67,11 @@ _.route("/get-customer-advance-payment-reviced").get(
   customerController.getCustomerAdvancePaymentReviced,
 );
 
-_.route("/update-customer-advance-payment-recived/:slug").put(
-  validate(updateCustomerAdvancePaymentSchema),
-  customerController.updateCustomerAdvancePaymentRecived,
-);
-_.route("/delete-customer-advance-payment-recived/:slug").delete(
+// _.route("/update-customer-advance-payment-recived/:customer").put(
+//   validate(updateCustomerAdvancePaymentSchema),
+//   customerController.updateCustomerAdvancePaymentRecived,
+// );
+_.route("/delete-customer-advance-payment-recived/:customer").delete(
   customerController.deleteCustomerAdvancePaymentRecived,
 );
 module.exports = _;

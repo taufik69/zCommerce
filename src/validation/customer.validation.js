@@ -209,14 +209,9 @@ const createCustomerAdvancePaymentSchema = Joi.object({
     "any.required": "Customer name is required",
   }),
 
-  balance: Joi.number().min(0).default(0).messages({
-    "number.base": "Balance must be a number",
-    "number.min": "Balance cannot be negative",
-  }),
-
-  paidAmount: Joi.number().positive().min(1).required().messages({
+  paidAmount: Joi.number().min(0).required().messages({
     "number.base": "Paid amount must be a number",
-    "number.min": "Paid amount must be greater than 0",
+    "number.min": "Advance cash back cannot be negative",
     "any.required": "Paid amount is required",
   }),
 
@@ -232,8 +227,6 @@ const createCustomerAdvancePaymentSchema = Joi.object({
       "any.only":
         "Payment mode must be cash, bank, bkash, nagad, rocket, cheque or other",
     }),
-
-  remarks: Joi.string().trim().max(500).allow("").optional(),
 }).options({ abortEarly: false, stripUnknown: true });
 
 // =============================
@@ -242,9 +235,7 @@ const createCustomerAdvancePaymentSchema = Joi.object({
 const updateCustomerAdvancePaymentSchema = Joi.object({
   customer: Joi.string().trim().optional(),
 
-  balance: Joi.number().min(0).optional(),
-
-  paidAmount: Joi.number().positive().min(1).optional(),
+  paidAmount: Joi.number().min(0).optional(),
 
   advanceCashBack: Joi.number().min(0).optional(),
 
