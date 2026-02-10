@@ -32,12 +32,12 @@ const employeeCreateSchema = joi
       "any.required": "Designation is required.",
     }),
 
-    educationalQualification: joi.string().trim().required().messages({
+    educationalQualification: joi.string().trim().messages({
       "string.empty": "Educational qualification is required.",
       "any.required": "Educational qualification is required.",
     }),
 
-    dateOfBirth: joi.date().required().messages({
+    dateOfBirth: joi.date().messages({
       "date.base": "Date of birth must be a valid date.",
       "any.required": "Date of birth is required.",
     }),

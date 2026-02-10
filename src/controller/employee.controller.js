@@ -287,8 +287,9 @@ exports.getEmployeeAdvancePayment = asynchandeler(async (req, res) => {
     filterQuery = {};
   }
 
-  const employeeAdvancePayment = await employeeAdvancePayment.find(filterQuery);
-  if (employeeAdvancePayment.length == 0) {
+  const employeeAdvancePaymentDoc =
+    await employeeAdvancePayment.find(filterQuery);
+  if (employeeAdvancePaymentDoc.length == 0) {
     return apiResponse.sendError(
       res,
       statusCodes.NOT_FOUND,
@@ -299,8 +300,8 @@ exports.getEmployeeAdvancePayment = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Advance Payment fetch successfully",
-    employeeAdvancePayment.map((advancePayment) =>
-      employeeAdvancePaymentDTO(advancePayment),
+    employeeAdvancePaymentDoc.map((employeeAdvancePayment) =>
+      employeeAdvancePaymentDTO(employeeAdvancePayment),
     ),
   );
 });

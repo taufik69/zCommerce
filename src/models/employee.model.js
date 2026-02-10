@@ -23,8 +23,6 @@ const employeeSchema = new mongoose.Schema(
     nidNumber: {
       type: String,
       trim: true,
-      unique: true,
-      sparse: true,
     },
 
     designation: {
@@ -36,7 +34,7 @@ const employeeSchema = new mongoose.Schema(
     educationalQualification: {
       type: String,
       trim: true,
-      required: [true, "Educational qualification is required"],
+      required: [false, "Educational qualification is required"],
     },
     dateOfBirth: { type: Date, required: [true, "Date of birth is required"] },
 
@@ -61,7 +59,7 @@ const employeeSchema = new mongoose.Schema(
 
     mobile: {
       type: String,
-      required: [true, "Mobile number is required"],
+      required: [false, "Mobile number is required"],
       trim: true,
       unique: true,
       index: true,
