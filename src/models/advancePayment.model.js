@@ -26,10 +26,10 @@ const employeeAdvancePaymentSchema = new mongoose.Schema(
 
     // Form: Employee ID*
     employeeId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
       required: [true, "Employee ID is required"],
       trim: true,
-      index: true,
+      ref: "Employee",
     },
 
     // Form: Amount*

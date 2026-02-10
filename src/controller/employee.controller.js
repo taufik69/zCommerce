@@ -283,7 +283,7 @@ exports.createEmployeeAdvancePayment = asynchandeler(async (req, res) => {
     await session.withTransaction(async () => {
       // 1) ensure employee exists
       const employee = await employeeModel
-        .findOne({ employeeId: employeeId })
+        .findOne({ _id: employeeId })
         .session(session);
 
       if (!employee) {
@@ -301,7 +301,7 @@ exports.createEmployeeAdvancePayment = asynchandeler(async (req, res) => {
 
       // 3) reduce from salary (minus)
       const updatedEmployee = await employeeModel.findOneAndUpdate(
-        { employeeId },
+        { _id: employeeId },
         { $inc: { "salary.grossSalary": -amount } },
         { new: true, runValidators: true, session },
       );
@@ -335,13 +335,14 @@ exports.getEmployeeAdvancePayment = asynchandeler(async (req, res) => {
   const { employeeId } = req.query;
   let filterQuery = {};
   if (employeeId) {
-    filterQuery.employeeId = employeeId;
+    filterQuery._id = employeeId;
   } else {
     filterQuery = {};
   }
 
-  const employeeAdvancePaymentDoc =
-    await employeeAdvancePayment.find(filterQuery);
+  const employeeAdvancePaymentDoc = await employeeAdvancePayment
+    .find(filterQuery)
+    .populate("employeeId");
   if (employeeAdvancePaymentDoc.length == 0) {
     return apiResponse.sendError(
       res,
@@ -362,7 +363,7 @@ exports.getEmployeeAdvancePayment = asynchandeler(async (req, res) => {
 // update advance payemnt
 exports.updateEmployeeAdvancePayment = asynchandeler(async (req, res) => {
   const advancePayment = await employeeAdvancePayment.findOneAndUpdate(
-    { employeeId: req.params.id },
+    { _id: req.params.id },
     req.body,
     { new: true },
   );
@@ -384,7 +385,7 @@ exports.updateEmployeeAdvancePayment = asynchandeler(async (req, res) => {
 // delete advance payment
 exports.deleteEmployeeAdvancePayment = asynchandeler(async (req, res) => {
   const advancePayment = await employeeAdvancePayment.findOneAndDelete({
-    employeeId: req.params.id,
+    _id: req.params.id,
   });
   if (!advancePayment) {
     return apiResponse.sendError(
