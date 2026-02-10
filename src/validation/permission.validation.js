@@ -10,7 +10,7 @@ const permissionSchema = Joi.object({
     .items(
       Joi.string().valid("view", "add", "delete", "update").messages({
         "any.only": "Action must be one of 'view', 'add', 'delete', 'update'",
-      })
+      }),
     )
     .min(1)
     .required()
@@ -19,7 +19,7 @@ const permissionSchema = Joi.object({
       "array.min": "At least one action is required",
       "any.required": "Actions are required",
     }),
-}).options({ abortEarly: false });
+}).options({ abortEarly: false, allowUnknown: true });
 
 const validatePermission = async (req) => {
   try {
@@ -29,7 +29,7 @@ const validatePermission = async (req) => {
     throw new customError(
       "Permission Validation error: " +
         error.details.map((err) => err.message).join(", "),
-      400
+      400,
     );
   }
 };

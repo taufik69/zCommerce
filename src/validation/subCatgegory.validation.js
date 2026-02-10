@@ -12,7 +12,7 @@ const subCategorySchmea = joi
       "any.required": "Category is required.",
     }),
   })
-  .options({ abortEarly: false }); // Validate all fields, not just the first error
+  .options({ abortEarly: false, allowUnknown: true }); // Validate all fields, not just the first error
 
 //   now make a validateSubCategory function that will validate the subcategory
 
@@ -22,12 +22,13 @@ exports.validateSubCategory = async (req) => {
     return value;
   } catch (error) {
     console.log(
-      "SubCategory  Validation error " + error.details.map((err) => err.message)
+      "SubCategory  Validation error " +
+        error.details.map((err) => err.message),
     );
     throw new customError(
       "SubCategory  Validation error " +
         error.details.map((err) => err.message),
-      400
+      400,
     );
   }
 };

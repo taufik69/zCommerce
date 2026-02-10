@@ -55,7 +55,7 @@ const productInventorySchema = joi
     }),
     isActive: joi.boolean().default(true).optional(),
   })
-  .options({ abortEarly: false }); // Validate all fields, not just the first error
+  .options({ abortEarly: false, allowUnknown: true }); // Validate all fields, not just the first error
 
 async function validateProductInventory(req) {
   try {
@@ -65,7 +65,7 @@ async function validateProductInventory(req) {
     throw new customError(
       "Product inventory validation error: " +
         error.details.map((err) => err.message).join(", "), // Use `error.details`
-      400
+      400,
     );
   }
 }

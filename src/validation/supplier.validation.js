@@ -43,7 +43,7 @@ exports.createSupplierSchema = Joi.object({
   deletedAt: Joi.date().allow(null).optional(),
 }).options({
   abortEarly: false,
-  stripUnknown: true,
+  allowUnknown: true,
 });
 
 /**
@@ -70,7 +70,7 @@ exports.updateSupplierSchema = Joi.object({
   .min(1) //  empty update body block
   .options({
     abortEarly: false,
-    stripUnknown: true,
+    allowUnknown: true,
   });
 
 // supplier due payment validation
@@ -101,7 +101,7 @@ exports.createSupplierDuePaymentSchema = Joi.object({
       "any.required": "Payment mode is required",
     }),
   remarks: Joi.string().trim().max(500).allow("").optional(),
-}).options({ abortEarly: false, stripUnknown: true });
+}).options({ abortEarly: false, allowUnknown: true });
 
 //  Update Due Payment
 exports.updateSupplierDuePaymentSchema = Joi.object({
@@ -117,4 +117,4 @@ exports.updateSupplierDuePaymentSchema = Joi.object({
   deletedAt: Joi.date().allow(null).optional(),
 })
   .min(1)
-  .options({ abortEarly: false, stripUnknown: true });
+  .options({ abortEarly: false, allowUnknown: true });

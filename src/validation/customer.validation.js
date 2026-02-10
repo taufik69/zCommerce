@@ -227,7 +227,7 @@ const createCustomerAdvancePaymentSchema = Joi.object({
       "any.only":
         "Payment mode must be cash, bank, bkash, nagad, rocket, cheque or other",
     }),
-}).options({ abortEarly: false, stripUnknown: true });
+}).options({ abortEarly: false, allowUnknown: true });
 
 // =============================
 // UPDATE SCHEMA

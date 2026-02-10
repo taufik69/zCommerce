@@ -52,7 +52,7 @@ const couponSchema = joi
       "any.required": "Subcategories is required.",
     }),
   })
-  .options({ abortEarly: false });
+  .options({ abortEarly: false, allowUnknown: true });
 
 exports.validateCoupon = async (req, res, next) => {
   try {

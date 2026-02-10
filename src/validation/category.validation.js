@@ -10,7 +10,7 @@ const categorySchema = joi
       "any.required": "Name is required.",
     }),
   })
-  .options({ abortEarly: false }); // Validate all fields, not just the first error
+  .options({ abortEarly: false, allowUnknown: true }); // Validate all fields, not just the first error
 
 // Middleware for validation
 const validateCategory = async (req, res, next) => {
