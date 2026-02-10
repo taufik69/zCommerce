@@ -1,6 +1,7 @@
 const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
+const mongoose = require("mongoose");
 const {
   validateEmployeeCreate,
   validateEmployeeUpdate,
@@ -261,20 +262,70 @@ exports.restoreEmployee = asynchandeler(async (req, res) => {
 
 // --------------------> create employee AdvancePayment
 exports.createEmployeeAdvancePayment = asynchandeler(async (req, res) => {
-  const advancePayment = await employeeAdvancePayment.create(req.body);
-  if (!advancePayment) {
-    return apiResponse.sendError(
+  const session = await mongoose.startSession();
+
+  try {
+    const employeeId = req.body.employeeId;
+    const amount = Number(req.body.amount || 0);
+
+    if (!employeeId) {
+      throw new customError("EmployeeId is required", statusCodes.BAD_REQUEST);
+    }
+    if (amount <= 0) {
+      throw new customError(
+        "Amount must be greater than 0",
+        statusCodes.BAD_REQUEST,
+      );
+    }
+
+    let advancePaymentDoc;
+
+    await session.withTransaction(async () => {
+      // 1) ensure employee exists
+      const employee = await employeeModel
+        .findOne({ employeeId: employeeId })
+        .session(session);
+
+      if (!employee) {
+        throw new customError("Employee not found", statusCodes.NOT_FOUND);
+      }
+
+      // (optional) salary enough check: if you want prevent negative salary
+      const grossSalary = Number(employee?.salary?.grossSalary || 0);
+      if (amount > grossSalary)
+        throw new customError("Salary not enough", statusCodes.BAD_REQUEST);
+
+      // 2) create advance payment
+      const doc = new employeeAdvancePayment({ ...req.body, amount });
+      advancePaymentDoc = await doc.save({ session });
+
+      // 3) reduce from salary (minus)
+      const updatedEmployee = await employeeModel.findOneAndUpdate(
+        { employeeId },
+        { $inc: { "salary.grossSalary": -amount } },
+        { new: true, runValidators: true, session },
+      );
+
+      if (!updatedEmployee) {
+        throw new customError(
+          "Employee update failed",
+          statusCodes.SERVER_ERROR,
+        );
+      }
+    });
+
+    session.endSession();
+
+    return apiResponse.sendSuccess(
       res,
-      statusCodes.NOT_FOUND,
-      "Advance Payment not found",
+      statusCodes.CREATED,
+      "Advance Payment created successfully",
+      employeeAdvancePaymentDTO(advancePaymentDoc),
     );
+  } catch (err) {
+    session.endSession();
+    throw err;
   }
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.CREATED,
-    "Advance Payment created successfully",
-    employeeAdvancePaymentDTO(advancePayment),
-  );
 });
 
 // get all employe advance pyament or get single advance payment by employee id
