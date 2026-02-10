@@ -325,6 +325,8 @@ exports.createEmployeeAdvancePayment = asynchandeler(async (req, res) => {
   } catch (err) {
     session.endSession();
     throw err;
+  } finally {
+    await session.endSession();
   }
 });
 
