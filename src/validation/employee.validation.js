@@ -108,7 +108,7 @@ const employeeCreateSchema = joi
     // soft delete fields/backend controlled
     isActive: joi.boolean().optional(),
   })
-  .options({ abortEarly: false, stripUnknown: true });
+  .options({ abortEarly: false, allowUnknown: true });
 
 /**
  * Update schema:
