@@ -90,6 +90,7 @@ const employeeSchema = new mongoose.Schema(
       othersAllowance: { type: Number, default: 0, min: 0 },
       specialAllowance: { type: Number, default: 0, min: 0 },
       providentFund: { type: Number, default: 0, min: 0 },
+      grossSalary: { type: Number, default: 0, min: 0 },
     },
 
     comments: { type: String, trim: true, maxlength: 500 },
@@ -168,6 +169,29 @@ employeeSchema.post("save", function (error, doc, next) {
   }
 
   return next(error);
+});
+
+// calculate salary
+employeeSchema.pre("save", async function (next) {
+  try {
+    const basicSalary = this.salary.basicSalary;
+    const houseRent = this.salary.houseRent || 0;
+    const medicalAllowance = this.salary.medicalAllowance || 0;
+    const othersAllowance = this.salary.othersAllowance || 0;
+    const specialAllowance = this.salary.specialAllowance || 0;
+    const providentFund = this.salary.providentFund || 0;
+    const wholeSalary =
+      basicSalary +
+      houseRent +
+      medicalAllowance +
+      othersAllowance +
+      specialAllowance;
+
+    this.salary.grossSalary = wholeSalary - providentFund;
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports =

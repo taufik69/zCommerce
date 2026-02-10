@@ -32,7 +32,7 @@ exports.createEmployeeAdvancePaymentSchema = Joi.object({
 
   isActive: Joi.boolean().optional(),
   deletedAt: Joi.date().allow(null).optional(),
-}).options({ abortEarly: false, stripUnknown: true });
+}).options({ abortEarly: false, allowUnknown: true });
 
 // Update schema (সব optional, but at least one field চাইলে নিচে .min(1) দাও)
 exports.updateEmployeeAdvancePaymentSchema = Joi.object({
@@ -49,4 +49,4 @@ exports.updateEmployeeAdvancePaymentSchema = Joi.object({
   deletedAt: Joi.date().allow(null).optional(),
 })
   .min(1) //  update এ খালি body পাঠালে error
-  .options({ abortEarly: false, stripUnknown: true });
+  .options({ abortEarly: false, allowUnknown: true });

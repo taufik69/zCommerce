@@ -115,17 +115,19 @@ const employeeCreateSchema = joi
  * - required fields optional
  * - employeeId still forbidden (auto)
  */
-const employeeUpdateSchema = employeeCreateSchema.fork(
-  [
-    "fullName",
-    "designation",
-    "educationalQualification",
-    "dateOfBirth",
-    "gender",
-    "mobile",
-  ],
-  (schema) => schema.optional(),
-);
+const employeeUpdateSchema = employeeCreateSchema
+  .fork(
+    [
+      "fullName",
+      "designation",
+      "educationalQualification",
+      "dateOfBirth",
+      "gender",
+      "mobile",
+    ],
+    (schema) => schema.optional(),
+  )
+  .unknown(true);
 
 const validateImageFile = (req, res, next) => {
   if (!req.files || req.files.length === 0) return null;
