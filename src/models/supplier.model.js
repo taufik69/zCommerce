@@ -21,7 +21,6 @@ const supplierSchema = new mongoose.Schema(
       trim: true,
       minlength: [2, "Supplier Name must be at least 2 characters"],
       maxlength: [120, "Supplier Name cannot exceed 120 characters"],
-      index: true,
     },
 
     // Contact Person Name (optional)
@@ -45,8 +44,6 @@ const supplierSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "",
-      // optional: BD format (edit if needed)
-      // match: [/^(?:\+?88)?01[3-9]\d{8}$/, "Invalid mobile number"],
     },
 
     // Supplier Address (optional)
@@ -54,7 +51,6 @@ const supplierSchema = new mongoose.Schema(
       type: String,
       trim: true,
       maxlength: [300, "Address cannot exceed 300 characters"],
-      default: "",
     },
 
     // Opening Dues (optional)
@@ -114,7 +110,6 @@ const supplierDuePaymentSchema = new mongoose.Schema(
       type: String,
       trim: true,
       unique: true,
-      index: true,
       required: [true, "Transaction ID is required"],
     },
 
@@ -190,9 +185,6 @@ const supplierDuePaymentSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
-
-// Unique index
-supplierDuePaymentSchema.index({ transactionId: 1 }, { unique: true });
 
 // Auto-generate Transaction ID
 supplierDuePaymentSchema.pre("validate", function (next) {
