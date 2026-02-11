@@ -21,26 +21,21 @@ const employeeCreateSchema = joi
       "string.max": "Full name cannot exceed 100 characters.",
     }),
 
-    nidNumber: joi
-      .string()
-      .trim()
-      .allow("" || null)
-      .optional()
-      .messages({
-        "string.pattern.base": "NID number must be 10, 13, or 17 digits.",
-      }),
+    nidNumber: joi.string().trim().allow("").optional().messages({
+      "string.pattern.base": "NID number must be 10, 13, or 17 digits.",
+    }),
 
-    designation: joi.string().trim().required().messages({
+    designation: joi.string().allow("").trim().required().messages({
       "string.empty": "Designation is required.",
       "any.required": "Designation is required.",
     }),
 
-    educationalQualification: joi.string().trim().messages({
+    educationalQualification: joi.string().allow("").trim().messages({
       "string.empty": "Educational qualification is required.",
       "any.required": "Educational qualification is required.",
     }),
 
-    dateOfBirth: joi.date().messages({
+    dateOfBirth: joi.date().allow("").messages({
       "date.base": "Date of birth must be a valid date.",
       "any.required": "Date of birth is required.",
     }),
@@ -59,13 +54,14 @@ const employeeCreateSchema = joi
     bloodGroup: joi
       .string()
       .trim()
+      .allow("")
       .valid(...BLOOD_GROUPS)
       .optional()
       .messages({
         "any.only": "Invalid blood group.",
       }),
 
-    mobile: joi.string().trim().pattern(bdMobileRegex).messages({
+    mobile: joi.string().trim().allow("").pattern(bdMobileRegex).messages({
       "string.empty": "Mobile number is required.",
       "any.required": "Mobile number is required.",
       "string.pattern.base":
@@ -75,6 +71,7 @@ const employeeCreateSchema = joi
     secondaryMobile: joi
       .string()
       .trim()
+      .allow("")
       .pattern(bdMobileRegex)
       .optional()
       .messages({
@@ -93,7 +90,7 @@ const employeeCreateSchema = joi
         "string.email": "Please provide a valid email address.",
       }),
 
-    joiningDate: joi.date().optional().messages({
+    joiningDate: joi.date().allow("").optional().messages({
       "date.base": "Joining date must be a valid date.",
     }),
 
