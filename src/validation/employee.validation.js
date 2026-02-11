@@ -65,18 +65,12 @@ const employeeCreateSchema = joi
         "any.only": "Invalid blood group.",
       }),
 
-    mobile: joi
-      .string()
-      .trim()
-      .pattern(bdMobileRegex)
-
-      .required()
-      .messages({
-        "string.empty": "Mobile number is required.",
-        "any.required": "Mobile number is required.",
-        "string.pattern.base":
-          "Mobile number must be a valid BD number (01XXXXXXXXX).",
-      }),
+    mobile: joi.string().trim().pattern(bdMobileRegex).messages({
+      "string.empty": "Mobile number is required.",
+      "any.required": "Mobile number is required.",
+      "string.pattern.base":
+        "Mobile number must be a valid BD number (01XXXXXXXXX).",
+    }),
 
     secondaryMobile: joi
       .string()
