@@ -8,7 +8,6 @@ const employeeSchema = new mongoose.Schema(
     employeeId: {
       type: String,
       unique: true,
-      index: true,
       trim: true,
     },
 
@@ -58,10 +57,8 @@ const employeeSchema = new mongoose.Schema(
 
     mobile: {
       type: String,
-
       trim: true,
       unique: true,
-      index: true,
     },
 
     secondaryMobile: { type: String, trim: true },
