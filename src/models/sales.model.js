@@ -33,6 +33,7 @@ const searchItemSchema = new mongoose.Schema(
     salesStatus: {
       type: String,
       enum: ["sale", "return"],
+      default: "sale",
     },
 
     barcode: { type: String, trim: true },
@@ -85,6 +86,7 @@ const customerTypeSchema = new mongoose.Schema(
     type: {
       type: String,
       enum: ["walking", "listed"],
+      default: "walking",
       required: true,
     },
     walking: { type: walkingCustomerSchema, default: null },
@@ -144,21 +146,17 @@ const salesSchema = new mongoose.Schema(
     paymentStatus: {
       type: String,
       enum: ["paid", "partial", "due"],
+      default: "due",
     },
 
     salesType: {
       type: String,
-
       enum: ["wholesale", "retailsale"],
+      default: "retailsale",
     },
   },
   { timestamps: true },
 );
-
-// Helpful indexes
-salesSchema.index({ date: -1 });
-salesSchema.index({ "customerType.listed.customerId": 1 });
-salesSchema.index({ invoiceStatus: 1, paymentStatus: 1 });
 
 salesSchema.pre("save", async function (next) {
   try {
