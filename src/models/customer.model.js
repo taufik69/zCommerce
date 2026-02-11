@@ -72,7 +72,6 @@ const customerSchema = new mongoose.Schema(
       trim: true,
       unique: true,
       index: true,
-      // auto set from mobileNumber in pre-save if empty
     },
 
     customerType: {
@@ -93,7 +92,6 @@ const customerSchema = new mongoose.Schema(
       required: [true, "Mobile number is required"],
       trim: true,
       unique: true,
-      index: true,
       validate: {
         validator: function (v) {
           // BD mobile example: 01XXXXXXXXX (11 digits) or +8801XXXXXXXXX

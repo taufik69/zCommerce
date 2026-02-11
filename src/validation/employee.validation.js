@@ -3,11 +3,7 @@ const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 const { statusCodes } = require("../constant/constant");
 
-const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const GENDERS = ["male", "female", "other"];
-
-// BD phone simple: 01xxxxxxxxx (11 digit)
-const bdMobileRegex = /^01\d{9}$/;
 
 const employeeCreateSchema = joi
   .object({
