@@ -34,9 +34,8 @@ const employeeSchema = new mongoose.Schema(
     educationalQualification: {
       type: String,
       trim: true,
-      required: [false, "Educational qualification is required"],
     },
-    dateOfBirth: { type: Date, required: [true, "Date of birth is required"] },
+    dateOfBirth: { type: Date },
 
     gender: {
       type: String,
@@ -49,7 +48,7 @@ const employeeSchema = new mongoose.Schema(
     bloodGroup: {
       type: String,
       trim: true,
-      required: [false, "Blood group is required"],
+
       enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
     },
 
@@ -59,7 +58,7 @@ const employeeSchema = new mongoose.Schema(
 
     mobile: {
       type: String,
-      required: [false, "Mobile number is required"],
+
       trim: true,
       unique: true,
       index: true,

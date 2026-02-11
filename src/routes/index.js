@@ -61,6 +61,7 @@ _.use("/courier-return", require("./api/courierReturn.api"));
 _.use("/employee", require("./api/employee.api"));
 _.use("/supplier", require("./api/supplier.api"));
 _.use("/customer", require("./api/customer.api"));
+_.use("/sales", require("./api/sales.api"));
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });

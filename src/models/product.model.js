@@ -381,10 +381,10 @@ productSchema.virtual("sizeWiseStock").get(function () {
 });
 
 // search product id  in purchase model and return total purchased quantity in virtual
-// Virtual শুধু placeholder হিসেবে
+// Virtual শুধু placeholder
 productSchema.virtual("singleVariantTotalPurchasedQuantity");
 
-// Middleware: শুধুমাত্র find এর জন্য
+// Middleware: শুধুমাত্র find
 productSchema.post("find", async function (docs, next) {
   try {
     await Promise.all(
