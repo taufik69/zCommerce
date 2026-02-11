@@ -8,8 +8,6 @@ const GENDERS = ["male", "female", "other"];
 
 // BD phone simple: 01xxxxxxxxx (11 digit)
 const bdMobileRegex = /^01\d{9}$/;
-// NID: 10/13/17 digits (common in BD)
-const nidRegex = /^(\d{10}|\d{13}|\d{17})$/;
 
 const employeeCreateSchema = joi
   .object({
@@ -23,9 +21,14 @@ const employeeCreateSchema = joi
       "string.max": "Full name cannot exceed 100 characters.",
     }),
 
-    nidNumber: joi.string().trim().pattern(nidRegex).optional().messages({
-      "string.pattern.base": "NID number must be 10, 13, or 17 digits.",
-    }),
+    nidNumber: joi
+      .string()
+      .trim()
+      .allow("" || null)
+      .optional()
+      .messages({
+        "string.pattern.base": "NID number must be 10, 13, or 17 digits.",
+      }),
 
     designation: joi.string().trim().required().messages({
       "string.empty": "Designation is required.",
@@ -62,12 +65,18 @@ const employeeCreateSchema = joi
         "any.only": "Invalid blood group.",
       }),
 
-    mobile: joi.string().trim().pattern(bdMobileRegex).required().messages({
-      "string.empty": "Mobile number is required.",
-      "any.required": "Mobile number is required.",
-      "string.pattern.base":
-        "Mobile number must be a valid BD number (01XXXXXXXXX).",
-    }),
+    mobile: joi
+      .string()
+      .trim()
+      .pattern(bdMobileRegex)
+
+      .required()
+      .messages({
+        "string.empty": "Mobile number is required.",
+        "any.required": "Mobile number is required.",
+        "string.pattern.base":
+          "Mobile number must be a valid BD number (01XXXXXXXXX).",
+      }),
 
     secondaryMobile: joi
       .string()
@@ -96,17 +105,14 @@ const employeeCreateSchema = joi
 
     salary: joi
       .object({
-        basicSalary: joi.number().min(0).default(0),
-        houseRent: joi.number().min(0).default(0),
-        medicalAllowance: joi.number().min(0).default(0),
-        othersAllowance: joi.number().min(0).default(0),
-        specialAllowance: joi.number().min(0).default(0),
-        providentFund: joi.number().min(0).default(0),
+        basicSalary: joi.number().min(0).default(0).optional().allow(null),
+        houseRent: joi.number().min(0).default(0).optional().allow(null),
+        medicalAllowance: joi.number().min(0).default(0).optional().allow(null),
+        othersAllowance: joi.number().min(0).default(0).optional().allow(null),
+        specialAllowance: joi.number().min(0).default(0).optional().allow(null),
+        providentFund: joi.number().min(0).default(0).optional().allow(null),
       })
       .optional(),
-
-    // soft delete fields/backend controlled
-    isActive: joi.boolean().optional(),
   })
   .options({ abortEarly: false, allowUnknown: true });
 
