@@ -21,24 +21,24 @@ const employeeCreateSchema = joi
       "string.max": "Full name cannot exceed 100 characters.",
     }),
 
-    nidNumber: joi.string().trim().allow("").optional().messages({
-      "string.pattern.base": "NID number must be 10, 13, or 17 digits.",
-    }),
+    // nidNumber: joi.string().trim().allow("").optional().messages({
+    //   "string.pattern.base": "NID number must be 10, 13, or 17 digits.",
+    // }),
 
     designation: joi.string().allow("").trim().required().messages({
       "string.empty": "Designation is required.",
       "any.required": "Designation is required.",
     }),
 
-    educationalQualification: joi.string().allow("").trim().messages({
-      "string.empty": "Educational qualification is required.",
-      "any.required": "Educational qualification is required.",
-    }),
+    // educationalQualification: joi.string().allow("").trim().messages({
+    //   "string.empty": "Educational qualification is required.",
+    //   "any.required": "Educational qualification is required.",
+    // }),
 
-    dateOfBirth: joi.date().allow("").messages({
-      "date.base": "Date of birth must be a valid date.",
-      "any.required": "Date of birth is required.",
-    }),
+    // dateOfBirth: joi.date().allow("").messages({
+    //   "date.base": "Date of birth must be a valid date.",
+    //   "any.required": "Date of birth is required.",
+    // }),
 
     gender: joi
       .string()
@@ -51,59 +51,59 @@ const employeeCreateSchema = joi
         "string.empty": "Gender is required.",
       }),
 
-    bloodGroup: joi
-      .string()
-      .trim()
-      .allow("")
-      .valid(...BLOOD_GROUPS)
-      .optional()
-      .messages({
-        "any.only": "Invalid blood group.",
-      }),
+    // bloodGroup: joi
+    //   .string()
+    //   .trim()
+    //   .allow("")
+    //   .valid(...BLOOD_GROUPS)
+    //   .optional()
+    //   .messages({
+    //     "any.only": "Invalid blood group.",
+    //   }),
 
-    mobile: joi.string().trim().allow("").pattern(bdMobileRegex).messages({
-      "string.empty": "Mobile number is required.",
-      "any.required": "Mobile number is required.",
-      "string.pattern.base":
-        "Mobile number must be a valid BD number (01XXXXXXXXX).",
-    }),
+    // mobile: joi.string().trim().allow("").pattern(bdMobileRegex).messages({
+    //   "string.empty": "Mobile number is required.",
+    //   "any.required": "Mobile number is required.",
+    //   "string.pattern.base":
+    //     "Mobile number must be a valid BD number (01XXXXXXXXX).",
+    // }),
 
-    secondaryMobile: joi
-      .string()
-      .trim()
-      .allow("")
-      .pattern(bdMobileRegex)
-      .optional()
-      .messages({
-        "string.pattern.base":
-          "Secondary mobile must be a valid BD number (01XXXXXXXXX).",
-      }),
+    // secondaryMobile: joi
+    //   .string()
+    //   .trim()
+    //   .allow("")
+    //   .pattern(bdMobileRegex)
+    //   .optional()
+    //   .messages({
+    //     "string.pattern.base":
+    //       "Secondary mobile must be a valid BD number (01XXXXXXXXX).",
+    //   }),
 
-    email: joi
-      .string()
-      .trim()
-      .lowercase()
-      .email()
-      .allow("")
-      .optional()
-      .messages({
-        "string.email": "Please provide a valid email address.",
-      }),
+    // email: joi
+    //   .string()
+    //   .trim()
+    //   .lowercase()
+    //   .email()
+    //   .allow("")
+    //   .optional()
+    //   .messages({
+    //     "string.email": "Please provide a valid email address.",
+    //   }),
 
-    joiningDate: joi.date().allow("").optional().messages({
-      "date.base": "Joining date must be a valid date.",
-    }),
+    // joiningDate: joi.date().allow("").optional().messages({
+    //   "date.base": "Joining date must be a valid date.",
+    // }),
 
-    salary: joi
-      .object({
-        basicSalary: joi.number().min(0).default(0).optional().allow(null),
-        houseRent: joi.number().min(0).default(0).optional().allow(null),
-        medicalAllowance: joi.number().min(0).default(0).optional().allow(null),
-        othersAllowance: joi.number().min(0).default(0).optional().allow(null),
-        specialAllowance: joi.number().min(0).default(0).optional().allow(null),
-        providentFund: joi.number().min(0).default(0).optional().allow(null),
-      })
-      .optional(),
+    // salary: joi
+    //   .object({
+    //     basicSalary: joi.number().min(0).default(0).optional().allow(null),
+    //     houseRent: joi.number().min(0).default(0).optional().allow(null),
+    //     medicalAllowance: joi.number().min(0).default(0).optional().allow(null),
+    //     othersAllowance: joi.number().min(0).default(0).optional().allow(null),
+    //     specialAllowance: joi.number().min(0).default(0).optional().allow(null),
+    //     providentFund: joi.number().min(0).default(0).optional().allow(null),
+    //   })
+    //   .optional(),
   })
   .options({ abortEarly: false, allowUnknown: true });
 
@@ -113,17 +113,7 @@ const employeeCreateSchema = joi
  * - employeeId still forbidden (auto)
  */
 const employeeUpdateSchema = employeeCreateSchema
-  .fork(
-    [
-      "fullName",
-      "designation",
-      "educationalQualification",
-      "dateOfBirth",
-      "gender",
-      "mobile",
-    ],
-    (schema) => schema.optional(),
-  )
+  .fork(["fullName", "designation", "gender"], (schema) => schema.optional())
   .unknown(true);
 
 const validateImageFile = (req, res, next) => {

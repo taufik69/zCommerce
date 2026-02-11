@@ -47,8 +47,6 @@ const employeeSchema = new mongoose.Schema(
     bloodGroup: {
       type: String,
       trim: true,
-
-      enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
     },
 
     nationality: { type: String, trim: true },
@@ -170,7 +168,7 @@ employeeSchema.post("save", function (error, doc, next) {
 // calculate salary
 employeeSchema.pre("save", async function (next) {
   try {
-    const basicSalary = this.salary.basicSalary;
+    const basicSalary = this.salary.basicSalary || 0;
     const houseRent = this.salary.houseRent || 0;
     const medicalAllowance = this.salary.medicalAllowance || 0;
     const othersAllowance = this.salary.othersAllowance || 0;
