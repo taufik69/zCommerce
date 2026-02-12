@@ -56,8 +56,8 @@ const variantSchema = new mongoose.Schema(
       default: "N/A",
     },
 
-    // Quantity / stock
-    stockVariant: {
+    // Quanrtity / stock
+    stockVaiant: {
       type: Number,
       required: false,
       min: 0,

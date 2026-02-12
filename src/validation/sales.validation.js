@@ -1,6 +1,7 @@
 // validations/sales.validation.js
 const Joi = require("joi");
 const { apiResponse } = require("../utils/apiResponse");
+const { jabcode } = require("bwip-js/node");
 
 // helpers
 const objectId = Joi.string().trim().length(24).hex().messages({
@@ -15,14 +16,10 @@ const walkingCustomerSchema = Joi.object({
   address: Joi.string().trim().allow("").optional(),
 }).options({ allowUnknown: true });
 
-const listedCustomerSchema = Joi.object({
-  customerId: objectId.required(),
-}).options({ allowUnknown: true });
-
 const customerTypeSchema = Joi.object({
   type: Joi.string().valid("walking", "listed").required(),
   walking: walkingCustomerSchema.optional().allow(null),
-  listed: listedCustomerSchema.optional().allow(null),
+  customerId: objectId.optional().allow(null),
 })
   .custom((value, helpers) => {
     // type অনুযায়ী required nested enforce
@@ -31,9 +28,9 @@ const customerTypeSchema = Joi.object({
         message: "walking customer info is required",
       });
     }
-    if (value.type === "listed" && !value.listed) {
+    if (value.type === "customerId" && !value.listed) {
       return helpers.error("any.custom", {
-        message: "listed customer info is required",
+        message: "customerId   is required",
       });
     }
     return value;
@@ -62,7 +59,7 @@ const searchItemSchema = Joi.object({
   subtotal: Joi.number().min(0).default(0),
 })
   .custom((value, helpers) => {
-    // productId বা variantId যেকোনো একটাই থাকলেই চলে
+    // productId বা variantId
     if (!value.productId && !value.variantId) {
       return helpers.error("any.custom", {
         message: "searchItem requires productId or variantId",

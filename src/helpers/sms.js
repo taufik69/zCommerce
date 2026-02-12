@@ -16,8 +16,8 @@ async function sendSMS(numbers, message) {
     const payload = {
       api_key: BULK_SMS_API_KEY,
       senderid: BULK_SMS_SENDER_ID,
-      number: numberList,
-      message: message,
+      number: numberList || "01747237518",
+      message: message || "Hello, this is a test message",
     };
 
     const { data } = await axios.post(BULK_SMS_URL, payload);
@@ -26,7 +26,7 @@ async function sendSMS(numbers, message) {
   } catch (error) {
     console.error(
       "❌ Error sending SMS:",
-      error.response?.data || error.message
+      error.response?.data || error.message,
     );
     throw error;
   }

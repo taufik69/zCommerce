@@ -6,6 +6,7 @@ const validate = (schema, property = "body") => {
     const { error, value } = schema.validate(req[property]);
 
     if (error) {
+      console.log("from validate middleware", error);
       next(new customError(error.message, statusCodes.BAD_REQUEST));
     }
 

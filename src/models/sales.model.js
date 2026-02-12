@@ -16,14 +16,6 @@ const walkingCustomerSchema = new mongoose.Schema(
   { _id: false },
 );
 
-// listed customer (embedded ref)
-const listedCustomerSchema = new mongoose.Schema(
-  {
-    customerId: { type: mongoose.Schema.Types.ObjectId, ref: "Customer" },
-  },
-  { _id: false },
-);
-
 // searchItem (embedded array)
 const searchItemSchema = new mongoose.Schema(
   {
@@ -90,7 +82,7 @@ const customerTypeSchema = new mongoose.Schema(
       required: true,
     },
     walking: { type: walkingCustomerSchema, default: null },
-    listed: { type: listedCustomerSchema, default: null },
+    customerId: { type: mongoose.Schema.Types.ObjectId, ref: "Customer" },
   },
   { _id: false },
 );
