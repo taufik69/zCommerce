@@ -11,4 +11,6 @@ _.route("/create-sales").post(
 
 _.route("/get-sales").get(salesController.getAllSales);
 
+_.route("/get-sales-products").get(salesController.searchProductsAndVariants);
+
 module.exports = _;

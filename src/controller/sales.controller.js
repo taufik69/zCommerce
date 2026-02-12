@@ -202,3 +202,175 @@ exports.getAllSales = asynchandeler(async (req, res) => {
     sales,
   );
 });
+
+// search by product name or barCode  sku and search also variant model variantName
+
+exports.searchProductsAndVariants = async (req, res) => {
+  const escapeRegex = (str = "") => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  try {
+    const q = String(req.query.q || "").trim();
+    const limit = Math.min(Number(req.query.limit || 20), 50);
+
+    if (!q) {
+      return apiResponse.sendError(
+        res,
+        statusCodes.BAD_REQUEST,
+        "Query (q) is required",
+      );
+    }
+
+    // barcode/sku usually numeric-ish (but keep generic)
+    const isLikelyCode = /^[0-9A-Za-z\-_.]{4,}$/.test(q);
+    const qRegex = new RegExp(escapeRegex(q), "i");
+
+    // ---------- Product match ----------
+    // code => exact match prefer
+    const productMatch = isLikelyCode
+      ? {
+          $or: [
+            { sku: q },
+            { barCode: q },
+            { qrCode: q },
+            { slug: q.toLowerCase?.() || q },
+          ],
+        }
+      : {
+          $or: [
+            { name: qRegex },
+            { slug: q.toLowerCase?.() || q },
+            { sku: qRegex },
+            { barCode: qRegex },
+          ],
+        };
+
+    // ---------- Variant match ----------
+    const variantMatch = isLikelyCode
+      ? {
+          $or: [
+            { sku: q },
+            { barCode: q },
+            { qrCode: q },
+            { slug: q.toLowerCase?.() || q },
+          ],
+        }
+      : {
+          $or: [
+            { variantName: qRegex },
+            { slug: q.toLowerCase?.() || q },
+            { sku: qRegex },
+            { barCode: qRegex },
+          ],
+        };
+
+    // One pipeline: products + variants
+    const results = await productModel.aggregate([
+      { $match: productMatch },
+
+      // score boost for exact code matches (optional)
+      {
+        $addFields: {
+          _type: "product",
+          _score: {
+            $cond: [
+              {
+                $or: [
+                  { $eq: ["$sku", q] },
+                  { $eq: ["$barCode", q] },
+                  { $eq: ["$qrCode", q] },
+                ],
+              },
+              100,
+              10,
+            ],
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          _type: 1,
+          _score: 1,
+          name: 1,
+          slug: 1,
+          sku: 1,
+          barCode: 1,
+          groupUnit: 1,
+          groupUnitQuantity: 1,
+          unit: 1,
+          qrCode: 1,
+          image: 1,
+          stock: 1,
+          size: 1,
+          color: 1,
+          purchasePrice: 1,
+          retailPrice: 1,
+          wholesalePrice: 1,
+          totalSales: 1,
+          slug: 1,
+        },
+      },
+
+      // union variants
+      {
+        $unionWith: {
+          coll: variantModel.collection.name, // "variants"
+          pipeline: [
+            { $match: variantMatch },
+            {
+              $addFields: {
+                _type: "variant",
+                _score: {
+                  $cond: [
+                    {
+                      $or: [
+                        { $eq: ["$sku", q] },
+                        { $eq: ["$barCode", q] },
+                        { $eq: ["$qrCode", q] },
+                      ],
+                    },
+                    100,
+                    10,
+                  ],
+                },
+              },
+            },
+            {
+              $project: {
+                _id: 1,
+                _type: 1,
+                _score: 1,
+                product: 1,
+                variantName: 1,
+                slug: 1,
+                sku: 1,
+                barCode: 1,
+                qrCode: 1,
+                image: 1,
+                stockVariant: 1,
+                purchasePrice: 1,
+                retailPrice: 1,
+                totalSales: 1,
+                wholesalePrice: 1,
+                size: 1,
+                color: 1,
+              },
+            },
+          ],
+        },
+      },
+
+      // sort best matches first
+      { $sort: { _score: -1, _id: -1 } },
+      { $limit: limit },
+    ]);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Search results",
+      results,
+    );
+  } catch (err) {
+    return apiResponse.sendError(res, statusCodes.SERVER_ERROR, err.message);
+  }
+};

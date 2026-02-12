@@ -269,6 +269,16 @@ const productSchema = new mongoose.Schema(
   },
 );
 
+// product.model.js (schema setup এর পরে)
+productSchema.index({
+  name: "text",
+  sku: "text",
+  barCode: "text",
+});
+productSchema.index({ slug: 1 });
+productSchema.index({ sku: 1 });
+productSchema.index({ barCode: 1 });
+
 // Auto-generate slug from name
 productSchema.pre("save", function (next) {
   if (this.isModified("name")) {

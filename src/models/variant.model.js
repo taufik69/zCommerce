@@ -175,6 +175,17 @@ const variantSchema = new mongoose.Schema(
   },
 );
 
+// variant.model.js
+variantSchema.index({
+  variantName: "text",
+  sku: "text",
+  // barCode: "text",
+});
+variantSchema.index({ slug: 1 });
+variantSchema.index({ sku: 1 });
+// variantSchema.index({ barCode: 1 });
+// variantSchema.index({ product: 1 });
+
 // calculate stock adjustment // adjustment plus
 variantSchema.virtual("adjustmentMultipleVariantPlus").get(function () {
   return this.stockVariantAdjust?.reduce((total, variant) => {
