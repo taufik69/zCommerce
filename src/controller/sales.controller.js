@@ -176,3 +176,29 @@ exports.createSales = asynchandeler(async (req, res) => {
     throw err;
   }
 });
+
+// get all sales order or get invoiceNumber wise sales
+exports.getAllSales = asynchandeler(async (req, res) => {
+  const { invoiceNumber } = req.query;
+  let query = {};
+  if (invoiceNumber) {
+    query = { invoiceNumber };
+  } else {
+    query = {};
+  }
+  const sales = await salesModel
+    .find(query)
+    .sort({ createdAt: -1 })
+    .populate("customerType.customerId")
+    .populate("searchItem.productId")
+    .populate("searchItem.variantId");
+  if (!sales || sales.length === 0) {
+    throw new customError("No sales found", statusCodes.NOT_FOUND);
+  }
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Sales fetched successfully",
+    sales,
+  );
+});

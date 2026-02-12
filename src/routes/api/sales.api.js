@@ -9,4 +9,6 @@ _.route("/create-sales").post(
   salesController.createSales,
 );
 
+_.route("/get-sales").get(salesController.getAllSales);
+
 module.exports = _;
