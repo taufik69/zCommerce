@@ -52,7 +52,7 @@ const searchItemSchema = Joi.object({
 
   quantity: Joi.number().min(0).default(1),
   groupQuantity: Joi.number().min(0).default(0),
-
+  unit: Joi.string().trim().allow("").optional(),
   salesRate: Joi.number().min(0).default(0),
   discount: Joi.number().min(0).default(0),
 

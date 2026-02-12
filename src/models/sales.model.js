@@ -36,6 +36,7 @@ const searchItemSchema = new mongoose.Schema(
 
     quantity: { type: Number, default: 1, min: 0 },
     groupQuantity: { type: Number, default: 0, min: 0 },
+    unit: { type: String, trim: true },
 
     salesRate: { type: Number, default: 0, min: 0 },
     discount: { type: Number, default: 0, min: 0 },
