@@ -64,7 +64,7 @@ exports.getAllCustomersTypes = asynchandeler(async (req, res) => {
       customer,
     );
   }
-  const customers = await CustomerType.find();
+  const customers = await CustomerType.find().sort({ createdAt: -1 });
   if (!customers || customers.length === 0) {
     throw new customError("No customer found", statusCodes.NOT_FOUND);
   }
@@ -190,7 +190,8 @@ exports.getAllCustomers = asynchandeler(async (req, res) => {
   const customers = await customerModel
     .find(query)
     .sort({ createdAt: -1 })
-    .populate("customerType");
+    .populate("customerType")
+    .sort({ createdAt: -1 });
 
   if (!customers || customers.length === 0) {
     return apiResponse.sendError(
@@ -392,7 +393,8 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
         customer,
         isActive: true,
       })
-      .populate("customer paymentMode");
+      .populate("customer paymentMode")
+      .sort({ createdAt: -1 });
 
     if (!doc) {
       return apiResponse.sendError(
@@ -416,7 +418,8 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
   const docs = await customerPaymentRecived
     .find(query)
     .sort({ createdAt: -1 })
-    .populate("customer paymentMode");
+    .populate("customer paymentMode")
+    .sort({ createdAt: -1 });
 
   if (!docs || docs.length === 0) {
     apiResponse.sendError(
@@ -640,7 +643,8 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
         customer,
         isActive: true,
       })
-      .populate("customer paymentMode");
+      .populate("customer paymentMode")
+      .sort({ createdAt: -1 });
 
     if (!doc) {
       return apiResponse.sendError(
@@ -664,7 +668,8 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
   const docs = await customerAdvancePaymentModel
     .find(query)
     .sort({ createdAt: -1 })
-    .populate("customer paymentMode");
+    .populate("customer paymentMode")
+    .sort({ createdAt: -1 });
 
   if (!docs || docs.length === 0) {
     apiResponse.sendError(
