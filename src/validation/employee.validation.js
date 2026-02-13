@@ -7,7 +7,6 @@ const GENDERS = ["male", "female", "other"];
 
 const employeeCreateSchema = joi
   .object({
-    // employeeId auto-generate হবে, তাই allow/strip
     employeeId: joi.forbidden(),
 
     fullName: joi.string().trim().min(2).max(100).required().messages({
@@ -17,10 +16,15 @@ const employeeCreateSchema = joi
       "string.max": "Full name cannot exceed 100 characters.",
     }),
 
-    designation: joi.string().allow("").trim().required().messages({
-      "string.empty": "Designation is required.",
-      "any.required": "Designation is required.",
-    }),
+    designation: joi
+      .string()
+      .trim()
+      .regex(/^[0-9a-fA-F]{24}$/)
+      .required()
+      .messages({
+        "string.empty": "Designation is required.",
+        "any.required": "Designation is required.",
+      }),
 
     gender: joi
       .string()

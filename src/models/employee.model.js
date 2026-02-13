@@ -3,6 +3,7 @@ const { customError } = require("../lib/CustomError");
 const Counter = require("./counter.model");
 const { apiResponse } = require("../utils/apiResponse");
 const { statusCodes } = require("../constant/constant");
+const { required } = require("joi");
 const employeeSchema = new mongoose.Schema(
   {
     employeeId: {
@@ -25,9 +26,20 @@ const employeeSchema = new mongoose.Schema(
     },
 
     designation: {
-      type: String,
+      type: mongoose.Types.ObjectId,
       required: [true, "Designation is required"],
-      trim: true,
+      ref: "Designation",
+    },
+
+    deapartment: {
+      type: mongoose.Types.ObjectId,
+      ref: "Department",
+      default: null,
+    },
+    section: {
+      type: mongoose.Types.ObjectId,
+      ref: "Section",
+      default: null,
     },
 
     educationalQualification: {
