@@ -77,6 +77,8 @@ const customerSchema = new mongoose.Schema(
     customerType: {
       type: mongoose.Types.ObjectId,
       ref: "CustomerType",
+      required: [true, "Customer type is required"],
+      trim: true,
     },
 
     fullName: {
@@ -110,9 +112,6 @@ const customerSchema = new mongoose.Schema(
     nidNumber: {
       type: String,
       trim: true,
-      default: "",
-      // if you want validation:
-      // validate: { validator: v => !v || /^\d{10}|\d{13}|\d{17}$/.test(v), message: "Invalid NID" }
     },
 
     openingDues: {
