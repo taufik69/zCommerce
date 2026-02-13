@@ -182,7 +182,7 @@ const supplierDuePaymentSchema = new mongoose.Schema(
 );
 
 // Auto-generate Transaction ID
-supplierDuePaymentSchema.pre("validate", function (next) {
+supplierDuePaymentSchema.pre("save", function (next) {
   if (!this.transactionId) {
     const d = new Date();
     const y = d.getFullYear();
