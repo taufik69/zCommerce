@@ -20,13 +20,7 @@ exports.createEmployeeAdvancePaymentSchema = Joi.object({
     "any.required": "Amount is required",
   }),
 
-  // balanceAmount: Joi.number().min(0).optional().messages({
-  //   "number.min": "Balance amount cannot be negative",
-  // }),
-
-  paymentMode: Joi.string()
-    .valid("cash", "bank", "bkash", "nagad", "rocket", "cheque", "other")
-    .default("cash"),
+  paymentMode: Joi.string(),
 
   remarks: Joi.string().trim().max(500).allow("").optional(),
 

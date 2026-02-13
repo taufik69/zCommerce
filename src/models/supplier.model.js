@@ -122,10 +122,10 @@ const supplierDuePaymentSchema = new mongoose.Schema(
 
     // Supplier info
     supplierId: {
-      type: String,
-      trim: true,
+      type: mongoose.Types.ObjectId,
       required: [true, "Supplier ID is required"],
       index: true,
+      ref: "Supplier ",
     },
 
     // Paid Amount *
@@ -144,13 +144,8 @@ const supplierDuePaymentSchema = new mongoose.Schema(
 
     // Payment Mode *
     paymentMode: {
-      type: String,
-      trim: true,
-      enum: {
-        values: ["cash", "bank", "bkash", "nagad", "rocket", "cheque", "other"],
-        message:
-          "Payment mode must be cash, bank, bkash, nagad, rocket, cheque, or other",
-      },
+      type: mongoose.Types.ObjectId,
+      ref: "Account",
       required: [true, "Payment mode is required"],
     },
 

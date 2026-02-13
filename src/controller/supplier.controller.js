@@ -173,7 +173,10 @@ exports.createSupplierDuePayment = asynchandeler(async (req, res) => {
   }
 
   // 1️Find supplier
-  const supplier = await SupplierModel.findOne({ supplierId, isActive: true });
+  const supplier = await SupplierModel.findOne({
+    _id: supplierId,
+    isActive: true,
+  });
   if (!supplier) {
     return apiResponse.sendError(
       res,
@@ -253,7 +256,7 @@ exports.getAllSupplierDuePayment = asynchandeler(async (req, res) => {
       $lookup: {
         from: "suppliers",
         localField: "supplierId",
-        foreignField: "supplierId",
+        foreignField: "_id",
         as: "supplier",
       },
     },
@@ -264,19 +267,32 @@ exports.getAllSupplierDuePayment = asynchandeler(async (req, res) => {
         preserveNullAndEmptyArrays: true,
       },
     },
+    {
+      $lookup: {
+        from: "accounts",
+        localField: "paymentMode",
+        foreignField: "_id",
+        as: "paymentMethod",
+      },
+    },
 
     {
       $project: {
         transactionId: 1,
         date: 1,
-        supplierId: 1,
         paidAmount: 1,
         lessAmount: 1,
         paymentMode: 1,
         remarks: 1,
+        paymentMethod: {
+          name: 1,
+          isActive: 1,
+          createdAt: 1,
+          slug: 1,
+          _id: 1,
+        },
         remainingDue: 1,
         isActive: 1,
-
         supplier: {
           supplierName: 1,
           supplierId: 1,
@@ -305,7 +321,7 @@ exports.updateSupplierDuePayment = asynchandeler(async (req, res) => {
   const { paidAmount, lessAmount, paymentMode, remarks, date } = req.body;
 
   // 1) find payment doc
-  const paymentDoc = await SupplierDuePayment.findOne({ supplierId: id });
+  const paymentDoc = await SupplierDuePayment.findOne({ _id: id });
   if (!paymentDoc) {
     return apiResponse.sendError(
       res,
@@ -316,7 +332,7 @@ exports.updateSupplierDuePayment = asynchandeler(async (req, res) => {
 
   // 2) find supplier
   const supplier = await SupplierModel.findOne({
-    supplierId: paymentDoc.supplierId,
+    _id: paymentDoc.supplierId,
     isActive: true,
   });
   if (!supplier) {
@@ -393,7 +409,7 @@ exports.softDeleteSupplierDuePayment = asynchandeler(async (req, res) => {
   const { deleteSupplier } = req.query;
   if (deleteSupplier === "true") {
     const payment = await SupplierDuePayment.findOneAndUpdate(
-      { supplierId: req.params.supplierId },
+      { _id: req.params.supplierId },
       { isActive: false, deletedAt: Date.now() },
       {
         new: true,
@@ -413,7 +429,7 @@ exports.softDeleteSupplierDuePayment = asynchandeler(async (req, res) => {
     );
   } else {
     const payment = await SupplierDuePayment.findOneAndUpdate(
-      { supplierId: req.params.supplierId },
+      { _id: req.params.supplierId },
       { isActive: true, updatedAt: Date.now() },
       {
         new: true,
@@ -437,7 +453,7 @@ exports.softDeleteSupplierDuePayment = asynchandeler(async (req, res) => {
 // hard delete supplier due payment
 exports.deleteSupplierDuePayment = asynchandeler(async (req, res) => {
   const payment = await SupplierDuePayment.findOneAndDelete({
-    supplierId: req.params.supplierId,
+    _id: req.params.supplierId,
   });
   if (!payment)
     apiResponse.sendError(

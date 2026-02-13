@@ -92,14 +92,10 @@ exports.createSupplierDuePaymentSchema = Joi.object({
     "number.min": "Less amount cannot be negative",
   }),
 
-  paymentMode: Joi.string()
-    .valid("cash", "bank", "bkash", "nagad", "rocket", "cheque", "other")
-    .required()
-    .messages({
-      "any.only":
-        "Payment mode must be cash, bank, bkash, nagad, rocket, cheque, or other",
-      "any.required": "Payment mode is required",
-    }),
+  paymentMode: Joi.string().required().messages({
+    "any.only": "suuplier id required",
+    "any.required": "Payment mode is required",
+  }),
   remarks: Joi.string().trim().max(500).allow("").optional(),
 }).options({ abortEarly: false, allowUnknown: true });
 
@@ -109,7 +105,7 @@ exports.updateSupplierDuePaymentSchema = Joi.object({
   paidAmount: Joi.number().min(0).optional(),
   lessAmount: Joi.number().min(0).optional(),
   paymentMode: Joi.string()
-    .valid("cash", "bank", "bkash", "nagad", "rocket", "cheque", "other")
+
     .optional(),
   remarks: Joi.string().trim().max(500).allow("").optional(),
   remainingDue: Joi.number().min(0).optional(),
