@@ -1,7 +1,5 @@
 // validations/sales.validation.js
 const Joi = require("joi");
-const { apiResponse } = require("../utils/apiResponse");
-const { jabcode } = require("bwip-js/node");
 
 // helpers
 const objectId = Joi.string().trim().length(24).hex().messages({
@@ -74,13 +72,13 @@ const searchItemSchema = Joi.object({
 
 const singlePaymentSchema = Joi.object({
   amount: Joi.number().min(0).default(0),
-  paymentTo: Joi.string().trim().allow("").optional(),
+  paymentTo: objectId.allow("").optional(),
   remark: Joi.string().trim().allow("").optional(),
 }).options({ allowUnknown: true });
 
 const multiplePaymentSchema = Joi.object({
   amount: Joi.number().min(0).default(0),
-  paymentTo: Joi.string().trim().allow("").optional(),
+  paymentTo: objectId.allow("").optional(),
   remark: Joi.string().trim().allow("").optional(),
 }).options({ allowUnknown: true });
 

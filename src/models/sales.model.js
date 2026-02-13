@@ -50,7 +50,7 @@ const searchItemSchema = new mongoose.Schema(
 const singlePaymentSchema = new mongoose.Schema(
   {
     amount: { type: Number, default: 0, min: 0 },
-    paymentTo: { type: String, trim: true },
+    paymentTo: { type: mongoose.Types.ObjectId, ref: "Account", trim: true },
     remark: { type: String, trim: true },
   },
   { _id: false },
@@ -59,7 +59,7 @@ const singlePaymentSchema = new mongoose.Schema(
 const multiplePaymentSchema = new mongoose.Schema(
   {
     amount: { type: Number, default: 0, min: 0 },
-    paymentTo: { type: String, trim: true },
+    paymentTo: { type: mongoose.Types.ObjectId, ref: "Account", trim: true },
     remark: { type: String, trim: true },
   },
   { _id: false },
