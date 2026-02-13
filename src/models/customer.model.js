@@ -283,9 +283,9 @@ const customerPaymentRecivedSchema = new mongoose.Schema(
     },
 
     paymentMode: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
       trim: true,
-      default: "",
+      ref: "Account",
     },
 
     remarks: {
@@ -343,8 +343,10 @@ const customerAdvancePaymentSchema = new mongoose.Schema(
     },
 
     paymentMode: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
       trim: true,
+      ref: "Account",
+      required: [true, "Payment mode is required"],
     },
 
     date: {

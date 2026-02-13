@@ -5,16 +5,6 @@ const { apiResponse } = require("../utils/apiResponse");
 const bdMobileRegex = /^(01\d{9}|\+8801\d{9})$/;
 const nidRegex = /^(\d{10}|\d{13}|\d{17})$/;
 
-const PAYMENT_MODES = [
-  "cash",
-  "bank",
-  "bkash",
-  "nagad",
-  "rocket",
-  "cheque",
-  "other",
-];
-
 const customerCreateSchema = Joi.object({
   customerId: Joi.forbidden(),
   customerType: Joi.string().trim().allow("").optional(),
@@ -169,13 +159,11 @@ const createCustomerPaymentSchema = Joi.object({
     "number.min": "Cash back cannot be negative",
   }),
 
-  paymentMode: Joi.string()
-    .valid(...PAYMENT_MODES)
-    .default("cash")
-    .messages({
-      "any.only":
-        "Payment mode must be cash, bank, bkash, nagad, rocket, cheque or other",
-    }),
+  paymentMode: Joi.string().required().messages({
+    "any.only":
+      "Payment mode must be cash, bank, bkash, nagad, rocket, cheque or other",
+    "any.required": "Payment mode is required",
+  }),
 
   remarks: Joi.string().trim().max(500).allow("").optional(),
 
@@ -192,9 +180,7 @@ const updateCustomerPaymentSchema = Joi.object({
   lessAmount: Joi.number().min(0).optional(),
   cashBack: Joi.number().min(0).optional(),
   date: Joi.date().optional(),
-  paymentMode: Joi.string()
-    .valid(...PAYMENT_MODES)
-    .optional(),
+  paymentMode: Joi.string().optional(),
   remarks: Joi.string().trim().max(500).allow("").optional(),
   isActive: Joi.boolean().optional(),
   deletedAt: Joi.date().allow(null).optional(),
@@ -220,13 +206,11 @@ const createCustomerAdvancePaymentSchema = Joi.object({
     "number.min": "Advance cash back cannot be negative",
   }),
 
-  paymentMode: Joi.string()
-    .valid(...PAYMENT_MODES)
-    .default("cash")
-    .messages({
-      "any.only":
-        "Payment mode must be cash, bank, bkash, nagad, rocket, cheque or other",
-    }),
+  paymentMode: Joi.string().required().messages({
+    "any.only":
+      "Payment mode must be cash, bank, bkash, nagad, rocket, cheque or other",
+    "any.required": "Payment mode is required",
+  }),
 }).options({ abortEarly: false, allowUnknown: true });
 
 // =============================
@@ -239,9 +223,7 @@ const updateCustomerAdvancePaymentSchema = Joi.object({
 
   advanceCashBack: Joi.number().min(0).optional(),
 
-  paymentMode: Joi.string()
-    .valid(...PAYMENT_MODES)
-    .optional(),
+  paymentMode: Joi.string().optional(),
 
   remarks: Joi.string().trim().max(500).allow("").optional(),
 })

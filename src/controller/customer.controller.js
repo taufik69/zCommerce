@@ -187,7 +187,10 @@ exports.getAllCustomers = asynchandeler(async (req, res) => {
     ];
   }
 
-  const customers = await customerModel.find(query).sort({ createdAt: -1 });
+  const customers = await customerModel
+    .find(query)
+    .sort({ createdAt: -1 })
+    .populate("customerType");
 
   if (!customers || customers.length === 0) {
     return apiResponse.sendError(
@@ -380,14 +383,16 @@ exports.createCustomerPaymentRecived = asynchandeler(async (req, res) => {
 // @query ?slug=rahim-ahmed
 // @query ?name=rahim
 exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
-  const { slug, name } = req.query;
+  const { customer } = req.query;
 
   // 1) Get single by slug
-  if (slug) {
-    const doc = await customerPaymentRecived.findOne({
-      slug,
-      isActive: true,
-    });
+  if (customer) {
+    const doc = await customerPaymentRecived
+      .findOne({
+        customer,
+        isActive: true,
+      })
+      .populate("customer paymentMode");
 
     if (!doc) {
       return apiResponse.sendError(
@@ -401,21 +406,17 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
       res,
       statusCodes.OK,
       "Customer payment retrieved successfully",
-      customerPaymentDetailsDTO(doc),
+      doc,
     );
   }
 
   // 2) Search by customer name (partial match)
-  let query = { isActive: true };
+  let query = {};
 
-  if (name && name.trim()) {
-    query.customerName = {
-      $regex: name.trim(),
-      $options: "i",
-    };
-  }
-
-  const docs = await customerPaymentRecived.find(query).sort({ createdAt: -1 });
+  const docs = await customerPaymentRecived
+    .find(query)
+    .sort({ createdAt: -1 })
+    .populate("customer paymentMode");
 
   if (!docs || docs.length === 0) {
     apiResponse.sendError(
@@ -430,7 +431,7 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Customer payments retrieved successfully",
-    customerPaymentListDTO(docs),
+    docs,
   );
 });
 
