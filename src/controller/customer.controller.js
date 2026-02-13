@@ -631,14 +631,16 @@ exports.createCustomerAdvancePaymentRecived = asynchandeler(
 // @query ?slug=rahim-ahmed
 // @query ?name=rahim
 exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
-  const { slug, name } = req.query;
+  const { customer } = req.query;
 
   //  Get single by slug
-  if (slug) {
-    const doc = await customerAdvancePaymentModel.findOne({
-      slug,
-      isActive: true,
-    });
+  if (customer) {
+    const doc = await customerAdvancePaymentModel
+      .findOne({
+        customer,
+        isActive: true,
+      })
+      .populate("customer paymentMode");
 
     if (!doc) {
       return apiResponse.sendError(
@@ -652,23 +654,17 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
       res,
       statusCodes.OK,
       "Customer payment retrieved successfully",
-      customerAdvancePaymentDetailsDTO(doc),
+      doc,
     );
   }
 
   // 2) Search by customer name (partial match)
-  let query = { isActive: true };
-
-  if (name && name.trim()) {
-    query.customerName = {
-      $regex: name.trim(),
-      $options: "i",
-    };
-  }
+  let query = {};
 
   const docs = await customerAdvancePaymentModel
     .find(query)
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .populate("customer paymentMode");
 
   if (!docs || docs.length === 0) {
     apiResponse.sendError(
@@ -683,7 +679,7 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Customer payments retrieved successfully",
-    customerAdvancePaymentListDTO(docs),
+    docs,
   );
 });
 
