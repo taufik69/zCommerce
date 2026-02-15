@@ -142,10 +142,10 @@ const createCustomerPaymentSchema = Joi.object({
     "any.required": "Customer id is required.",
   }),
 
-  customerType: Joi.string().trim().required().messages({
-    "string.empty": "Customer type id is required.",
-    "any.required": "Customer type id is required.",
-  }),
+  // customerType: Joi.string().trim().required().messages({
+  //   "string.empty": "Customer type id is required.",
+  //   "any.required": "Customer type id is required.",
+  // }),
 
   referenceInvoice: Joi.string().trim().allow("").optional(),
 
