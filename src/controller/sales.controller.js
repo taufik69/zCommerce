@@ -374,3 +374,303 @@ exports.searchProductsAndVariants = async (req, res) => {
     return apiResponse.sendError(res, statusCodes.SERVER_ERROR, err.message);
   }
 };
+
+// update sales
+exports.updateSales = asynchandeler(async (req, res) => {
+  const session = await mongoose.startSession();
+  let updatedSale;
+
+  try {
+    await session.withTransaction(async () => {
+      const saleId = req.params.saleId;
+      console.log(saleId);
+
+      // 1) Load old sale inside transaction
+      const oldSale = await salesModel.findById(saleId).session(session).lean();
+      if (!oldSale) {
+        throw new customError("Sales not found", statusCodes.NOT_FOUND);
+      }
+
+      // 2) Decide NEW state (if field not sent, keep old)
+      const newInvoiceStatus = req.body.invoiceStatus ?? oldSale.invoiceStatus;
+      const newItems = req.body.searchItem ?? oldSale.searchItem ?? [];
+      const oldItems = oldSale.searchItem ?? [];
+
+      const oldIsComplete = oldSale.invoiceStatus === "complete";
+      const newIsComplete = newInvoiceStatus === "complete";
+
+      // helpers
+      const effectQty = (it) => {
+        const qty = Number(it?.quantity || 0);
+        if (qty <= 0) return 0;
+        // sale -> reduce (-), return -> increase (+)
+        return (it.salesStatus === "return" ? +1 : -1) * qty;
+      };
+
+      const addToMap = (map, id, val) => {
+        if (!id || !val) return;
+        const key = String(id);
+        map.set(key, (map.get(key) || 0) + val);
+      };
+
+      const buildEffectMaps = (items) => {
+        const productMap = new Map();
+        const variantMap = new Map();
+
+        for (const it of items || []) {
+          const eff = effectQty(it);
+          addToMap(productMap, it.productId, eff);
+          addToMap(variantMap, it.variantId, eff);
+        }
+
+        return { productMap, variantMap };
+      };
+
+      // 3) Determine stock delta maps based on invoiceStatus transitions
+      // delta = what to apply to stock NOW
+      let productDelta = new Map();
+      let variantDelta = new Map();
+
+      if (oldIsComplete && newIsComplete) {
+        // diff = new - old
+        const oldMaps = buildEffectMaps(oldItems);
+        const newMaps = buildEffectMaps(newItems);
+
+        const mergeDelta = (newMap, oldMap) => {
+          const out = new Map();
+          const ids = new Set([...newMap.keys(), ...oldMap.keys()]);
+          for (const id of ids) {
+            const n = newMap.get(id) || 0;
+            const o = oldMap.get(id) || 0;
+            const d = n - o;
+            if (d !== 0) out.set(id, d);
+          }
+          return out;
+        };
+
+        productDelta = mergeDelta(newMaps.productMap, oldMaps.productMap);
+        variantDelta = mergeDelta(newMaps.variantMap, oldMaps.variantMap);
+      } else if (!oldIsComplete && newIsComplete) {
+        // apply FULL new effect (since previously no stock was applied)
+        const newMaps = buildEffectMaps(newItems);
+        productDelta = newMaps.productMap;
+        variantDelta = newMaps.variantMap;
+      } else if (oldIsComplete && !newIsComplete) {
+        // revert FULL old effect (undo what was applied before)
+        const oldMaps = buildEffectMaps(oldItems);
+
+        // revert means: delta = -oldEffect
+        productDelta = new Map(
+          [...oldMaps.productMap.entries()].map(([id, v]) => [id, -v]),
+        );
+        variantDelta = new Map(
+          [...oldMaps.variantMap.entries()].map(([id, v]) => [id, -v]),
+        );
+      }
+      // else: !oldComplete && !newComplete => do nothing (no stock ops)
+
+      // 4) Build bulk operations (with stock check on reductions)
+      const productOps = [];
+      for (const [productId, d] of productDelta.entries()) {
+        if (!d) continue;
+        const reduce = d < 0;
+        const filter = reduce
+          ? { _id: productId, stock: { $gte: Math.abs(d) } }
+          : { _id: productId };
+
+        productOps.push({
+          updateOne: { filter, update: { $inc: { stock: d } } },
+        });
+      }
+
+      const variantOps = [];
+      for (const [variantId, d] of variantDelta.entries()) {
+        if (!d) continue;
+        const reduce = d < 0;
+        const filter = reduce
+          ? { _id: variantId, stockVariant: { $gte: Math.abs(d) } }
+          : { _id: variantId };
+
+        variantOps.push({
+          updateOne: { filter, update: { $inc: { stockVariant: d } } },
+        });
+      }
+
+      // 5) Execute stock updates FIRST (only if needed)
+      if (productOps.length) {
+        const r = await productModel.bulkWrite(productOps, { session });
+        if (r.matchedCount !== productOps.length) {
+          throw new customError(
+            "Product stock not enough for some items",
+            statusCodes.BAD_REQUEST,
+          );
+        }
+      }
+
+      if (variantOps.length) {
+        const r = await variantModel.bulkWrite(variantOps, { session });
+        if (r.matchedCount !== variantOps.length) {
+          throw new customError(
+            "Variant stock not enough for some items",
+            statusCodes.BAD_REQUEST,
+          );
+        }
+      }
+
+      // 6) Now update the sales doc (inside same transaction)
+      // NOTE: if user didn't send invoiceStatus/searchItem we already handled stock using old values,
+      // and $set will only change what they sent.
+      updatedSale = await salesModel.findByIdAndUpdate(
+        saleId,
+        { $set: req.body },
+        { new: true, session, runValidators: true },
+      );
+
+      if (!updatedSale) {
+        throw new customError("Sales update failed", statusCodes.SERVER_ERROR);
+      }
+    });
+
+    session.endSession();
+
+    // 7) Post-commit notifications (optional, same style as your createSales)
+    if (updatedSale?.sendSms) {
+      setImmediate(async () => {
+        try {
+          // const msgContent =
+          //   `Customer Name: ${updatedSale.name}\n` +
+          //   `Mobile Number: ${phone}\n` +
+          //   (email ? `Email: ${email}\n` : "") +
+          //   (address ? `Address: ${address}\n` : "") +
+          //   `Invoice: ${updatedSale.invoiceNumber}`;
+
+          // const smsResult = await sendSMS(phone, msgContent);
+          console.log("SMS sent:", updatedSale);
+        } catch (e) {
+          console.log("Notification background error:", e);
+        }
+      });
+    }
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Sales updated successfully",
+      updatedSale,
+    );
+  } catch (err) {
+    session.endSession();
+    throw err;
+  }
+});
+
+// delete  sales controller
+exports.deleteSales = asynchandeler(async (req, res) => {
+  const session = await mongoose.startSession();
+
+  try {
+    await session.withTransaction(async () => {
+      const saleId = req.params.saleId;
+      // 1️ Find sale inside transaction
+      const sale = await salesModel.findById(saleId).session(session).lean();
+      if (!sale) {
+        throw new customError("Sales not found", statusCodes.NOT_FOUND);
+      }
+
+      const isComplete = sale.invoiceStatus === "complete";
+      const items = sale.searchItem || [];
+
+      // helper: effect
+      const effectQty = (it) => {
+        const qty = Number(it?.quantity || 0);
+        if (qty <= 0) return 0;
+        return (it.salesStatus === "return" ? +1 : -1) * qty;
+      };
+
+      // 2️ If complete → revert stock
+      if (isComplete) {
+        const productMap = new Map();
+        const variantMap = new Map();
+
+        const addToMap = (map, id, val) => {
+          if (!id || !val) return;
+          const key = String(id);
+          map.set(key, (map.get(key) || 0) + val);
+        };
+
+        for (const it of items) {
+          const eff = effectQty(it);
+          if (!eff) continue;
+
+          // revert means: delta = -eff
+          const revertDelta = -eff;
+
+          addToMap(productMap, it.productId, revertDelta);
+          addToMap(variantMap, it.variantId, revertDelta);
+        }
+
+        // 3️⃣Build bulk ops
+        const productOps = [];
+        for (const [productId, d] of productMap.entries()) {
+          const reduce = d < 0;
+
+          const filter = reduce
+            ? { _id: productId, stock: { $gte: Math.abs(d) } }
+            : { _id: productId };
+
+          productOps.push({
+            updateOne: { filter, update: { $inc: { stock: d } } },
+          });
+        }
+
+        const variantOps = [];
+        for (const [variantId, d] of variantMap.entries()) {
+          const reduce = d < 0;
+
+          const filter = reduce
+            ? { _id: variantId, stockVariant: { $gte: Math.abs(d) } }
+            : { _id: variantId };
+
+          variantOps.push({
+            updateOne: { filter, update: { $inc: { stockVariant: d } } },
+          });
+        }
+
+        // 4️ Execute stock revert
+        if (productOps.length) {
+          const r = await productModel.bulkWrite(productOps, { session });
+          if (r.matchedCount !== productOps.length) {
+            throw new customError(
+              "Product stock revert failed",
+              statusCodes.BAD_REQUEST,
+            );
+          }
+        }
+
+        if (variantOps.length) {
+          const r = await variantModel.bulkWrite(variantOps, { session });
+          if (r.matchedCount !== variantOps.length) {
+            throw new customError(
+              "Variant stock revert failed",
+              statusCodes.BAD_REQUEST,
+            );
+          }
+        }
+      }
+
+      // 5️ Delete sale
+      await salesModel.findByIdAndDelete(saleId, { session });
+    });
+
+    session.endSession();
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Sales deleted successfully",
+    );
+  } catch (err) {
+    session.endSession();
+    throw err;
+  }
+});
