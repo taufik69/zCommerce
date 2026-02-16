@@ -12,5 +12,7 @@ _.route("/create-sales").post(
 _.route("/get-sales").get(salesController.getAllSales);
 
 _.route("/get-sales-products").get(salesController.searchProductsAndVariants);
+_.route("/update-sales/:saleId").put(salesController.updateSales);
+_.route("/delete-sales/:saleId").delete(salesController.deleteSales);
 
 module.exports = _;
