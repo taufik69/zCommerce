@@ -306,6 +306,7 @@ exports.searchProductsAndVariants = async (req, res) => {
           retailPrice: 1,
           wholesalePrice: 1,
           totalSales: 1,
+          discount: 1,
           slug: 1,
         },
       },
