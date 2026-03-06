@@ -328,20 +328,20 @@ exports.searchProductsAndVariants = async (req, res) => {
             { $match: variantMatch },
 
             // variant discount populate
-            {
-              $lookup: {
-                from: "discounts",
-                localField: "discount",
-                foreignField: "_id",
-                as: "discount",
-              },
-            },
-            {
-              $unwind: {
-                path: "$discount",
-                preserveNullAndEmptyArrays: true,
-              },
-            },
+            // {
+            //   $lookup: {
+            //     from: "discounts",
+            //     localField: "discount",
+            //     foreignField: "_id",
+            //     as: "discount",
+            //   },
+            // },
+            // {
+            //   $unwind: {
+            //     path: "$discount",
+            //     preserveNullAndEmptyArrays: true,
+            //   },
+            // },
 
             {
               $addFields: {
