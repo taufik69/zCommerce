@@ -207,6 +207,7 @@ exports.getAllSales = asynchandeler(async (req, res) => {
 
 exports.searchProductsAndVariants = async (req, res) => {
   const escapeRegex = (str = "") => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
   try {
     const q = String(req.query.q || "").trim();
     const limit = Math.min(Number(req.query.limit || 20), 50);
@@ -219,12 +220,9 @@ exports.searchProductsAndVariants = async (req, res) => {
       );
     }
 
-    // barcode/sku usually numeric-ish (but keep generic)
     const isLikelyCode = /^[0-9A-Za-z\-_.]{4,}$/.test(q);
     const qRegex = new RegExp(escapeRegex(q), "i");
 
-    // ---------- Product match ----------
-    // code => exact match prefer
     const productMatch = isLikelyCode
       ? {
           $or: [
@@ -243,7 +241,6 @@ exports.searchProductsAndVariants = async (req, res) => {
           ],
         };
 
-    // ---------- Variant match ----------
     const variantMatch = isLikelyCode
       ? {
           $or: [
@@ -262,11 +259,25 @@ exports.searchProductsAndVariants = async (req, res) => {
           ],
         };
 
-    // One pipeline: products + variants
     const results = await productModel.aggregate([
       { $match: productMatch },
 
-      // score boost for exact code matches (optional)
+      // product discount populate
+      {
+        $lookup: {
+          from: "discounts",
+          localField: "discount",
+          foreignField: "_id",
+          as: "discount",
+        },
+      },
+      {
+        $unwind: {
+          path: "$discount",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+
       {
         $addFields: {
           _type: "product",
@@ -307,16 +318,31 @@ exports.searchProductsAndVariants = async (req, res) => {
           wholesalePrice: 1,
           totalSales: 1,
           discount: 1,
-          slug: 1,
         },
       },
 
-      // union variants
       {
         $unionWith: {
-          coll: variantModel.collection.name, // "variants"
+          coll: variantModel.collection.name,
           pipeline: [
             { $match: variantMatch },
+
+            // variant discount populate
+            {
+              $lookup: {
+                from: "discounts",
+                localField: "discount",
+                foreignField: "_id",
+                as: "discount",
+              },
+            },
+            {
+              $unwind: {
+                path: "$discount",
+                preserveNullAndEmptyArrays: true,
+              },
+            },
+
             {
               $addFields: {
                 _type: "variant",
@@ -354,13 +380,13 @@ exports.searchProductsAndVariants = async (req, res) => {
                 wholesalePrice: 1,
                 size: 1,
                 color: 1,
+                discount: 1,
               },
             },
           ],
         },
       },
 
-      // sort best matches first
       { $sort: { _score: -1, _id: -1 } },
       { $limit: limit },
     ]);
