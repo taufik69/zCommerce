@@ -1,6 +1,7 @@
 const joi = require("joi");
 const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
+const { expandBracketKeys } = require("../utils/parseFormData.util");
 
 // ─── Reusable schemas ─────────────────────────────────────────────────────────
 
@@ -9,23 +10,45 @@ const objectId = joi.string().pattern(objectIdRegex).messages({
   "string.pattern.base": "Invalid ObjectId format",
 });
 
-const seoFields = joi
-  .object({
-    metaTitle: joi.string().trim().max(70).allow(""),
-    metaDescription: joi.string().trim().max(200).allow(""),
-    metaKeywords: joi.array().items(joi.string().trim().lowercase()),
-    canonicalUrl: joi.string().trim().uri().allow(""),
-    focusKeyword: joi.string().trim().lowercase().allow(""),
-    ogTitle: joi.string().trim().max(70).allow(""),
-    ogDescription: joi.string().trim().max(200).allow(""),
-    twitterCard: joi
-      .string()
-      .valid("summary", "summary_large_image", "app", "player"),
-    structuredData: joi.any(),
-    noIndex: joi.boolean(),
-    noFollow: joi.boolean(),
-  })
-  .unknown(false);
+const seoFieldsSchema = {
+  metaTitle: joi.string().trim().max(70).allow(""),
+  metaDescription: joi.string().trim().max(200).allow(""),
+  metaKeywords: joi.array().items(joi.string().trim().lowercase()),
+  canonicalUrl: joi.string().trim().uri().allow(""),
+  focusKeyword: joi.string().trim().lowercase().allow(""),
+  ogTitle: joi.string().trim().max(70).allow(""),
+  ogDescription: joi.string().trim().max(200).allow(""),
+  ogImage: joi
+    .object({
+      url: joi.string().allow(""),
+      publicId: joi.string().allow(""),
+      status: joi.string().valid("pending", "processing", "uploaded", "failed"),
+      localPath: joi.string().allow(""),
+      tries: joi.number(),
+      lastError: joi.string().allow(""),
+    })
+    .optional(),
+  twitterCard: joi
+    .string()
+    .valid("summary", "summary_large_image", "app", "player"),
+  structuredData: joi
+    .alternatives()
+    .try(
+      joi.object(),
+      joi.string().custom((value, helpers) => {
+        try {
+          return JSON.parse(value);
+        } catch (e) {
+          return helpers.error("any.invalid");
+        }
+      }),
+    )
+    .allow(null, ""),
+  noIndex: joi.boolean(),
+  noFollow: joi.boolean(),
+};
+
+const seoFields = joi.object(seoFieldsSchema).unknown(false);
 
 const dimensionsField = joi.object({
   width: joi.number().min(0),
@@ -81,7 +104,7 @@ const productCreateSchema = joi
     warehouseLocation: joi.string().trim().optional(),
     tag: joi.array().items(joi.string().trim()).optional(),
     specifications: joi.string().trim().optional(),
-
+    ...seoFieldsSchema,
     seo: seoFields.optional(),
   })
   .options({ abortEarly: false, stripUnknown: { objects: true } });
@@ -132,7 +155,7 @@ const productUpdateSchema = joi
     specifications: joi.string().trim(),
 
     isActive: joi.boolean(),
-
+    ...seoFieldsSchema,
     seo: seoFields,
   })
   .min(1) // at least one field must be present
@@ -159,7 +182,8 @@ const validateImageFile = (file, label) => {
  * Strips unknown fields to prevent mass-assignment.
  */
 const validateProduct = async (req) => {
-  const value = await productCreateSchema.validateAsync(req.body);
+  const expandedBody = expandBracketKeys(req.body);
+  const value = await productCreateSchema.validateAsync(expandedBody);
 
   const thumbnail = req.files?.thumbnail?.[0];
   const images = req.files?.image || [];
@@ -188,7 +212,8 @@ const validateProduct = async (req) => {
  * Also accepts an optional ogImage file upload.
  */
 const validateProductUpdate = async (req) => {
-  const value = await productUpdateSchema.validateAsync(req.body);
+  const expandedBody = expandBracketKeys(req.body);
+  const value = await productUpdateSchema.validateAsync(expandedBody);
 
   const ogImage = req.files?.ogImage?.[0];
   if (ogImage) validateImageFile(ogImage, "OG Image");

@@ -27,7 +27,36 @@ const NS = "product";
 const CACHE_TTL = 60 * 60;
 const CACHE_TTL_LIST = 60 * 30;
 
+const SEO_KEYS = [
+  "metaTitle",
+  "metaDescription",
+  "metaKeywords",
+  "canonicalUrl",
+  "focusKeyword",
+  "ogTitle",
+  "ogDescription",
+  "twitterCard",
+  "structuredData",
+  "noIndex",
+  "noFollow",
+];
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Merge flat SEO fields into a nested seo object.
+ */
+const mergeSeoData = (data = {}) => {
+  const seo = { ...(data.seo || {}) };
+  delete data.seo;
+  SEO_KEYS.forEach((key) => {
+    if (data[key] !== undefined) {
+      seo[key] = data[key];
+      delete data[key];
+    }
+  });
+  return seo;
+};
 
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -105,12 +134,11 @@ class ProductController {
     }
 
     // Build SEO subdoc — merge text fields with ogImage placeholder if uploaded
-    const seoData = {
-      ...(productData.seo || {}),
-      ...(ogImage
-        ? { ogImage: { status: "pending", localPath: ogImage.path } }
-        : {}),
-    };
+    const seoData = mergeSeoData(productData);
+
+    if (ogImage) {
+      seoData.ogImage = { status: "pending", localPath: ogImage.path };
+    }
 
     const product = await Product.create({
       ...productData,
@@ -299,10 +327,11 @@ class ProductController {
     }
 
     // Build $set payload — flatten seo so ogImage merges instead of replacing
+    const seoData = mergeSeoData(updateData);
     const $set = { ...updateData };
-    if (updateData.seo) {
-      delete $set.seo;
-      Object.entries(updateData.seo).forEach(([k, v]) => {
+
+    if (Object.keys(seoData).length > 0) {
+      Object.entries(seoData).forEach(([k, v]) => {
         $set[`seo.${k}`] = v;
       });
     }
