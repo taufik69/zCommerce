@@ -10,11 +10,11 @@ const VariantSchema = Joi.object({
     "string.empty": "Variant name is required",
     "any.required": "Variant name is required",
   }),
-  size: Joi.array().items(Joi.string()).messages({
-    "array.base": "Size must be an array of strings",
+  size: Joi.string().trim().default("N/A").messages({
+    "string.base": "Size must be a string",
   }),
-  color: Joi.array().items(Joi.string()).messages({
-    "array.base": "Color must be an array of strings",
+  color: Joi.string().trim().default("N/A").messages({
+    "string.base": "Color must be a string",
   }),
   stockVariant: Joi.number().optional().min(0).messages({
     "number.base": "Stock variant must be a number",

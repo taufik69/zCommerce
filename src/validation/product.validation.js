@@ -67,8 +67,16 @@ const productCreateSchema = joi
     brand: objectId.optional(),
     discount: objectId.optional(),
 
-    sku: joi.string().trim().optional(),
-    barCode: joi.string().trim().optional(),
+    sku: joi.string().trim().when("variantType", {
+      is: "singleVariant",
+      then: joi.required(),
+      otherwise: joi.optional(),
+    }),
+    barCode: joi.string().trim().when("variantType", {
+      is: "singleVariant",
+      then: joi.required(),
+      otherwise: joi.optional(),
+    }),
     qrCode: joi.string().trim().optional(),
 
     warrantyInformation: joi.string().trim().default("No warranty info"),
@@ -79,27 +87,78 @@ const productCreateSchema = joi
       .valid("In Stock", "Out of Stock", "Preorder")
       .optional(),
 
-    stock: joi.number().min(0).default(0),
-    purchasePrice: joi.number().min(0).optional(),
-    retailPrice: joi.number().min(0).optional(),
-    wholesalePrice: joi.number().min(0).optional(),
+    stock: joi.number().min(0).when("variantType", {
+      is: "singleVariant",
+      then: joi.required(),
+      otherwise: joi.optional().default(0),
+    }),
+    purchasePrice: joi.number().min(0).when("variantType", {
+      is: "singleVariant",
+      then: joi.required(),
+      otherwise: joi.optional(),
+    }),
+    retailPrice: joi.number().min(0).when("variantType", {
+      is: "singleVariant",
+      then: joi.required(),
+      otherwise: joi.optional(),
+    }),
+    wholesalePrice: joi.number().min(0).when("variantType", {
+      is: "singleVariant",
+      then: joi.required(),
+      otherwise: joi.optional(),
+    }),
     retailProfitMarginByPercentage: joi.number().min(0).max(100).optional(),
     wholesaleProfitMarginPercentage: joi.number().min(0).max(100).optional(),
-    alertQuantity: joi.number().min(0).optional(),
+    alertQuantity: joi.number().min(0).when("variantType", {
+      is: "singleVariant",
+      then: joi.required(),
+      otherwise: joi.optional(),
+    }),
 
     variantType: joi
       .string()
       .valid("singleVariant", "multipleVariant")
       .required(),
-    size: joi.string().trim().optional(),
-    color: joi.string().trim().optional(),
+    size: joi.string().trim().when("variantType", {
+      is: "singleVariant",
+      then: joi.required(),
+      otherwise: joi.optional(),
+    }),
+    color: joi.string().trim().when("variantType", {
+      is: "singleVariant",
+      then: joi.required(),
+      otherwise: joi.optional(),
+    }),
 
-    weight: joi.number().min(0).optional(),
-    dimensions: dimensionsField.optional(),
+    weight: joi.number().min(0).when("variantType", {
+      is: "singleVariant",
+      then: joi.required(),
+      otherwise: joi.optional(),
+    }),
+    dimensions: dimensionsField.when("variantType", {
+      is: "singleVariant",
+      then: joi.required(),
+      otherwise: joi.optional(),
+    }),
 
-    groupUnit: joi.string().trim().optional(),
-    groupUnitQuantity: joi.number().min(0).optional(),
-    unit: joi.string().valid("Piece", "Kg", "Gram", "Packet", "Custom").optional(),
+    groupUnit: joi.string().trim().when("variantType", {
+      is: "singleVariant",
+      then: joi.required(),
+      otherwise: joi.optional(),
+    }),
+    groupUnitQuantity: joi.number().min(0).when("variantType", {
+      is: "singleVariant",
+      then: joi.required(),
+      otherwise: joi.optional(),
+    }),
+    unit: joi
+      .string()
+      .valid("Piece", "Kg", "Gram", "Packet", "Custom")
+      .when("variantType", {
+        is: "singleVariant",
+        then: joi.required(),
+        otherwise: joi.optional(),
+      }),
 
     warehouseLocation: joi.string().trim().optional(),
     tag: joi.array().items(joi.string().trim()).optional(),
@@ -189,11 +248,18 @@ const validateProduct = async (req) => {
   const images = req.files?.image || [];
   const ogImage = req.files?.ogImage?.[0]; // optional SEO og:image
 
-  if (!thumbnail) {
-    throw new customError("Thumbnail is required", statusCodes.BAD_REQUEST);
+  if (value.variantType === "singleVariant") {
+    if (!thumbnail) {
+      throw new customError("Thumbnail is required for single variant products", statusCodes.BAD_REQUEST);
+    }
+    if (images.length === 0) {
+      throw new customError("At least one gallery image is required for single variant products", statusCodes.BAD_REQUEST);
+    }
   }
 
-  validateImageFile(thumbnail, "Thumbnail");
+  if (thumbnail) {
+    validateImageFile(thumbnail, "Thumbnail");
+  }
   images.forEach((img, idx) => validateImageFile(img, `Image ${idx + 1}`));
   if (ogImage) validateImageFile(ogImage, "OG Image");
 

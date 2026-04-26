@@ -6,17 +6,43 @@ const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const validateVariant = require("../validation/variant.validation");
 
-const {
-  uploadBarcodeToCloudinary,
-  cloudinaryFileUpload,
-  deleteCloudinaryFile,
-} = require("../helpers/cloudinary");
 const { statusCodes } = require("../constant/constant");
+const {
+  getCache,
+  setCache,
+  bumpNsVersion,
+  buildCacheKey,
+} = require("@/utils/cache.util");
+const { imageQueue } = require("@/queues/image.queue");
+const { deleteCloudinaryFile } = require("../helpers/cloudinary");
 
-// @desc create  variant controller
+const NS = "variant";
+const CACHE_TTL = 60 * 60; // 1 hour
+const CACHE_TTL_LIST = 60 * 30; // 30 mins
+
+/**
+ * Collect all Cloudinary publicIds from a variant.
+ */
+const collectVariantPublicIds = (v) => {
+  if (!v || !Array.isArray(v.image)) return [];
+  return v.image.map((img) => img?.publicId).filter(Boolean);
+};
+
+const fireAndForgetCloudinaryDelete = (publicIds = []) => {
+  if (!publicIds.length) return;
+  setImmediate(() => {
+    publicIds.forEach((id) =>
+      deleteCloudinaryFile(id).catch((err) =>
+        console.error(`[Cleanup] Failed to delete ${id}:`, err.message),
+      ),
+    );
+  });
+};
+
+// @desc create variant controller (batch)
 exports.createVariant = asynchandeler(async (req, res) => {
-  const { variants } = req.body; // এখানে variants আসবে array of objects হিসেবে
-  const files = req.files;
+  const { variants } = req.body;
+  const files = req.files || [];
 
   if (!variants || !Array.isArray(variants) || variants.length === 0) {
     throw new customError(
@@ -25,57 +51,80 @@ exports.createVariant = asynchandeler(async (req, res) => {
     );
   }
 
-  if (!files || files.length === 0) {
-    throw new customError(
-      "At least one variant image is required",
-      statusCodes.BAD_REQUEST,
-    );
-  }
-
-  if (variants.length !== files.length) {
-    throw new customError(
-      "Each variant must have a corresponding image",
-      statusCodes.BAD_REQUEST,
-    );
-  }
-
-  let savedVariants = [];
+  const savedVariants = [];
+  const jobs = [];
 
   for (let i = 0; i < variants.length; i++) {
     const v = variants[i];
-
-    // validate variant data with Joi
     const validatedData = await validateVariant(v);
 
-    // upload corresponding image
-    const imageUpload = await cloudinaryFileUpload(files[i].path);
+    // Prepare variant with pending image if file exists
+    const variantImages = [];
+    if (files[i]) {
+      variantImages.push({
+        status: "pending",
+        localPath: files[i].path,
+        tries: 0,
+      });
+    }
 
-    // create variant document
-    const variantData = new variant({
+    const newVariant = new variant({
       ...validatedData,
-      image: imageUpload?.optimizeUrl || "N/A",
+      image: variantImages,
     });
 
-    await variantData.save();
+    await newVariant.save();
 
-    // attach variant to product
-    await product.findByIdAndUpdate(variantData.product, {
-      $push: { variant: variantData._id },
+    // Attach to product
+    await product.findByIdAndUpdate(newVariant.product, {
+      $push: { variant: newVariant._id },
     });
 
-    savedVariants.push(variantData);
+    // Enqueue job if image exists
+    if (files[i]) {
+      jobs.push({
+        name: "add-product-image", // Reuse existing worker job name or similar
+        data: {
+          modelName: NS,
+          documentId: newVariant._id,
+          localPath: files[i].path,
+          fieldName: "image",
+          index: 0,
+        },
+      });
+    }
+
+    savedVariants.push(newVariant);
   }
 
-  apiResponse.sendSuccess(
+  if (jobs.length > 0) {
+    await imageQueue.addBulk(jobs);
+  }
+
+  await bumpNsVersion(NS);
+  await bumpNsVersion("product"); // Variants affect products
+
+  return apiResponse.sendSuccess(
     res,
     statusCodes.CREATED,
-    "Variants created successfully",
+    "Variants creation started in background",
     savedVariants,
   );
 });
 
-// @desc get all  variant
+// @desc get all variants
 exports.getAllVariants = asynchandeler(async (req, res, next) => {
+  const cacheKey = await buildCacheKey(NS, "all");
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Variants fetched successfully",
+      { variants: cached, fromCache: true },
+    );
+  }
+
   const variants = await variant
     .find()
     .populate({
@@ -84,80 +133,116 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
     })
     .populate("stockVariantAdjust byReturn salesReturn")
     .select("-updatedAt")
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
+
   if (!variants || variants.length === 0) {
     throw new customError("Variants not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(
+
+  await setCache(cacheKey, variants, CACHE_TTL_LIST);
+
+  return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Variants fetched successfully",
-    variants,
+    { variants },
   );
 });
 
 // @desc get single variant
 exports.getSingleVariant = asynchandeler(async (req, res, next) => {
-  const slug = req.params.slug;
+  const { slug } = req.params;
+  const cacheKey = await buildCacheKey(NS, `slug:${slug}`);
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Variant fetched successfully",
+      { variant: cached, fromCache: true },
+    );
+  }
+
   const singleVariant = await variant
     .findOne({ slug })
     .populate({
       path: "product",
       populate: [{ path: "subcategory", select: "name" }],
     })
-    .populate("stockVariantAdjust byReturn salesReturn");
+    .populate("stockVariantAdjust byReturn salesReturn")
+    .lean();
+
   if (!singleVariant) {
     throw new customError("Variant not found", statusCodes.NOT_FOUND);
   }
-  apiResponse.sendSuccess(
+
+  await setCache(cacheKey, singleVariant, CACHE_TTL);
+
+  return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Variant fetched successfully",
-    singleVariant,
+    { variant: singleVariant },
   );
 });
 
-// @desc update variant using req.params
+// @desc update variant
 exports.updateVariant = asynchandeler(async (req, res) => {
   const { slug } = req.params;
+  const files = req.files || [];
 
-  // Find the variant first
   const existingVariant = await variant.findOne({ slug });
   if (!existingVariant) {
     throw new customError("Variant not found", statusCodes.NOT_FOUND);
   }
 
-  // Handle image update if new image is provided
-  let updatedImageUrl = existingVariant.image;
-  if (req.files && req.files.length > 0) {
-    // Delete previous image from cloudinary if exists
-    if (existingVariant.image) {
-      // cloudinary public_id extract (assuming image url contains public_id)
-      const match = existingVariant.image.split("/");
-      const publicId = match[match.length - 1].split(".")[0];
-      await deleteCloudinaryFile(publicId);
-    }
-    // Upload new image
-    const imageUpload = await cloudinaryFileUpload(req.files[0].path);
-    updatedImageUrl = imageUpload.optimizeUrl;
+  // Handle new images
+  const jobs = [];
+  const initialImageCount = existingVariant.image.length;
+
+  if (files.length > 0) {
+    const newImages = files.map((file) => ({
+      status: "pending",
+      localPath: file.path,
+      tries: 0,
+    }));
+    existingVariant.image.push(...newImages);
+
+    files.forEach((file, i) => {
+      jobs.push({
+        name: "add-product-image",
+        data: {
+          modelName: NS,
+          documentId: existingVariant._id,
+          localPath: file.path,
+          fieldName: "image",
+          index: initialImageCount + i,
+        },
+      });
+    });
   }
 
-  // Update variant
-  const updatedVariant = await variant.findOneAndUpdate(
-    { slug },
-    { ...req.body, image: updatedImageUrl },
-    { new: true },
-  );
+  // Update other fields
+  Object.assign(existingVariant, req.body);
+  await existingVariant.save();
 
-  apiResponse.sendSuccess(
+  if (jobs.length > 0) {
+    await imageQueue.addBulk(jobs);
+  }
+
+  await bumpNsVersion(NS);
+  await bumpNsVersion("product");
+
+  return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Variant updated successfully",
-    updatedVariant,
+    existingVariant,
   );
 });
 
-// @desc deactivateVariant variant
+// @desc deactivate variant
 exports.deactivateVariant = asynchandeler(async (req, res) => {
   const { slug } = req.query;
   const variantToDeactivate = await variant.findOne({ slug });
@@ -166,6 +251,10 @@ exports.deactivateVariant = asynchandeler(async (req, res) => {
   }
   variantToDeactivate.isActive = false;
   await variantToDeactivate.save();
+
+  await bumpNsVersion(NS);
+  await bumpNsVersion("product");
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -183,6 +272,10 @@ exports.activateVariant = asynchandeler(async (req, res) => {
   }
   variantToActivate.isActive = true;
   await variantToActivate.save();
+
+  await bumpNsVersion(NS);
+  await bumpNsVersion("product");
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -198,17 +291,18 @@ exports.deleteVariant = asynchandeler(async (req, res) => {
   if (!deletedVariant) {
     throw new customError("Variant not found", statusCodes.NOT_FOUND);
   }
-  // remve the variant from the product's variants array
-  const productData = await product.findById(deletedVariant.product);
-  if (!productData) {
-    throw new customError("Product not found", statusCodes.NOT_FOUND);
-  }
-  productData.variant.pull(deletedVariant._id);
-  await productData.save();
 
-  const match = deletedVariant.image.split("/");
-  const publicId = match[match.length - 1].split(".")[0];
-  await deleteCloudinaryFile(publicId);
+  // Remove the variant from the product's variants array
+  await product.findByIdAndUpdate(deletedVariant.product, {
+    $pull: { variant: deletedVariant._id },
+  });
+
+  // Background cleanup for Cloudinary
+  fireAndForgetCloudinaryDelete(collectVariantPublicIds(deletedVariant));
+
+  await bumpNsVersion(NS);
+  await bumpNsVersion("product");
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,

@@ -144,7 +144,7 @@ class ProductController {
     const product = await Product.create({
       ...productData,
       barCode: productData.barCode || generateBarcode(),
-      thumbnail: { status: "pending", localPath: thumbnail.path },
+      thumbnail: thumbnail ? { status: "pending", localPath: thumbnail.path } : undefined,
       image: images.map((img) => ({
         status: "pending",
         localPath: img.path,
@@ -153,8 +153,10 @@ class ProductController {
     });
 
     // Enqueue all uploads in one Redis round-trip
-    const jobs = [
-      {
+    const jobs = [];
+    
+    if (thumbnail) {
+      jobs.push({
         name: "create-product-thumbnail",
         data: {
           modelName: NS,
@@ -162,7 +164,10 @@ class ProductController {
           localPath: thumbnail.path,
           fieldName: "thumbnail",
         },
-      },
+      });
+    }
+
+    jobs.push(
       ...images.map((img, i) => ({
         name: "create-product-image",
         data: {
@@ -172,8 +177,8 @@ class ProductController {
           fieldName: "image",
           index: i,
         },
-      })),
-    ];
+      }))
+    );
 
     if (ogImage) {
       jobs.push({

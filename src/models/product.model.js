@@ -19,24 +19,6 @@ const imageSchema = new mongoose.Schema(
   { _id: false },
 );
 
-const courierReturnSchema = new mongoose.Schema(
-  {
-    orderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order" },
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Product",
-      default: null,
-    },
-    variant: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Variant",
-      default: null,
-    },
-    receivedQuantity: { type: Number, default: 0 },
-    courierName: { type: String, trim: true, default: "N/A" },
-  },
-  { _id: true, timestamps: true },
-);
 
 // SEO subdocument — search-engine + social-share metadata
 const seoSchema = new mongoose.Schema(
@@ -175,7 +157,9 @@ const productSchema = new mongoose.Schema(
     totalSales: { type: Number, default: 0 },
     salesReturn: [{ type: mongoose.Schema.Types.ObjectId, ref: "SalesReturn" }],
     byReturn: [{ type: mongoose.Schema.Types.ObjectId, ref: "ByReturn" }],
-    courierReturn: [courierReturnSchema],
+    courierReturn: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "CourierReturn" },
+    ],
   },
   {
     timestamps: true,
