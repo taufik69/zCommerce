@@ -29,5 +29,15 @@ _.route("/brand/:slug")
     // authorize("brand", "delete"),
     Brand.deleteBrand
   );
+_.route("/brand/:slug/activate").put(
+  // authGuard,
+  // authorize("brand", "edit"),
+  Brand.activateBrand
+);
+_.route("/brand/:slug/deactivate").put(
+  // authGuard,
+  // authorize("brand", "edit"),
+  Brand.deactivateBrand
+);
 
 module.exports = _;

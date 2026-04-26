@@ -1,266 +1,181 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
-const { customError } = require("../lib/CustomError");
-const purchaseModel = require("../models/purchase.model");
-const { statusCodes } = require("../constant/constant");
 
-const reviewSchema = new mongoose.Schema(
+// ─── Reusable subschemas ─────────────────────────────────────────────────────
+
+const imageSchema = new mongoose.Schema(
   {
-    rating: {
-      type: Number,
-      required: false,
-      min: 0,
-      max: 5,
-    },
-    comment: {
+    url: { type: String, default: "" },
+    publicId: { type: String, default: "" },
+    status: {
       type: String,
-      required: false,
+      enum: ["pending", "processing", "uploaded", "failed"],
+      default: "pending",
     },
-
-    reviewer: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
+    localPath: { type: String, default: "" },
+    tries: { type: Number, default: 0 },
+    lastError: { type: String, default: "" },
   },
-  { timestamps: true },
+  { _id: false },
 );
+
+const courierReturnSchema = new mongoose.Schema(
+  {
+    orderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order" },
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      default: null,
+    },
+    variant: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Variant",
+      default: null,
+    },
+    receivedQuantity: { type: Number, default: 0 },
+    courierName: { type: String, trim: true, default: "N/A" },
+  },
+  { _id: true, timestamps: true },
+);
+
+// SEO subdocument — search-engine + social-share metadata
+const seoSchema = new mongoose.Schema(
+  {
+    metaTitle: { type: String, trim: true, maxlength: 70, default: "" },
+    metaDescription: { type: String, trim: true, maxlength: 200, default: "" },
+    metaKeywords: [{ type: String, trim: true, lowercase: true }],
+    canonicalUrl: { type: String, trim: true, default: "" },
+    focusKeyword: { type: String, trim: true, lowercase: true, default: "" },
+    ogTitle: { type: String, trim: true, maxlength: 70, default: "" },
+    ogDescription: { type: String, trim: true, maxlength: 200, default: "" },
+    ogImage: { type: imageSchema, default: () => ({}) },
+    twitterCard: {
+      type: String,
+      enum: ["summary", "summary_large_image", "app", "player"],
+      default: "summary_large_image",
+    },
+    structuredData: { type: mongoose.Schema.Types.Mixed, default: null }, // JSON-LD
+    noIndex: { type: Boolean, default: false },
+    noFollow: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
+// ─── Product schema ──────────────────────────────────────────────────────────
 
 const productSchema = new mongoose.Schema(
   {
-    // Basic Product Info
-    // Slug
-    slug: {
-      type: String,
-      unique: true,
-      lowercase: true,
-      trim: true,
-    },
-    name: {
-      type: String,
-      required: false,
-      trim: true,
-    },
-    description: {
-      type: String,
-      required: false,
-    },
+    slug: { type: String, unique: true, lowercase: true, trim: true },
+    name: { type: String, required: true, trim: true },
+    description: { type: String },
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
-      required: false,
+      required: true,
+      index: true,
     },
     subcategory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Subcategory",
-      required: false,
+      index: true,
     },
     brand: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Brand",
       default: null,
+      index: true,
     },
-    variant: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Variant",
-        default: null,
-      },
-    ],
+    variant: [{ type: mongoose.Schema.Types.ObjectId, ref: "Variant" }],
     discount: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Discount",
       default: null,
     },
 
-    image: [
-      {
-        type: String,
-      },
-    ],
-    tag: [
-      {
-        type: String,
-        trim: true,
-      },
-    ],
-    manufactureCountry: {
-      type: String,
-      trim: true,
-    },
-    rating: {
-      type: Number,
-      default: 0,
-    },
-    warrantyInformation: {
-      type: String,
-      required: false,
-      default: "No warranty info",
-    },
+    // Media
+    image: [imageSchema], // gallery
+    thumbnail: { type: imageSchema, default: () => ({}) },
+
+    // SEO
+    seo: { type: seoSchema, default: () => ({}) },
+
+    // Tags / metadata
+    tag: [{ type: String, trim: true, lowercase: true }],
+    manufactureCountry: { type: String, trim: true },
+    rating: { type: Number, default: 0, min: 0, max: 5 },
+    warrantyInformation: { type: String, default: "No warranty info" },
     shippingInformation: {
       type: String,
       default: "Shipping details not available",
     },
+
+    weight: { type: Number, default: 0, min: 0 },
+    dimensions: {
+      width: { type: Number, default: 0, min: 0 },
+      height: { type: Number, default: 0, min: 0 },
+      depth: { type: Number, default: 0, min: 0 },
+    },
+
     availabilityStatus: {
       type: String,
       enum: ["In Stock", "Out of Stock", "Preorder"],
       default: "In Stock",
     },
-    reviews: [reviewSchema],
-    // stock key unit
-    sku: {
-      type: String,
-      trim: true,
-    },
 
-    //bar code
-    qrCode: {
-      type: String,
-    },
-    barCode: {
-      type: String,
-    },
+    // Identifiers
+    sku: { type: String, trim: true, unique: true, sparse: true, index: true },
+    qrCode: { type: String },
+    barCode: { type: String, unique: true, sparse: true, index: true },
 
-    // group unit
-    groupUnit: {
-      type: String,
-    },
-    groupUnitQuantity: {
-      type: Number,
-    },
+    // Units
+    groupUnit: { type: String },
+    groupUnitQuantity: { type: Number },
     unit: {
       type: String,
       enum: ["Piece", "Kg", "Gram", "Packet", "Custom"],
     },
-    // Variant Type
+
+    // Variant type
     variantType: {
       type: String,
       enum: ["singleVariant", "multipleVariant"],
+      required: true,
     },
 
-    // Inventory & Price for Single Variant
-    size: [
-      {
-        type: String,
-        trim: true,
-        // enum: ["S", "M", "L", "XL", "XXL", "XXXL", "Custom", "N/A"],
-        default: "N/A",
-      },
-    ],
-    color: [
-      {
-        type: String,
-        trim: true,
-        default: "N/A",
-      },
-    ],
-
-    stock: {
-      type: Number,
-      min: 0,
-    },
-    warehouseLocation: {
-      type: String,
-      trim: true,
-    },
+    // Single-variant inventory
+    size: { type: String, trim: true, default: "N/A" },
+    color: { type: String, trim: true, default: "N/A" },
+    stock: { type: Number, min: 0, default: 0 },
+    warehouseLocation: { type: String, trim: true },
 
     // Pricing
-    purchasePrice: {
-      type: Number,
-      min: 0,
-    },
-    retailPrice: {
-      type: Number,
-      min: 0,
-    },
-    retailProfitMarginbyPercentance: {
+    purchasePrice: { type: Number, min: 0 },
+    retailPrice: { type: Number, min: 0 },
+    retailProfitMarginByPercentage: {
       type: Number,
       min: 0,
       max: 100,
       default: 0,
     },
-    retailProfitMarginbyAmount: {
-      type: Number,
-      min: 0,
-      default: 0,
-    },
-    wholesalePrice: {
-      type: Number,
-      min: 0,
-    },
+    wholesalePrice: { type: Number, min: 0 },
     wholesaleProfitMarginPercentage: {
       type: Number,
       min: 0,
       max: 100,
       default: 0,
     },
-    wholesaleProfitMarginAmount: {
-      type: Number,
-      min: 0,
-      default: 0,
-    },
 
-    alertQuantity: {
-      type: Number,
-      default: 5,
-    },
-    stockAlert: {
-      type: Boolean,
-      default: false,
-    },
-    instock: {
-      type: Boolean,
-    },
+    alertQuantity: { type: Number, default: 5 },
+    stockAlert: { type: Boolean, default: false },
+    instock: { type: Boolean },
     stockAdjustment: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "StockAdjust",
-      },
+      { type: mongoose.Schema.Types.ObjectId, ref: "StockAdjust" },
     ],
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-    totalSales: {
-      type: Number,
-      default: 0,
-    },
-    salesReturn: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "SalesReturn",
-      },
-    ],
-    byReturn: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "ByReturn",
-      },
-    ],
-    courierReturn: {
-      orderId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Order",
-      },
-      product: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Product",
-        default: null,
-      },
-      variant: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Variant",
-        default: null,
-      },
-      recivedQuantity: {
-        type: Number,
-        default: 0,
-      },
-      courierName: {
-        type: String,
-        trim: true,
-        default: "N/A",
-      },
-    },
+    isActive: { type: Boolean, default: true, index: true },
+    totalSales: { type: Number, default: 0 },
+    salesReturn: [{ type: mongoose.Schema.Types.ObjectId, ref: "SalesReturn" }],
+    byReturn: [{ type: mongoose.Schema.Types.ObjectId, ref: "ByReturn" }],
+    courierReturn: [courierReturnSchema],
   },
   {
     timestamps: true,
@@ -269,163 +184,101 @@ const productSchema = new mongoose.Schema(
   },
 );
 
-// product.model.js (schema setup এর পরে)
+// ─── Indexes ──────────────────────────────────────────────────────────────────
+
 productSchema.index({
   name: "text",
-  sku: "text",
-  barCode: "text",
+  "seo.metaKeywords": "text",
+  "seo.focusKeyword": "text",
 });
-productSchema.index({ slug: 1 });
-productSchema.index({ sku: 1 });
-productSchema.index({ barCode: 1 });
+productSchema.index({ isActive: 1, createdAt: -1 });
+productSchema.index({ category: 1, isActive: 1 });
+productSchema.index({ totalSales: -1 });
+productSchema.index({ retailPrice: 1 });
 
-// Auto-generate slug from name
+// ─── Hooks ────────────────────────────────────────────────────────────────────
+
+// Auto-slug on save
 productSchema.pre("save", function (next) {
-  if (this.isModified("name")) {
+  if (this.isModified("name") && !this.isModified("slug")) {
     this.slug = slugify(this.name, { lower: true, strict: true });
   }
   next();
 });
 
-// when changing prouct name then change the slug using findoneandupdate
-productSchema.pre("findOneAndUpdate", async function (next) {
+// Auto-slug on findOneAndUpdate
+productSchema.pre("findOneAndUpdate", function (next) {
   const update = this.getUpdate();
-  if (update.name) {
+  if (update?.name && !update.slug) {
     update.slug = slugify(update.name, { lower: true, strict: true });
   }
   next();
 });
 
-// Ensure unique slug
-productSchema.pre("save", async function (next) {
-  try {
-    const existingProduct = await this.constructor.findOne({ slug: this.slug });
-    if (
-      existingProduct &&
-      existingProduct._id.toString() !== this._id.toString()
-    ) {
-      return next(
-        new customError(
-          `Product with slug ${this.slug} or ${this.name} already exists`,
-          statusCodes.BAD_REQUEST,
-        ),
-      );
-    }
-    next();
-  } catch (error) {
-    next(error);
-  }
+// ─── Virtuals ─────────────────────────────────────────────────────────────────
+
+productSchema.virtual("retailProfitMarginByAmount").get(function () {
+  return (this.retailPrice || 0) - (this.purchasePrice || 0);
 });
 
-// virtual populate for variants
-productSchema.virtual("allSize").get(function () {
-  const standardSizes = ["S", "M", "L", "XL", "XXL", "XXXL"];
-
-  return standardSizes;
-});
-
-productSchema.virtual("allNummerixSize").get(function () {
-  return [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 38, 40, 42, 44, 46];
+productSchema.virtual("wholesaleProfitMarginByAmount").get(function () {
+  return (this.wholesalePrice || 0) - (this.purchasePrice || 0);
 });
 
 productSchema.virtual("singleVariantOpeningStock").get(function () {
   return this.stock;
 });
 
-// adjustment plus
 productSchema.virtual("adjustmentSingleVariantPlus").get(function () {
-  return this.stockAdjustment?.reduce((total, variant) => {
-    total += variant?.increaseQuantity;
-    return total;
-  }, 0);
+  return (this.stockAdjustment || []).reduce(
+    (sum, a) => sum + (a?.increaseQuantity || 0),
+    0,
+  );
 });
 
-// adjustment minus
 productSchema.virtual("adjustmentSingleVariantMinus").get(function () {
-  return this.stockAdjustment?.reduce((total, variant) => {
-    total += variant?.decreaseQuantity;
-    return total;
-  }, 0);
+  return (this.stockAdjustment || []).reduce(
+    (sum, a) => sum + (a?.decreaseQuantity || 0),
+    0,
+  );
 });
 
-// get all byReturn quantity data
 productSchema.virtual("totalByReturnQuantity").get(function () {
-  return this.byReturn?.reduce((total, item) => {
-    total += item?.quantity;
-    return total;
-  }, 0);
+  return (this.byReturn || []).reduce(
+    (sum, item) => sum + (item?.quantity || 0),
+    0,
+  );
 });
 
-// get all salesReturn quantity data
 productSchema.virtual("totalSalesReturnQuantity").get(function () {
-  return this.salesReturn?.reduce((total, item) => {
-    total += item?.quantity;
-    return total;
-  }, 0);
+  return (this.salesReturn || []).reduce(
+    (sum, item) => sum + (item?.quantity || 0),
+    0,
+  );
 });
 
-// size wise stock
 productSchema.virtual("sizeWiseStock").get(function () {
   const result = {};
 
-  // CASE 1: multipleVariant -> use variants
-  if (this.variant && this.variant?.length > 0) {
-    this.variant?.forEach((v) => {
-      if (v.size) {
+  if (this.variant?.length > 0) {
+    this.variant.forEach((v) => {
+      if (v?.size) {
         result[v.size] = (result[v.size] || 0) + (v.stockVariant || 0);
       }
     });
     return result;
   }
 
-  // CASE 2: singleVariant -> use product's own size + stock
-  if (this.variantType === "singleVariant" && this.size && this.size.length) {
-    this.size.forEach((s) => {
-      result[s] = (result[s] || 0) + (this.stock || 0);
-    });
-    return result;
+  if (this.variantType === "singleVariant" && this.size) {
+    result[this.size] = (result[this.size] || 0) + (this.stock || 0);
   }
-
-  // CASE 3: no variants and not singleVariant
   return result;
 });
 
-// search product id  in purchase model and return total purchased quantity in virtual
-// Virtual শুধু placeholder
-productSchema.virtual("singleVariantTotalPurchasedQuantity");
-
-// Middleware: শুধুমাত্র find
-productSchema.post("find", async function (docs, next) {
-  try {
-    await Promise.all(
-      docs.map(async (doc) => {
-        const purchases = await purchaseModel.find({
-          "allproduct.product": doc._id,
-        });
-
-        let totalPurchased = 0;
-
-        purchases.forEach((purchase) => {
-          purchase.allproduct.forEach((item) => {
-            if (
-              item.product &&
-              item.product.toString() === doc._id.toString()
-            ) {
-              totalPurchased += item.quantity || 0;
-            }
-          });
-        });
-
-        // attach calculated field
-        doc.singleVariantTotalPurchasedQuantity = totalPurchased;
-      }),
-    );
-
-    next();
-  } catch (error) {
-    return next(error);
-  }
-});
+// NOTE: The previous `post('find')` middleware that fetched purchase totals on
+// EVERY find() call has been REMOVED — it caused N+1 queries on every list/get
+// request. To compute purchase totals, use a dedicated endpoint or aggregation
+// only when explicitly needed.
 
 const Product =
   mongoose.models.Product || mongoose.model("Product", productSchema);

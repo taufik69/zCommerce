@@ -12,6 +12,7 @@ _.route("/createproduct").post(
   multipleFileUploadWithFields([
     { name: "image", maxCount: 10 },
     { name: "thumbnail", maxCount: 1 },
+    { name: "ogImage", maxCount: 1 },
   ]),
   Product.createProduct
 );
@@ -22,6 +23,9 @@ _.route("/getproduct/:slug").get(Product.getProductBySlug);
 _.route("/updateproductinfo/:slug").put(
   // authGuard,
   // authorize("product", "edit"),
+  multipleFileUploadWithFields([
+    { name: "ogImage", maxCount: 1 },
+  ]),
   Product.updateProductInfoBySlug
 );
 _.route("/addproductimage/:slug").post(

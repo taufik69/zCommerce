@@ -3,6 +3,22 @@ const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
 
+const imageSchema = new mongoose.Schema(
+  {
+    url: { type: String, default: "" },
+    publicId: { type: String, default: "" },
+    status: {
+      type: String,
+      enum: ["pending", "processing", "uploaded", "failed"],
+      default: "pending",
+    },
+    localPath: { type: String, default: "" },
+    tries: { type: Number, default: 0 },
+    lastError: { type: String, default: "" },
+  },
+  { _id: false },
+);
+
 const brandSchema = new mongoose.Schema(
   {
     name: {
@@ -16,12 +32,10 @@ const brandSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
-    image: [
-      {
-        type: String,
-        required: true,
-      },
-    ],
+    image: {
+      type: imageSchema,
+      default: () => ({}),
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -47,7 +61,7 @@ brandSchema.pre("save", async function (next) {
     if (existingBrand && existingBrand._id.toString() !== this._id.toString()) {
       return next(
         new customError(
-          `Category with slug ${this.slug} or ${this.name} already exists`,
+          `Brand with slug ${this.slug} or ${this.name} already exists`,
           statusCodes.BAD_REQUEST,
         ),
       );

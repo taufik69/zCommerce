@@ -12,8 +12,16 @@ const {
   deleteCloudinaryFile,
 } = require("@/helpers/cloudinary");
 const categoryModel = require("@/models/category.model");
+const brandModel = require("@/models/brand.model");
+const productModel = require("@/models/product.model");
 const { bumpNsVersion } = require("@/utils/cache.util");
 const { dbConnect } = require("@/database/db");
+
+const MODELS = {
+  category: categoryModel,
+  brand: brandModel,
+  product: productModel,
+};
 
 dbConnect()
   .then(() => {
@@ -29,14 +37,38 @@ function startImageWorker() {
   const worker = new Worker(
     IMAGE_QUEUE_NAME,
     async (job) => {
-      const { categoryId, localPath, oldPublicId } = job.data;
+      const {
+        modelName,
+        documentId,
+        localPath,
+        oldPublicId,
+        fieldName = "image",
+        index,
+      } = job.data;
+
+      const targetField = index !== undefined ? `${fieldName}.${index}` : fieldName;
+
+      console.log(
+        `[Worker] Processing ${modelName} image upload for ID: ${documentId} (Field: ${targetField})`,
+      );
+
+      const Model = MODELS[modelName];
+      if (!Model) {
+        console.error(`[Worker] Model ${modelName} not found!`);
+        throw new Error(`Model ${modelName} not found in worker registry`);
+      }
 
       // Mark as processing so frontend knows upload is in progress
-      await categoryModel.findByIdAndUpdate(categoryId, {
-        "image.status": "processing",
-        "image.localPath": localPath,
-        "image.tries": job.attemptsMade,
-      });
+      await Model.updateOne(
+        { _id: documentId },
+        {
+          $set: {
+            [`${targetField}.status`]: "processing",
+            [`${targetField}.localPath`]: localPath,
+            [`${targetField}.tries`]: job.attemptsMade,
+          },
+        },
+      );
 
       try {
         // deleteAfter: false — worker manages file lifecycle across retries
@@ -45,18 +77,27 @@ function startImageWorker() {
         });
 
         if (!uploaded) {
-          throw new Error("Cloudinary upload returned null — file missing or upload failed");
+          throw new Error(
+            "Cloudinary upload returned null — file missing or upload failed",
+          );
         }
 
         // Update DB with final image data
-        await categoryModel.findByIdAndUpdate(categoryId, {
-          "image.url": uploaded.optimizeUrl,
-          "image.publicId": uploaded.result.public_id,
-          "image.status": "uploaded",
-          "image.localPath": "",
-          "image.tries": job.attemptsMade + 1,
-          "image.lastError": "",
-        });
+        const updateResult = await Model.updateOne(
+          { _id: documentId },
+          {
+            $set: {
+              [`${targetField}.url`]: uploaded.optimizeUrl,
+              [`${targetField}.publicId`]: uploaded.result.public_id,
+              [`${targetField}.status`]: "uploaded",
+              [`${targetField}.localPath`]: "",
+              [`${targetField}.tries`]: job.attemptsMade + 1,
+              [`${targetField}.lastError`]: "",
+            },
+          },
+        );
+
+        console.log(`[Worker] DB Update Result for ${modelName}:`, updateResult);
 
         // Delete old Cloudinary image (update case) — non-blocking, non-critical
         if (oldPublicId) {
@@ -68,16 +109,21 @@ function startImageWorker() {
         // Cleanup local temp file
         await fs.unlink(localPath).catch(() => {});
 
-        // Invalidate category cache — clients will re-fetch with new image URL
-        await bumpNsVersion("category");
+        // Invalidate cache — clients will re-fetch with new image URL
+        await bumpNsVersion(modelName);
 
-        return { categoryId, imageUrl: uploaded.optimizeUrl };
+        return { documentId, imageUrl: uploaded.optimizeUrl };
       } catch (err) {
-        await categoryModel.findByIdAndUpdate(categoryId, {
-          "image.status": "failed",
-          "image.tries": job.attemptsMade + 1,
-          "image.lastError": err?.message || "Upload failed",
-        });
+        await Model.updateOne(
+          { _id: documentId },
+          {
+            $set: {
+              [`${targetField}.status`]: "failed",
+              [`${targetField}.tries`]: job.attemptsMade + 1,
+              [`${targetField}.lastError`]: err?.message || "Upload failed",
+            },
+          },
+        );
 
         // Cleanup local file once max retries are exhausted
         if (job.attemptsMade >= 3) {

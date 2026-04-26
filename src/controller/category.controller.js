@@ -49,7 +49,8 @@ class CategoryController {
 
     // Enqueue image upload — worker handles upload, DB update, and cache bump
     await imageQueue.add("create-category-image", {
-      categoryId: category._id,
+      modelName: NS,
+      documentId: category._id,
       localPath: image.path,
     });
 
@@ -154,7 +155,8 @@ class CategoryController {
       category.image.lastError = "";
 
       await imageQueue.add("update-category-image", {
-        categoryId: category._id,
+        modelName: NS,
+        documentId: category._id,
         localPath: req.files[0].path,
         oldPublicId,
       });

@@ -1,12 +1,23 @@
 const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 const Subcategory = require("../models/subcategory.model");
-const Category = require("..//models/category.model");
+const Category = require("../models/category.model");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const {
   validateSubCategory,
 } = require("../validation/subCatgegory.validation");
 const { statusCodes } = require("../constant/constant");
+const {
+  getCache,
+  setCache,
+  bumpNsVersion,
+  buildCacheKey,
+} = require("@/utils/cache.util");
+
+// ─── constants ────────────────────────────────────────────────────────────────
+
+const NS = "subcategory";
+const CACHE_TTL = 60 * 60; // 1 hour
 
 // @desc    Create a new subcategory
 exports.createSubCategory = asynchandeler(async (req, res) => {
@@ -36,6 +47,10 @@ exports.createSubCategory = asynchandeler(async (req, res) => {
   parentCategory.subcategories.push(subcategory._id);
   await parentCategory.save();
 
+  // Invalidate cache
+  await bumpNsVersion(NS);
+  await bumpNsVersion("category"); // Bump category too since subcategories array changed
+
   return apiResponse.sendSuccess(
     res,
     statusCodes.CREATED,
@@ -46,6 +61,18 @@ exports.createSubCategory = asynchandeler(async (req, res) => {
 
 // @desc    Get all subcategories
 exports.getAllSubCategory = asynchandeler(async (req, res) => {
+  const cacheKey = await buildCacheKey(NS, "all");
+  const cached = await getCache(cacheKey);
+
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Subcategories found",
+      { subCategories: cached, fromCache: true },
+    );
+  }
+
   const subCategories = await Subcategory.find()
     .populate("category", {
       name: 1,
@@ -53,10 +80,15 @@ exports.getAllSubCategory = asynchandeler(async (req, res) => {
       isActive: 1,
     })
     .populate("discount")
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
+
   if (!subCategories) {
     throw new customError("Subcategories not found", statusCodes.NOT_FOUND);
   }
+
+  await setCache(cacheKey, subCategories, CACHE_TTL);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -68,14 +100,32 @@ exports.getAllSubCategory = asynchandeler(async (req, res) => {
 // @desc    Get a subcategory by slug
 exports.getSubCategoryBySlug = asynchandeler(async (req, res) => {
   const { slug } = req.params;
-  const subCategory = await Subcategory.findOne({ slug }).populate("category", {
-    name: 1,
-    slug: 1,
-    isActive: 1,
-  });
+  const cacheKey = await buildCacheKey(NS, `slug:${slug}`);
+  const cached = await getCache(cacheKey);
+
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Subcategory found",
+      { subCategory: cached, fromCache: true },
+    );
+  }
+
+  const subCategory = await Subcategory.findOne({ slug })
+    .populate("category", {
+      name: 1,
+      slug: 1,
+      isActive: 1,
+    })
+    .lean();
+
   if (!subCategory) {
     throw new customError("Subcategory not found", statusCodes.NOT_FOUND);
   }
+
+  await setCache(cacheKey, subCategory, CACHE_TTL);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -111,10 +161,15 @@ exports.updateSubCategory = asynchandeler(async (req, res) => {
     await Category.findByIdAndUpdate(newCategoryId, {
       $addToSet: { subcategories: subCategory._id },
     });
+    // Bump category cache since relations changed
+    await bumpNsVersion("category");
   }
 
   // Save the updated subcategory to the database
   await subCategory.save();
+
+  // Invalidate cache
+  await bumpNsVersion(NS);
 
   // Send success response
   apiResponse.sendSuccess(
@@ -143,6 +198,10 @@ exports.deleteSubCategory = asynchandeler(async (req, res) => {
     $pull: { subcategories: subCategory._id },
   });
 
+  // Invalidate cache
+  await bumpNsVersion(NS);
+  await bumpNsVersion("category");
+
   // Send success response
   apiResponse.sendSuccess(
     res,
@@ -165,6 +224,10 @@ exports.activateSubCategory = asynchandeler(async (req, res) => {
   // now activate the subcategory in the database
   subCategory.isActive = true;
   await subCategory.save();
+
+  // Invalidate cache
+  await bumpNsVersion(NS);
+
   // send success response
   apiResponse.sendSuccess(
     res,
@@ -186,6 +249,10 @@ exports.deactivateSubCategory = asynchandeler(async (req, res) => {
   // now deactivate the subcategory in the database
   subCategory.isActive = false;
   await subCategory.save();
+
+  // Invalidate cache
+  await bumpNsVersion(NS);
+
   // send success response
   apiResponse.sendSuccess(
     res,
@@ -199,16 +266,31 @@ exports.deactivateSubCategory = asynchandeler(async (req, res) => {
 
 // @desc    Get all inactive subcategories
 exports.getInactiveSubCategories = asynchandeler(async (req, res) => {
-  const subCategories = await Subcategory.find({ isActive: false }).populate(
-    "category",
-    { name: 1, slug: 1, isActive: 1 },
-  );
+  const cacheKey = await buildCacheKey(NS, "inactive");
+  const cached = await getCache(cacheKey);
+
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Inactive subcategories found",
+      { subCategories: cached, fromCache: true },
+    );
+  }
+
+  const subCategories = await Subcategory.find({ isActive: false })
+    .populate("category", { name: 1, slug: 1, isActive: 1 })
+    .lean();
+
   if (!subCategories) {
     throw new customError(
       "Inactive subcategories not found",
       statusCodes.NOT_FOUND,
     );
   }
+
+  await setCache(cacheKey, subCategories, CACHE_TTL);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -218,16 +300,31 @@ exports.getInactiveSubCategories = asynchandeler(async (req, res) => {
 });
 // @desc    Get all active subcategories
 exports.getActiveSubCategories = asynchandeler(async (req, res) => {
-  const subCategories = await Subcategory.find({ isActive: true }).populate(
-    "category",
-    { name: 1, slug: 1, isActive: 1 },
-  );
+  const cacheKey = await buildCacheKey(NS, "active");
+  const cached = await getCache(cacheKey);
+
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Active subcategories found",
+      { subCategories: cached, fromCache: true },
+    );
+  }
+
+  const subCategories = await Subcategory.find({ isActive: true })
+    .populate("category", { name: 1, slug: 1, isActive: 1 })
+    .lean();
+
   if (!subCategories) {
     throw new customError(
       "Active subcategories not found",
       statusCodes.NOT_FOUND,
     );
   }
+
+  await setCache(cacheKey, subCategories, CACHE_TTL);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -235,3 +332,4 @@ exports.getActiveSubCategories = asynchandeler(async (req, res) => {
     subCategories,
   );
 });
+

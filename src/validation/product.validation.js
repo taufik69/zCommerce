@@ -2,136 +2,215 @@ const joi = require("joi");
 const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
 
-const productSchema = joi
-  .object({
-    name: joi.string().trim().messages({
-      "string.empty": "Name is required.",
-      "any.required": "Name is required.",
-    }),
-    description: joi.string().trim().messages({
-      "string.empty": "Description is required.",
-      "any.required": "Description is required.",
-    }),
-    category: joi.string().trim().messages({
-      "string.empty": "Category is required.",
-      "any.required": "Category is required.",
-    }),
-    subcategory: joi.string().trim().messages({
-      "string.empty": "Subcategory is required.",
-      "any.required": "Subcategory is required.",
-    }),
-    brand: joi.string().trim().messages({
-      "string.empty": "Brand is required.",
-      "any.required": "Brand is required.",
-    }),
-    warrantyInformation: joi
-      .string()
-      .trim()
-      .default("No warranty info")
-      .messages({
-        "string.empty": "Warranty information cannot be empty.",
-        "any.required": "Warranty information is required.",
-      }),
+// ─── Reusable schemas ─────────────────────────────────────────────────────────
 
-    stock: joi
-      .number()
-      .min(0)
-      .messages({
-        "number.base": "Stock must be a number.",
-        "number.min": "Stock cannot be negative.",
-        "any.required": "Stock is required.",
-      })
-      .default(0),
-    purchasePrice: joi.number().min(0).messages({
-      "number.base": "Purchase price must be a number.",
-      "number.min": "Purchase price cannot be negative.",
-      "any.required": "Purchase price is required.",
-    }),
-    retailPrice: joi.number().min(0).messages({
-      "number.base": "Retail price must be a number.",
-      "number.min": "Retail price cannot be negative.",
-      "any.required": "Retail price is required.",
-    }),
-    wholesalePrice: joi.number().min(0).messages({
-      "number.base": "Wholesale price must be a number.",
-      "number.min": "Wholesale price cannot be negative.",
-      "any.required": "Wholesale price is required.",
-    }),
+const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+const objectId = joi.string().pattern(objectIdRegex).messages({
+  "string.pattern.base": "Invalid ObjectId format",
+});
+
+const seoFields = joi
+  .object({
+    metaTitle: joi.string().trim().max(70).allow(""),
+    metaDescription: joi.string().trim().max(200).allow(""),
+    metaKeywords: joi.array().items(joi.string().trim().lowercase()),
+    canonicalUrl: joi.string().trim().uri().allow(""),
+    focusKeyword: joi.string().trim().lowercase().allow(""),
+    ogTitle: joi.string().trim().max(70).allow(""),
+    ogDescription: joi.string().trim().max(200).allow(""),
+    twitterCard: joi
+      .string()
+      .valid("summary", "summary_large_image", "app", "player"),
+    structuredData: joi.any(),
+    noIndex: joi.boolean(),
+    noFollow: joi.boolean(),
+  })
+  .unknown(false);
+
+const dimensionsField = joi.object({
+  width: joi.number().min(0),
+  height: joi.number().min(0),
+  depth: joi.number().min(0),
+});
+
+// ─── Create product schema (strict — strips unknown fields) ──────────────────
+
+const productCreateSchema = joi
+  .object({
+    name: joi.string().trim().min(2).max(200).required(),
+    description: joi.string().trim().allow(""),
+    category: objectId.required(),
+    subcategory: objectId.optional(),
+    brand: objectId.optional(),
+    discount: objectId.optional(),
+
+    sku: joi.string().trim().optional(),
+    barCode: joi.string().trim().optional(),
+    qrCode: joi.string().trim().optional(),
+
+    warrantyInformation: joi.string().trim().default("No warranty info"),
+    shippingInformation: joi.string().trim().optional(),
+    manufactureCountry: joi.string().trim().optional(),
+    availabilityStatus: joi
+      .string()
+      .valid("In Stock", "Out of Stock", "Preorder")
+      .optional(),
+
+    stock: joi.number().min(0).default(0),
+    purchasePrice: joi.number().min(0).optional(),
+    retailPrice: joi.number().min(0).optional(),
+    wholesalePrice: joi.number().min(0).optional(),
+    retailProfitMarginByPercentage: joi.number().min(0).max(100).optional(),
+    wholesaleProfitMarginPercentage: joi.number().min(0).max(100).optional(),
+    alertQuantity: joi.number().min(0).optional(),
+
     variantType: joi
       .string()
-      .required()
       .valid("singleVariant", "multipleVariant")
-      .messages({
-        "string.empty": "Variant type is required.",
-        "any.required": "Variant type is required.",
-      }),
-    specifications: joi.string().trim().messages({
-      "string.empty": "Specifications is required.",
-      "any.required": "Specifications is required.",
-    }),
+      .required(),
+    size: joi.string().trim().optional(),
+    color: joi.string().trim().optional(),
+
+    weight: joi.number().min(0).optional(),
+    dimensions: dimensionsField.optional(),
+
+    groupUnit: joi.string().trim().optional(),
+    groupUnitQuantity: joi.number().min(0).optional(),
+    unit: joi.string().valid("Piece", "Kg", "Gram", "Packet", "Custom").optional(),
+
+    warehouseLocation: joi.string().trim().optional(),
+    tag: joi.array().items(joi.string().trim()).optional(),
+    specifications: joi.string().trim().optional(),
+
+    seo: seoFields.optional(),
   })
-  .options({ abortEarly: false, allowUnknown: true }); // Allow extra fields, only validate required
+  .options({ abortEarly: false, stripUnknown: { objects: true } });
 
-const validateProduct = async (req, res, next) => {
-  try {
-    const value = await productSchema.validateAsync(req.body);
+// ─── Update product schema (everything optional, strict) ─────────────────────
 
-    // Manual image validation (if needed)
-    if (!req.files) {
-      return next(
-        new customError(
-          "Please provide at least one image",
-          statusCodes.BAD_REQUEST,
-        ),
-      );
-    }
-    if (!req.files.image || req.files.image[0].fieldname !== "image") {
-      return next(
-        new customError(
-          "Please provide a valid image name fieldName (image)",
-          statusCodes.BAD_REQUEST,
-        ),
-      );
-    }
-    if (req.files.image.length === 0) {
-      return next(
-        new customError(
-          "Please provide at least one image",
-          statusCodes.BAD_REQUEST,
-        ),
-      );
-    }
+const productUpdateSchema = joi
+  .object({
+    name: joi.string().trim().min(2).max(200),
+    description: joi.string().trim().allow(""),
+    category: objectId,
+    subcategory: objectId,
+    brand: objectId,
+    discount: objectId,
 
-    if (req.files.image.length > 10) {
-      return next(
-        new customError(
-          "You can upload a maximum of 10 images",
-          statusCodes.BAD_REQUEST,
-        ),
-      );
-    }
+    sku: joi.string().trim(),
+    barCode: joi.string().trim(),
+    qrCode: joi.string().trim(),
 
-    if (req?.files?.image[0].size > 1 * 1024 * 1024) {
-      return next(
-        new customError(
-          "Image size should be less than 15MB",
-          statusCodes.BAD_REQUEST,
-        ),
-      );
-    }
+    warrantyInformation: joi.string().trim(),
+    shippingInformation: joi.string().trim(),
+    manufactureCountry: joi.string().trim(),
+    availabilityStatus: joi
+      .string()
+      .valid("In Stock", "Out of Stock", "Preorder"),
 
-    return value;
-  } catch (error) {
-    console.log("Product Validation error:", error);
+    stock: joi.number().min(0),
+    purchasePrice: joi.number().min(0),
+    retailPrice: joi.number().min(0),
+    wholesalePrice: joi.number().min(0),
+    retailProfitMarginByPercentage: joi.number().min(0).max(100),
+    wholesaleProfitMarginPercentage: joi.number().min(0).max(100),
+    alertQuantity: joi.number().min(0),
 
-    return next(
-      new customError(
-        "Product Validation error: " +
-          error?.details?.map((err) => err.message).join(", "),
-        400,
-      ),
+    variantType: joi.string().valid("singleVariant", "multipleVariant"),
+    size: joi.string().trim(),
+    color: joi.string().trim(),
+
+    weight: joi.number().min(0),
+    dimensions: dimensionsField,
+
+    groupUnit: joi.string().trim(),
+    groupUnitQuantity: joi.number().min(0),
+    unit: joi.string().valid("Piece", "Kg", "Gram", "Packet", "Custom"),
+
+    warehouseLocation: joi.string().trim(),
+    tag: joi.array().items(joi.string().trim()),
+    specifications: joi.string().trim(),
+
+    isActive: joi.boolean(),
+
+    seo: seoFields,
+  })
+  .min(1) // at least one field must be present
+  .options({ abortEarly: false, stripUnknown: { objects: true } });
+
+// ─── File checks ──────────────────────────────────────────────────────────────
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_GALLERY_IMAGES = 10;
+
+const validateImageFile = (file, label) => {
+  if (file.size > MAX_FILE_SIZE) {
+    throw new customError(
+      `${label} size must be less than 5 MB`,
+      statusCodes.BAD_REQUEST,
     );
   }
 };
 
-module.exports = { validateProduct };
+// ─── Validators ───────────────────────────────────────────────────────────────
+
+/**
+ * Validate product CREATE request — requires thumbnail, optional gallery + ogImage.
+ * Strips unknown fields to prevent mass-assignment.
+ */
+const validateProduct = async (req) => {
+  const value = await productCreateSchema.validateAsync(req.body);
+
+  const thumbnail = req.files?.thumbnail?.[0];
+  const images = req.files?.image || [];
+  const ogImage = req.files?.ogImage?.[0]; // optional SEO og:image
+
+  if (!thumbnail) {
+    throw new customError("Thumbnail is required", statusCodes.BAD_REQUEST);
+  }
+
+  validateImageFile(thumbnail, "Thumbnail");
+  images.forEach((img, idx) => validateImageFile(img, `Image ${idx + 1}`));
+  if (ogImage) validateImageFile(ogImage, "OG Image");
+
+  if (images.length > MAX_GALLERY_IMAGES) {
+    throw new customError(
+      `You can upload a maximum of ${MAX_GALLERY_IMAGES} gallery images`,
+      statusCodes.BAD_REQUEST,
+    );
+  }
+
+  return { ...value, thumbnail, images, ogImage };
+};
+
+/**
+ * Validate product UPDATE — all fields optional, strict.
+ * Also accepts an optional ogImage file upload.
+ */
+const validateProductUpdate = async (req) => {
+  const value = await productUpdateSchema.validateAsync(req.body);
+
+  const ogImage = req.files?.ogImage?.[0];
+  if (ogImage) validateImageFile(ogImage, "OG Image");
+
+  return { ...value, ogImage };
+};
+
+/**
+ * Validate single image upload (for addProductImage endpoint).
+ */
+const validateProductImageUpload = (req) => {
+  const file = req.files?.image?.[0];
+  if (!file) {
+    throw new customError("Image file is required", statusCodes.BAD_REQUEST);
+  }
+  validateImageFile(file, "Image");
+  return file;
+};
+
+module.exports = {
+  validateProduct,
+  validateProductUpdate,
+  validateProductImageUpload,
+  MAX_GALLERY_IMAGES,
+};

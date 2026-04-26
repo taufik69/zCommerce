@@ -1,794 +1,930 @@
-require("dotenv").config();
-const bwipjs = require("bwip-js");
-const QRCode = require("qrcode");
+const crypto = require("crypto");
 const Product = require("../models/product.model");
-const variant = require("../models/variant.model");
+const Review = require("../models/review.model");
+const Variant = require("../models/variant.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { apiResponse } = require("../utils/apiResponse");
-
+const { deleteCloudinaryFile } = require("../helpers/cloudinary");
 const {
-  cloudinaryFileUpload,
-  deleteCloudinaryFile,
-  uploadBarcodeToCloudinary,
-} = require("../helpers/cloudinary");
-const { validateProduct } = require("../validation/product.validation");
-const { populate } = require("../models/purchase.model");
+  validateProduct,
+  validateProductUpdate,
+  validateProductImageUpload,
+  MAX_GALLERY_IMAGES,
+} = require("../validation/product.validation");
 const { statusCodes } = require("../constant/constant");
+const {
+  getCache,
+  setCache,
+  bumpNsVersion,
+  buildCacheKey,
+} = require("@/utils/cache.util");
+const { imageQueue } = require("@/queues/image.queue");
 
-// Create a new product (only required fields)
-exports.createProduct = asynchandeler(async (req, res, next) => {
-  //  Step 1: Validate required fields
-  const value = await validateProduct(req, res, next);
-  const {
-    name,
-    description,
-    category,
-    subcategory,
-    brand,
-    sku,
-    purchasePrice,
-    wholesalePrice,
-    retailPrice,
-    warrantyInformation,
-    manufactureCountry,
-    stock,
-    size,
-    color,
-    barCode,
-    variantType,
-    specifications,
-  } = value;
+// ─── constants ────────────────────────────────────────────────────────────────
 
-  //  Create basic product first (without images & QR)
-  const product = new Product({
-    name,
-    barCode: barCode || `${Date.now()}`.toLocaleUpperCase().slice(0, 13),
-    sku,
-    description,
-    category,
-    subcategory,
-    brand,
-    size,
-    color,
-    purchasePrice,
-    wholesalePrice,
-    retailPrice,
-    warrantyInformation,
-    manufactureCountry,
-    stock,
-    variantType,
-    specifications,
-    ...req.body,
+const NS = "product";
+const CACHE_TTL = 60 * 60;
+const CACHE_TTL_LIST = 60 * 30;
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Build a stable cache suffix from a query object — sorted keys for hit consistency.
+ */
+const stableSuffix = (obj) => {
+  const sorted = Object.keys(obj || {})
+    .sort()
+    .reduce((acc, k) => {
+      if (obj[k] !== undefined && obj[k] !== "") acc[k] = obj[k];
+      return acc;
+    }, {});
+  return JSON.stringify(sorted);
+};
+
+/**
+ * Generate a collision-safe barcode — Date.now() alone collides under load.
+ */
+const generateBarcode = () => {
+  const ts = Date.now().toString();
+  const rand = crypto.randomBytes(2).toString("hex").toUpperCase();
+  return `${ts.slice(-9)}${rand}`.slice(0, 13);
+};
+
+/**
+ * Collect every Cloudinary publicId from a product (thumbnail + gallery + ogImage).
+ */
+const collectProductPublicIds = (product) => {
+  const ids = [];
+  if (product.thumbnail?.publicId) ids.push(product.thumbnail.publicId);
+  if (Array.isArray(product.image)) {
+    product.image.forEach((img) => img?.publicId && ids.push(img.publicId));
+  }
+  if (product.seo?.ogImage?.publicId) ids.push(product.seo.ogImage.publicId);
+  return ids;
+};
+
+const fireAndForgetCloudinaryDelete = (publicIds = []) => {
+  if (!publicIds.length) return;
+  setImmediate(() => {
+    publicIds.forEach((id) =>
+      deleteCloudinaryFile(id).catch((e) =>
+        console.error(`[Cloudinary] delete ${id} failed:`, e.message),
+      ),
+    );
   });
+};
 
-  await product.save();
+// ─── controller class ─────────────────────────────────────────────────────────
 
-  //  Step 3: Send immediate response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.CREATED,
-    "Product creation is being processed in the background",
-    { productId: product._id },
-  );
+class ProductController {
+  // ─── CREATE ────────────────────────────────────────────────────────────────
+  createProduct = asynchandeler(async (req, res) => {
+    const value = await validateProduct(req);
+    const { thumbnail, images, ogImage, ...productData } = value;
 
-  //  Step 4: Background processing (fire-and-forget)
-  (async () => {
-    try {
-      // Upload images if provided
-      let imageUrls = [];
-      if (req.files?.image?.length) {
-        const imageUploads = await Promise.all(
-          req.files.image.map((file) => cloudinaryFileUpload(file.path)),
-        );
-        imageUrls = imageUploads.map((img) => img.optimizeUrl);
-        product.image = imageUrls;
-      }
+    // Uniqueness checks (parallel)
+    const [skuTaken, barCodeTaken] = await Promise.all([
+      productData.sku ? Product.exists({ sku: productData.sku }) : null,
+      productData.barCode ? Product.exists({ barCode: productData.barCode }) : null,
+    ]);
 
-      // Generate QR code
-      const qrCodeBuffer = await QRCode.toBuffer(
-        JSON.stringify(
-          `${
-            process.env.PRODUCT_QR_URL ||
-            "https://www.facebook.com/zahirulislamdev"
-          }`,
-        ),
-        {
-          errorCorrectionLevel: "H",
-          margin: 2,
-          width: 200,
-          height: 200,
-          type: "png",
+    if (skuTaken) {
+      throw new customError(
+        `SKU "${productData.sku}" already exists`,
+        statusCodes.BAD_REQUEST,
+      );
+    }
+    if (barCodeTaken) {
+      throw new customError(
+        `Barcode "${productData.barCode}" already exists`,
+        statusCodes.BAD_REQUEST,
+      );
+    }
+
+    // Build SEO subdoc — merge text fields with ogImage placeholder if uploaded
+    const seoData = {
+      ...(productData.seo || {}),
+      ...(ogImage
+        ? { ogImage: { status: "pending", localPath: ogImage.path } }
+        : {}),
+    };
+
+    const product = await Product.create({
+      ...productData,
+      barCode: productData.barCode || generateBarcode(),
+      thumbnail: { status: "pending", localPath: thumbnail.path },
+      image: images.map((img) => ({
+        status: "pending",
+        localPath: img.path,
+      })),
+      seo: seoData,
+    });
+
+    // Enqueue all uploads in one Redis round-trip
+    const jobs = [
+      {
+        name: "create-product-thumbnail",
+        data: {
+          modelName: NS,
+          documentId: product._id,
+          localPath: thumbnail.path,
+          fieldName: "thumbnail",
         },
-      );
+      },
+      ...images.map((img, i) => ({
+        name: "create-product-image",
+        data: {
+          modelName: NS,
+          documentId: product._id,
+          localPath: img.path,
+          fieldName: "image",
+          index: i,
+        },
+      })),
+    ];
 
-      const base64qrCode = `data:image/png;base64,${qrCodeBuffer.toString(
-        "base64",
-      )}`;
-      const { optimizeUrl: qrCodeUrl } =
-        await uploadBarcodeToCloudinary(base64qrCode);
-      product.qrCode = qrCodeUrl || null;
-
-      // Save product with images & QR
-      await product.save();
-      console.log(`✅ Background product creation completed: ${product._id}`);
-    } catch (error) {
-      console.error(
-        `❌ Background product creation failed: ${product._id}`,
-        error.message,
-      );
-    }
-  })();
-});
-
-// @desc Get all products with optional filters
-exports.getAllProducts = asynchandeler(async (req, res) => {
-  const { category, subcategory, brand, minPrice, maxPrice } = req.query;
-
-  const query = {};
-  if (category) query.category = category;
-  if (subcategory) query.subcategory = subcategory;
-  if (brand) query.brand = brand;
-
-  // Price filtering
-  const priceFilter = {};
-  if (minPrice) priceFilter.$gte = parseFloat(minPrice);
-  if (maxPrice) priceFilter.$lte = parseFloat(maxPrice);
-
-  // Fetch products first
-  const products = await Product.find(query)
-    .populate({
-      path: "variant",
-      populate: "stockVariantAdjust product",
-    })
-    .populate({
-      path: "byReturn",
-      populate: "product variant",
-    })
-    .populate({
-      path: "salesReturn",
-      populate: "product variant",
-    })
-    .populate("category brand  discount stockAdjustment")
-    .populate({
-      path: "category",
-      populate: "discount",
-    })
-    .populate({
-      path: "subcategory",
-      populate: "discount",
-    })
-    .select("-updatedAt -createdAt");
-
-  // Now filter based on price (after population)
-  const filteredProducts = products.filter((product) => {
-    // Single variant
-    if (product.variantType === "singleVariant") {
-      if (Object.keys(priceFilter).length === 0) return true;
-      const price = product.retailPrice || 0;
-      if (priceFilter.$gte && price < priceFilter.$gte) return false;
-      if (priceFilter.$lte && price > priceFilter.$lte) return false;
-      return true;
-    }
-
-    // Multiple variant
-    if (
-      product.variantType === "multipleVariant" &&
-      Array.isArray(product.variant)
-    ) {
-      return product.variant.some((v) => {
-        const price = v.retailPrice || 0;
-        if (priceFilter.$gte && price < priceFilter.$gte) return false;
-        if (priceFilter.$lte && price > priceFilter.$lte) return false;
-        return true;
+    if (ogImage) {
+      jobs.push({
+        name: "create-product-ogimage",
+        data: {
+          modelName: NS,
+          documentId: product._id,
+          localPath: ogImage.path,
+          fieldName: "seo.ogImage",
+        },
       });
     }
 
-    return true;
+    await imageQueue.addBulk(jobs);
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.CREATED,
+      "Product created. Images are uploading in background.",
+      { _id: product._id, slug: product.slug, name: product.name },
+    );
   });
 
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Products fetched successfully",
-    filteredProducts,
-  );
-});
+  // ─── READ — all (with filters + caching) ───────────────────────────────────
+  getAllProducts = asynchandeler(async (req, res) => {
+    const cacheKey = await buildCacheKey(NS, `all:${stableSuffix(req.query)}`);
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Products fetched successfully",
+        { products: cached, fromCache: true },
+      );
+    }
 
-//@desc Get product by slug
-exports.getProductBySlug = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-  const product = await Product.findOne({ slug })
-    .populate({
-      path: "variant",
-      populate: "stockVariantAdjust product",
-    })
-    .populate({
-      path: "byReturn",
-      populate: "product variant",
-    })
-    .populate({
-      path: "salesReturn",
-      populate: "product variant",
-    })
-    .populate("brand  discount stockAdjustment")
-    .populate({
-      path: "category",
-      populate: "discount",
-    })
-    .populate({
-      path: "subcategory",
-      populate: "discount",
+    const { category, subcategory, brand, minPrice, maxPrice } = req.query;
+
+    const query = {};
+    if (category) query.category = category;
+    if (subcategory) query.subcategory = subcategory;
+    if (brand) query.brand = brand;
+
+    // Push price filter to the DB instead of in-memory filter
+    if (minPrice || maxPrice) {
+      const priceCond = {};
+      if (minPrice) priceCond.$gte = parseFloat(minPrice);
+      if (maxPrice) priceCond.$lte = parseFloat(maxPrice);
+      query.retailPrice = priceCond;
+    }
+
+    const products = await Product.find(query)
+      .populate("category brand discount")
+      .populate({ path: "subcategory", populate: "discount" })
+      .populate({ path: "variant", select: "variantName retailPrice stockVariant size color image" })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!products.length) {
+      throw new customError("No products found", statusCodes.NOT_FOUND);
+    }
+
+    await setCache(cacheKey, products, CACHE_TTL_LIST);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Products fetched successfully",
+      { products },
+    );
+  });
+
+  // ─── READ — by slug ────────────────────────────────────────────────────────
+  getProductBySlug = asynchandeler(async (req, res) => {
+    const { slug } = req.params;
+    const cacheKey = await buildCacheKey(NS, `slug:${slug}`);
+
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Product fetched successfully",
+        { product: cached, fromCache: true },
+      );
+    }
+
+    const product = await Product.findOne({ slug })
+      .populate("brand discount stockAdjustment")
+      .populate({ path: "category", populate: "discount" })
+      .populate({ path: "subcategory", populate: "discount" })
+      .populate({ path: "variant", populate: "stockVariantAdjust" })
+      .populate({ path: "byReturn", populate: "product variant" })
+      .populate({ path: "salesReturn", populate: "product variant" })
+      .lean();
+
+    if (!product) {
+      throw new customError("Product not found", statusCodes.NOT_FOUND);
+    }
+
+    await setCache(cacheKey, product, CACHE_TTL);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Product fetched successfully",
+      { product },
+    );
+  });
+
+  // ─── UPDATE — text fields + SEO + optional ogImage replacement ─────────────
+  updateProductInfoBySlug = asynchandeler(async (req, res) => {
+    const { slug } = req.params;
+    const value = await validateProductUpdate(req);
+    const { ogImage, ...updateData } = value;
+
+    // Uniqueness checks against OTHER docs (parallel)
+    const [skuTaken, barCodeTaken] = await Promise.all([
+      updateData.sku
+        ? Product.exists({ sku: updateData.sku, slug: { $ne: slug } })
+        : null,
+      updateData.barCode
+        ? Product.exists({ barCode: updateData.barCode, slug: { $ne: slug } })
+        : null,
+    ]);
+
+    if (skuTaken) {
+      throw new customError(
+        `SKU "${updateData.sku}" is already taken`,
+        statusCodes.BAD_REQUEST,
+      );
+    }
+    if (barCodeTaken) {
+      throw new customError(
+        `Barcode "${updateData.barCode}" is already taken`,
+        statusCodes.BAD_REQUEST,
+      );
+    }
+
+    // Load doc first if image change is needed (we need oldPublicId)
+    let product;
+    let oldOgPublicId = null;
+
+    if (ogImage) {
+      product = await Product.findOne({ slug });
+      if (!product) {
+        throw new customError("Product not found", statusCodes.NOT_FOUND);
+      }
+      oldOgPublicId = product.seo?.ogImage?.publicId || null;
+    }
+
+    // Build $set payload — flatten seo so ogImage merges instead of replacing
+    const $set = { ...updateData };
+    if (updateData.seo) {
+      delete $set.seo;
+      Object.entries(updateData.seo).forEach(([k, v]) => {
+        $set[`seo.${k}`] = v;
+      });
+    }
+    if (ogImage) {
+      $set["seo.ogImage"] = {
+        status: "pending",
+        localPath: ogImage.path,
+        url: product.seo?.ogImage?.url || "", // keep old URL visible during upload
+        publicId: product.seo?.ogImage?.publicId || "",
+        tries: 0,
+        lastError: "",
+      };
+    }
+
+    product = await Product.findOneAndUpdate(
+      { slug },
+      { $set },
+      { new: true, runValidators: true },
+    ).populate("category subcategory brand variant discount");
+
+    if (!product) {
+      throw new customError("Product not found", statusCodes.NOT_FOUND);
+    }
+
+    if (ogImage) {
+      await imageQueue.add("update-product-ogimage", {
+        modelName: NS,
+        documentId: product._id,
+        localPath: ogImage.path,
+        fieldName: "seo.ogImage",
+        oldPublicId: oldOgPublicId,
+      });
+    }
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Product updated successfully",
+      product,
+    );
+  });
+
+  // ─── ADD a single gallery image ────────────────────────────────────────────
+  addProductImage = asynchandeler(async (req, res) => {
+    const { slug } = req.params;
+    const file = validateProductImageUpload(req);
+
+    const product = await Product.findOne({ slug });
+    if (!product) {
+      throw new customError("Product not found", statusCodes.NOT_FOUND);
+    }
+
+    if (product.image.length >= MAX_GALLERY_IMAGES) {
+      throw new customError(
+        `Gallery already has ${MAX_GALLERY_IMAGES} images (max)`,
+        statusCodes.BAD_REQUEST,
+      );
+    }
+
+    const nextIndex = product.image.length;
+    product.image.push({
+      status: "pending",
+      localPath: file.path,
+      tries: 0,
     });
 
-  if (!product) {
-    throw new customError("Product not found", statusCodes.NOT_FOUND);
-  }
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Product fetched successfully",
-    product,
-  );
-});
+    await product.save();
 
-//@desc Update product by slug and when update name then change the sku as well as qrCode and barcode
-exports.updateProductInfoBySlug = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
+    await imageQueue.add("add-product-image", {
+      modelName: NS,
+      documentId: product._id,
+      localPath: file.path,
+      fieldName: "image",
+      index: nextIndex,
+    });
 
-  const product = await Product.findOneAndUpdate(
-    { slug },
-    { ...req.body },
-    {
-      new: true,
-    },
-  ).populate("category subcategory brand variant discount");
+    await bumpNsVersion(NS);
 
-  if (!product) {
-    throw new customError("Product not found", statusCodes.NOT_FOUND);
-  }
-
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Product updated successfully",
-    product,
-  );
-});
-
-//@desc Add images to product by slug
-exports.addProductImage = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-
-  const product = await Product.findOne({ slug });
-  if (!product) {
-    return apiResponse.sendError(
+    return apiResponse.sendSuccess(
       res,
-      statusCodes.NOT_FOUND,
-      "Product not found",
+      statusCodes.OK,
+      "Image upload started in background",
+      { slug, index: nextIndex },
     );
-  }
+  });
 
-  // Step 1: Validate files
-  if (!req.files || !req.files.image || req.files.image.length === 0) {
-    return apiResponse.sendError(
-      res,
-      statusCodes.BAD_REQUEST,
-      "No image files provided",
-    );
-  }
+  // ─── DELETE a single gallery image (or thumbnail) ──────────────────────────
+  deleteProductImage = asynchandeler(async (req, res) => {
+    const { slug } = req.params;
+    const { imageUrl } = req.body;
 
-  //  Step 2: Send immediate response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Image upload is being processed in the background",
-    { slug },
-  );
-
-  //  Step 3: Background processing
-  (async () => {
-    try {
-      const imageUploads = await Promise.all(
-        req.files.image.map((file) => cloudinaryFileUpload(file.path)),
-      );
-      const newImageUrls = imageUploads.map((img) => img.optimizeUrl);
-
-      product.image = [...product.image, ...newImageUrls];
-      await product.save();
-
-      console.log(`✅ Background images added to product: ${product._id}`);
-    } catch (error) {
-      console.error(
-        `❌ Background image upload failed for product: ${product._id}`,
-        error.message,
-      );
+    if (!imageUrl) {
+      throw new customError("imageUrl is required", statusCodes.BAD_REQUEST);
     }
-  })();
-});
 
-//@desc find the product by slug and select image and send image urls and delte this image from cloudinary
-exports.deleteProductImage = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-  let { imageUrl } = req.body;
+    const product = await Product.findOne({ slug });
+    if (!product) {
+      throw new customError("Product not found", statusCodes.NOT_FOUND);
+    }
 
-  const product = await Product.findOne({ slug });
-  if (!product) {
-    throw new customError("Product not found", statusCodes.NOT_FOUND);
-  }
+    const toDelete = [];
 
-  //  Step 1: Normalize imageUrl to array
-  if (!Array.isArray(imageUrl)) {
-    imageUrl = [imageUrl];
-  }
-
-  //  Step 2: Send immediate response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Image deletion is being processed in the background",
-    { slug },
-  );
-
-  //  Step 3: Background processing
-  (async () => {
-    try {
-      for (const url of imageUrl) {
-        const match = url.split("/");
-        const publicId = match[match.length - 1].split(".")[0]; // Extract public ID
-
-        if (!publicId) {
-          console.warn(
-            `⚠️ Invalid image URL: ${url} for product: ${product._id}`,
-          );
-          continue;
+    // Match thumbnail
+    if (product.thumbnail?.url === imageUrl) {
+      if (product.thumbnail.publicId) toDelete.push(product.thumbnail.publicId);
+      product.thumbnail = { status: "pending" };
+    } else {
+      // Match in gallery
+      const beforeLen = product.image.length;
+      product.image = product.image.filter((img) => {
+        if (img.url === imageUrl) {
+          if (img.publicId) toDelete.push(img.publicId);
+          return false;
         }
+        return true;
+      });
 
-        await deleteCloudinaryFile(publicId.split("?")[0]);
-        product.image = product.image.filter((img) => img !== url);
-      }
-
-      await product.save();
-      console.log(` Background images deleted for product: ${product._id}`);
-    } catch (error) {
-      console.error(
-        `❌ Background image deletion failed for product: ${product._id}`,
-        error.message,
-      );
-    }
-  })();
-});
-
-//@desc  get products with pagination and sorting
-exports.getProductsWithPagination = asynchandeler(async (req, res) => {
-  const { page = 1, limit = 10 } = req.query;
-  const skip = (page - 1) * limit;
-
-  const products = await Product.find()
-    .skip(skip)
-    .limit(limit)
-    .sort({ createdAt: -1 })
-    .populate("category subcategory brand variant discount");
-  if (!products || products.length === 0) {
-    throw new customError("Product not found", statusCodes.NOT_FOUND);
-  }
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Product fetched successfully",
-    products,
-  );
-});
-
-//@desc delete product by slug and whenn delete product then delete all images from cloudinary
-exports.deleteProductBySlug = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-
-  const product = await Product.findOneAndDelete({ slug });
-  if (!product) {
-    return apiResponse.sendError(
-      res,
-      statusCodes.NOT_FOUND,
-      "Product not found",
-    );
-  }
-
-  //  Step 1: Send immediate response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Product deletion is being processed in the background",
-    { slug },
-  );
-
-  //  Step 2: Background processing
-  (async () => {
-    try {
-      // Delete all images from Cloudinary
-      if (product.image && product.image.length > 0) {
-        await Promise.all(
-          product.image.map(async (imgUrl) => {
-            const match = imgUrl.split("/");
-            const publicId = match[match.length - 1].split(".")[0];
-            if (publicId) {
-              await deleteCloudinaryFile(publicId.split("?")[0]);
-              console.log(`🗑️ Deleted Cloudinary image: ${publicId}`);
-            } else {
-              console.warn(`⚠️ Invalid image URL for product: ${product._id}`);
-            }
-          }),
+      if (product.image.length === beforeLen) {
+        throw new customError(
+          "Image not found in this product",
+          statusCodes.NOT_FOUND,
         );
       }
+    }
 
-      console.log(`✅ Background product deletion completed: ${slug}`);
-    } catch (error) {
-      console.error(
-        `❌ Background product deletion failed: ${slug}`,
-        error.message,
+    await product.save();
+    await bumpNsVersion(NS);
+    fireAndForgetCloudinaryDelete(toDelete);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Image deleted successfully",
+      { slug, removed: toDelete.length },
+    );
+  });
+
+  // ─── PAGINATION ────────────────────────────────────────────────────────────
+  getProductsWithPagination = asynchandeler(async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const skip = (page - 1) * limit;
+
+    const cacheKey = await buildCacheKey(NS, `page:${page}:limit:${limit}`);
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Products fetched successfully",
+        { ...cached, fromCache: true },
       );
     }
-  })();
-});
 
-// @desc get product review by slug
-exports.getProductReviewBySlug = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-  const product = await Product.findOne({ slug })
-    .select("reviews")
-    .populate("reviews.reviewer", "name email image phone");
-  if (!product) {
-    throw new customError("Product not found", statusCodes.NOT_FOUND);
-  }
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Product fetched successfully",
-    product,
-  );
-});
+    const [products, total] = await Promise.all([
+      Product.find()
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .populate("category subcategory brand variant discount")
+        .lean(),
+      Product.countDocuments(),
+    ]);
 
-// @desc update product review by slug
-exports.updateProductReviewBySlug = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-  const product = await Product.findOne({ slug });
-  if (!product) {
-    throw new customError("Product not found", statusCodes.NOT_FOUND);
-  }
-  product.reviews.push(req.body);
-  await product.save();
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Product review updated successfully",
-    product,
-  );
-});
+    if (!products.length) {
+      throw new customError("No products found", statusCodes.NOT_FOUND);
+    }
 
-//@desc remove product review by slug
-exports.removeProductReviewBySlug = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-  const product = await Product.findOne({ slug });
-  if (!product) {
-    throw new customError("Product not found", statusCodes.NOT_FOUND);
-  }
-  product.reviews = product.reviews.filter(
-    (review) => review._id.toString() !== req.body.id,
-  );
-  await product.save();
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Product review removed successfully",
-    product,
-  );
-});
+    const payload = {
+      products,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    };
 
-// @desc get all multiple variant products
-exports.getAllMultipleVariantProducts = asynchandeler(async (req, res) => {
-  const products = await Product.find({ variantType: "multipleVariant" })
-    .populate("category subcategory brand variant discount")
-    .sort({ createdAt: -1 });
+    await setCache(cacheKey, payload, CACHE_TTL_LIST);
 
-  if (!products || products.length === 0) {
-    throw new customError(
-      "Multiple variant products not found",
-      statusCodes.NOT_FOUND,
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Products fetched successfully",
+      payload,
     );
-  }
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Multiple variant products fetched successfully",
-    products,
-  );
-});
+  });
 
-// @desc new arrival product
-exports.getNewArrivalProducts = asynchandeler(async (req, res) => {
-  const products = await Product.find({})
-    .sort({ createdAt: -1 })
-    .populate("brand variant discount")
-    .populate({
-      path: "category",
-      populate: "discount",
-    })
-    .populate({
-      path: "subcategory",
-      populate: "discount",
-    })
-    .limit(20);
+  // ─── DELETE ────────────────────────────────────────────────────────────────
+  deleteProductBySlug = asynchandeler(async (req, res) => {
+    const { slug } = req.params;
 
-  if (!products || products.length === 0) {
-    throw new customError(
-      "New arrival products not found",
-      statusCodes.NOT_FOUND,
+    const product = await Product.findOneAndDelete({ slug });
+    if (!product) {
+      throw new customError("Product not found", statusCodes.NOT_FOUND);
+    }
+
+    await bumpNsVersion(NS);
+
+    // Cleanup ALL images (thumbnail + gallery + SEO og image)
+    fireAndForgetCloudinaryDelete(collectProductPublicIds(product));
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Product deleted successfully",
+      { slug },
     );
-  }
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "New arrival products fetched successfully",
-    products,
-  );
-});
+  });
 
-//@desc product price range filter
-exports.getProductsByPriceRange = asynchandeler(async (req, res) => {
-  let { minPrice, maxPrice } = req.query;
-  minPrice = Number(minPrice);
-  maxPrice = Number(maxPrice);
+  // ─── REVIEWS ───────────────────────────────────────────────────────────────
+  getProductReviewBySlug = asynchandeler(async (req, res) => {
+    const { slug } = req.params;
+    const product = await Product.findOne({ slug }).select("_id").lean();
+    if (!product) {
+      throw new customError("Product not found", statusCodes.NOT_FOUND);
+    }
 
-  if (isNaN(minPrice) || isNaN(maxPrice)) {
-    throw new customError("Invalid price range", statusCodes.BAD_REQUEST);
-  }
+    const reviews = await Review.find({ product: product._id })
+      .populate("reviewer", "name email image phone")
+      .lean();
 
-  const products = await Product.aggregate([
-    {
-      $lookup: {
-        from: "variants", // Variant collection
-        localField: "variant", // Product এর variant field (ObjectId[])
-        foreignField: "_id", // Variant collection এর _id
-        as: "variantdocs", // lookup result
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Reviews fetched successfully",
+      { reviews },
+    );
+  });
+
+  updateProductReviewBySlug = asynchandeler(async (req, res) => {
+    const { slug } = req.params;
+    const product = await Product.findOne({ slug }).select("_id").lean();
+    if (!product) {
+      throw new customError("Product not found", statusCodes.NOT_FOUND);
+    }
+
+    const review = await Review.create({
+      product: product._id,
+      reviewer: req.user._id,
+      rating: req.body.rating,
+      comment: req.body.comment,
+    });
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Product review added successfully",
+      review,
+    );
+  });
+
+  removeProductReviewBySlug = asynchandeler(async (req, res) => {
+    const { id } = req.body;
+    if (!id) {
+      throw new customError("Review id is required", statusCodes.BAD_REQUEST);
+    }
+
+    const review = await Review.findByIdAndDelete(id);
+    if (!review) {
+      throw new customError("Review not found", statusCodes.NOT_FOUND);
+    }
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Product review removed successfully",
+      null,
+    );
+  });
+
+  // ─── MULTIPLE-VARIANT PRODUCTS ─────────────────────────────────────────────
+  getAllMultipleVariantProducts = asynchandeler(async (req, res) => {
+    const cacheKey = await buildCacheKey(NS, "multiple-variants");
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Multiple variant products fetched successfully",
+        { products: cached, fromCache: true },
+      );
+    }
+
+    const products = await Product.find({ variantType: "multipleVariant" })
+      .populate("category subcategory brand variant discount")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!products.length) {
+      throw new customError(
+        "Multiple variant products not found",
+        statusCodes.NOT_FOUND,
+      );
+    }
+
+    await setCache(cacheKey, products, CACHE_TTL_LIST);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Multiple variant products fetched successfully",
+      { products },
+    );
+  });
+
+  // ─── NEW ARRIVALS ──────────────────────────────────────────────────────────
+  getNewArrivalProducts = asynchandeler(async (req, res) => {
+    const cacheKey = await buildCacheKey(NS, "new-arrivals");
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "New arrival products fetched successfully",
+        { products: cached, fromCache: true },
+      );
+    }
+
+    const products = await Product.find({ isActive: true })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .populate("brand variant discount")
+      .populate({ path: "category", populate: "discount" })
+      .populate({ path: "subcategory", populate: "discount" })
+      .lean();
+
+    if (!products.length) {
+      throw new customError(
+        "New arrival products not found",
+        statusCodes.NOT_FOUND,
+      );
+    }
+
+    await setCache(cacheKey, products, CACHE_TTL_LIST);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "New arrival products fetched successfully",
+      { products },
+    );
+  });
+
+  // ─── PRICE-RANGE FILTER ────────────────────────────────────────────────────
+  getProductsByPriceRange = asynchandeler(async (req, res) => {
+    const minPrice = Number(req.query.minPrice);
+    const maxPrice = Number(req.query.maxPrice);
+
+    if (Number.isNaN(minPrice) || Number.isNaN(maxPrice)) {
+      throw new customError("Invalid price range", statusCodes.BAD_REQUEST);
+    }
+    if (minPrice > maxPrice) {
+      throw new customError(
+        "minPrice cannot be greater than maxPrice",
+        statusCodes.BAD_REQUEST,
+      );
+    }
+
+    const cacheKey = await buildCacheKey(NS, `price:${minPrice}-${maxPrice}`);
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Products fetched successfully",
+        { products: cached, fromCache: true },
+      );
+    }
+
+    const products = await Product.aggregate([
+      {
+        $lookup: {
+          from: "variants",
+          localField: "variant",
+          foreignField: "_id",
+          as: "variantdocs",
+        },
       },
-    },
-    {
-      $lookup: {
-        from: "discounts", // Discount collection
-        localField: "discount", // Product এর discount field (ObjectId)
-        foreignField: "_id", // Discount collection এর _id
-        as: "discountdocs", // lookup result
+      {
+        $lookup: {
+          from: "discounts",
+          localField: "discount",
+          foreignField: "_id",
+          as: "discountdocs",
+        },
       },
-    },
-    {
-      $match: {
-        $or: [
-          { retailPrice: { $gte: minPrice, $lte: maxPrice } },
-
-          {
-            variantdocs: {
-              $elemMatch: {
-                retailPrice: { $gte: minPrice, $lte: maxPrice },
+      {
+        $match: {
+          $or: [
+            { retailPrice: { $gte: minPrice, $lte: maxPrice } },
+            {
+              variantdocs: {
+                $elemMatch: {
+                  retailPrice: { $gte: minPrice, $lte: maxPrice },
+                },
               },
             },
-          },
-        ],
+          ],
+        },
       },
-    },
-  ]);
+    ]);
 
-  if (!products || products.length === 0) {
-    throw new customError("Products not found", statusCodes.NOT_FOUND);
-  }
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Products fetched successfully",
-    products,
-  );
-});
+    if (!products.length) {
+      throw new customError("No products found", statusCodes.NOT_FOUND);
+    }
 
-//@desc  get related product
-exports.getRelatedProducts = asynchandeler(async (req, res) => {
-  const { category } = req.body;
-  const products = await Product.find({
-    category,
-  })
-    .populate("category subcategory brand variant discount")
-    .sort({ createdAt: -1 });
-  if (!products || products.length === 0) {
-    throw new customError("Products not found", statusCodes.NOT_FOUND);
-  }
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Products fetched successfully",
-    products,
-  );
-});
+    await setCache(cacheKey, products, CACHE_TTL_LIST);
 
-//@desc   discount product
-// Get all Discounted Products (Product + Variant)
-exports.getDiscountProducts = asynchandeler(async (req, res) => {
-  // ==============================
-  // 1️ Find discounted main products
-  // ==============================
-  const products = await Product.find({ discount: { $ne: null } })
-    .populate("brand variant discount")
-    .populate({
-      path: "category",
-      populate: "discount",
-    })
-    .populate({
-      path: "subcategory",
-      populate: "discount",
-    })
-    .sort({ createdAt: -1 });
-
-  if (!products || products.length === 0) {
-    throw new customError(
-      "Discounted products not found",
-      statusCodes.NOT_FOUND,
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Products fetched successfully",
+      { products },
     );
-  }
-  // ==============================
-  // 2️ Find discounted variant products
-  // ==============================
-  const variantDiscountedProducts = await variant
-    .find({ discount: { $ne: null } })
-    .sort({ createdAt: -1 })
-    .populate({
-      path: "product",
-      populate: [
-        { path: "category", populate: "discount" },
-        { path: "subcategory", populate: "discount" },
-        { path: "brand", populate: "discount" },
-      ],
-      select: "-variant",
-    });
+  });
 
-  if (!variantDiscountedProducts || variantDiscountedProducts.length === 0) {
-    throw new customError(
-      "Discounted variant products not found",
-      statusCodes.NOT_FOUND,
+  // ─── RELATED PRODUCTS ──────────────────────────────────────────────────────
+  getRelatedProducts = asynchandeler(async (req, res) => {
+    const { category } = req.body;
+    if (!category) {
+      throw new customError("category is required", statusCodes.BAD_REQUEST);
+    }
+
+    const products = await Product.find({ category, isActive: true })
+      .populate("category subcategory brand variant discount")
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    if (!products.length) {
+      throw new customError(
+        "No related products found",
+        statusCodes.NOT_FOUND,
+      );
+    }
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Products fetched successfully",
+      { products },
     );
-  }
+  });
 
-  // =============================
-  // 3️Merge both product lists
-  // ==============================
-  const allDiscountedProducts = [...products, ...variantDiscountedProducts];
+  // ─── DISCOUNTED PRODUCTS (graceful empty handling) ─────────────────────────
+  getDiscountProducts = asynchandeler(async (req, res) => {
+    const cacheKey = await buildCacheKey(NS, "discount");
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Discounted products fetched successfully",
+        { products: cached, fromCache: true },
+      );
+    }
 
-  // ==============================
-  // 4️ Send success response
-  // ==============================
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Discounted products fetched successfully",
-    allDiscountedProducts,
-  );
-});
+    // Run both queries in parallel — independent
+    const [products, variantDiscountedProducts] = await Promise.all([
+      Product.find({ discount: { $ne: null } })
+        .populate("brand variant discount")
+        .populate({ path: "category", populate: "discount" })
+        .populate({ path: "subcategory", populate: "discount" })
+        .sort({ createdAt: -1 })
+        .lean(),
+      Variant.find({ discount: { $ne: null } })
+        .sort({ createdAt: -1 })
+        .populate({
+          path: "product",
+          populate: [
+            { path: "category", populate: "discount" },
+            { path: "subcategory", populate: "discount" },
+            { path: "brand", populate: "discount" },
+          ],
+          select: "-variant",
+        })
+        .lean(),
+    ]);
 
-//@desc get bestSellig product
-exports.getBestSellingProducts = asynchandeler(async (_, res) => {
-  const products = await Product.find({
-    totalSales: { $gt: 1 },
-  })
-    .sort({ totalSales: -1 })
-    .populate("brand variant discount")
-    .populate({
-      path: "category",
-      populate: "discount",
-    })
-    .populate({
-      path: "subcategory",
-      populate: "discount",
-    })
-    .limit(10);
+    const merged = [...products, ...variantDiscountedProducts];
 
-  if (!products || products.length === 0) {
-    throw new customError(
-      "Best selling products not found",
-      statusCodes.NOT_FOUND,
+    if (!merged.length) {
+      throw new customError(
+        "No discounted products found",
+        statusCodes.NOT_FOUND,
+      );
+    }
+
+    await setCache(cacheKey, merged, CACHE_TTL_LIST);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Discounted products fetched successfully",
+      { products: merged },
     );
-  }
+  });
 
-  // now find the variant products which are best selling
-  const variantBestSellingProducts = await variant
-    .find({
-      totalSales: { $gt: 1 },
-    })
-    .sort({ totalSales: -1 })
-    .populate({
-      path: "product",
-      // populate: [
-      //   {
-      //     path: "category",
-      //     populate: "discount",
-      //   },
-      //   {
-      //     path: "subcategory",
-      //     populate: "discount",
-      //   },
-      //   {
-      //     path: "brand",
-      //     populate: "discount",
-      //   },
-      // ],
-      select: "-variant",
-    })
+  // ─── BEST-SELLING (graceful empty handling) ────────────────────────────────
+  getBestSellingProducts = asynchandeler(async (req, res) => {
+    const cacheKey = await buildCacheKey(NS, "best-selling");
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Best selling products fetched successfully",
+        { products: cached, fromCache: true },
+      );
+    }
 
-    .limit(50);
+    const [products, variantBestSelling] = await Promise.all([
+      Product.find({ totalSales: { $gt: 0 } })
+        .sort({ totalSales: -1 })
+        .limit(10)
+        .populate("brand variant discount")
+        .populate({ path: "category", populate: "discount" })
+        .populate({ path: "subcategory", populate: "discount" })
+        .lean(),
+      Variant.find({ totalSales: { $gt: 0 } })
+        .sort({ totalSales: -1 })
+        .limit(50)
+        .populate({ path: "product", select: "-variant" })
+        .lean(),
+    ]);
 
-  if (!variantBestSellingProducts || variantBestSellingProducts.length === 0) {
-    throw new customError(
-      "Best selling variant products not found",
-      statusCodes.NOT_FOUND,
+    const merged = [...products, ...variantBestSelling];
+
+    if (!merged.length) {
+      throw new customError(
+        "No best selling products found",
+        statusCodes.NOT_FOUND,
+      );
+    }
+
+    await setCache(cacheKey, merged, CACHE_TTL_LIST);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Best selling products fetched successfully",
+      { products: merged },
     );
-  }
-  products.push(...variantBestSellingProducts);
+  });
 
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Best selling products fetched successfully",
-    products,
-  );
-});
+  // ─── NAME / BARCODE SEARCH (regex-escaped) ─────────────────────────────────
+  getNameWiseSearch = asynchandeler(async (req, res) => {
+    const name = String(req.query.name || "").trim();
+    const barCode = String(req.query.barCode || "").trim();
 
-//@desc name wise  search
-exports.getNameWiseSearch = asynchandeler(async (req, res) => {
-  const { name = "", barCode = "" } = req.query;
-  console.log("Search Query:", { name, barCode });
+    if (!name && !barCode) {
+      throw new customError(
+        "name or barCode query is required",
+        statusCodes.BAD_REQUEST,
+      );
+    }
 
-  // Build match conditions dynamically
-  const matchConditions = [];
-
-  if (name) {
-    matchConditions.push(
-      { name: { $regex: name, $options: "i" } },
-      { "variant.variantName": { $regex: name, $options: "i" } },
+    const cacheKey = await buildCacheKey(
+      NS,
+      `search:${name.toLowerCase()}:${barCode.toLowerCase()}`,
     );
-  }
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Products fetched successfully",
+        { products: cached, fromCache: true },
+      );
+    }
 
-  if (barCode) {
-    matchConditions.push({
-      barCode: { $regex: barCode, $options: "i" },
-    });
-  }
+    const matchConditions = [];
+    if (name) {
+      const safe = escapeRegex(name);
+      matchConditions.push(
+        { name: { $regex: safe, $options: "i" } },
+        { "variant.variantName": { $regex: safe, $options: "i" } },
+      );
+    }
+    if (barCode) {
+      const safe = escapeRegex(barCode);
+      matchConditions.push({ barCode: { $regex: safe, $options: "i" } });
+    }
 
-  const products = await Product.aggregate([
-    {
-      $lookup: {
-        from: "variants",
-        localField: "variant",
-        foreignField: "_id",
-        as: "variant",
+    const products = await Product.aggregate([
+      {
+        $lookup: {
+          from: "variants",
+          localField: "variant",
+          foreignField: "_id",
+          as: "variant",
+        },
       },
-    },
-    {
-      $lookup: {
-        from: "discounts",
-        localField: "discount",
-        foreignField: "_id",
-        as: "discount",
+      {
+        $lookup: {
+          from: "discounts",
+          localField: "discount",
+          foreignField: "_id",
+          as: "discount",
+        },
       },
-    },
-    {
-      $match: {
-        $or: matchConditions.length > 0 ? matchConditions : [{}], // prevents empty $or error
-      },
-    },
-  ]);
+      { $match: { $or: matchConditions } },
+    ]);
 
-  if (products.length === 0) {
-    throw new customError("Product not found", statusCodes.NOT_FOUND);
-  }
+    if (!products.length) {
+      throw new customError("No products found", statusCodes.NOT_FOUND);
+    }
 
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Products fetched successfully",
-    products,
-  );
-});
+    await setCache(cacheKey, products, 60 * 5); // 5 min — search results change
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Products fetched successfully",
+      { products },
+    );
+  });
+}
+
+module.exports = new ProductController();
