@@ -1,5 +1,6 @@
 const Joi = require("joi");
 const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
 
 const discountSchema = Joi.object({
   discountValidFrom: Joi.date().required().messages({
@@ -32,39 +33,56 @@ const discountSchema = Joi.object({
     "number.min": "Discount value by percentage cannot be less than 0",
   }),
   discountPlan: Joi.string()
-    .valid("flat", "category", "product", "subCategory")
+    .valid("flat", "category", "product", "subCategory", "variant")
     .required()
     .messages({
       "any.only":
-        "Discount plan must be one of 'flat', 'category',  ,subCategory or product",
+        "Discount plan must be one of 'flat', 'category', 'subCategory', 'product' or 'variant'",
       "any.required": "Discount plan is required",
     }),
-  category: Joi.string().optional().allow(null).messages({
+  category: Joi.string().optional().allow(null, "").messages({
     "string.base": "Category must be a valid ID",
   }),
-  subCategory: Joi.string().optional().allow(null).messages({
+  subCategory: Joi.string().optional().allow(null, "").messages({
     "string.base": "Subcategory must be a valid ID",
   }),
-  product: Joi.string().optional().allow(null).messages({
+  product: Joi.string().optional().allow(null, "").messages({
     "string.base": "Product must be a valid ID",
   }),
-}).options({ abortEarly: false, allowUnknown: true }); // Validate all fields, not just the first error
+  variant: Joi.string().optional().allow(null, "").messages({
+    "string.base": "Variant must be a valid ID",
+  }),
+  isActive: Joi.boolean().optional(),
+}).options({ abortEarly: false, allowUnknown: true });
 
 const validateDiscount = async (req) => {
   try {
     const value = await discountSchema.validateAsync(req.body);
     return value;
   } catch (error) {
-    console.log(
-      "Discount Validation error: " +
-        error.details.map((err) => err.message).join(", ")
-    );
     throw new customError(
       "Discount Validation error: " +
         error.details.map((err) => err.message).join(", "),
-      400
+      statusCodes.BAD_REQUEST,
     );
   }
 };
 
-module.exports = validateDiscount;
+const validateDiscountUpdate = async (req) => {
+  try {
+    const updateSchema = discountSchema.fork(
+      Object.keys(discountSchema.describe().keys),
+      (schema) => schema.optional(),
+    );
+    const value = await updateSchema.validateAsync(req.body);
+    return value;
+  } catch (error) {
+    throw new customError(
+      "Discount Update Validation error: " +
+        error.details.map((err) => err.message).join(", "),
+      statusCodes.BAD_REQUEST,
+    );
+  }
+};
+
+module.exports = { validateDiscount, validateDiscountUpdate };

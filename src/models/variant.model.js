@@ -1,6 +1,7 @@
 const { statusCodes } = require("../constant/constant");
 const mongoose = require("mongoose");
 const purchaseModel = require("./purchase.model");
+const slugify = require("slugify");
 
 // ─── Reusable subschemas ─────────────────────────────────────────────────────
 
@@ -105,6 +106,11 @@ const variantSchema = new mongoose.Schema(
     courierReturn: [
       { type: mongoose.Schema.Types.ObjectId, ref: "CourierReturn" },
     ],
+    discount: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Discount",
+      default: null,
+    },
   },
   {
     timestamps: true,

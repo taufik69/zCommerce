@@ -44,7 +44,7 @@ const discountSchema = new mongoose.Schema(
     },
     discountPlan: {
       type: String,
-      enum: ["flat", "category", "product", "subCategory"],
+      enum: ["flat", "category", "product", "subCategory", "variant"],
       required: true,
       default: null,
       trim: true,
@@ -62,6 +62,11 @@ const discountSchema = new mongoose.Schema(
     subCategory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Subcategory",
+      trim: true,
+    },
+    variant: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Variant",
       trim: true,
     },
 

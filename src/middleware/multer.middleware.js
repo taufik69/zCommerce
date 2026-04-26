@@ -116,10 +116,34 @@ const multipleFileUploadWithFields = (fields) => (req, res, next) => {
     next();
   });
 };
+const anyFileUpload = () => (req, res, next) => {
+  const uploader = upload.any();
+
+  uploader(req, res, function (err) {
+    if (err instanceof multer.MulterError) {
+      return next(
+        new customError(
+          "Multer error: " + (err.message || "File upload error"),
+          statusCodes.BAD_REQUEST,
+        ),
+      );
+    } else if (err) {
+      return next(
+        new customError(
+          err.message || "Internal Server Error",
+          statusCodes.SERVER_ERROR,
+        ),
+      );
+    }
+    next();
+  });
+};
+
 // Export the middleware functions
 
 module.exports = {
   singleFileUpload,
   multipleFileUpload,
   multipleFileUploadWithFields,
+  anyFileUpload,
 };

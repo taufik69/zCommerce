@@ -4,7 +4,7 @@ const variant = require("../models/variant.model");
 const product = require("../models/product.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
-const validateVariant = require("../validation/variant.validation");
+const { validateVariant, validateVariantUpdate } = require("../validation/variant.validation");
 
 const { statusCodes } = require("../constant/constant");
 const {
@@ -42,7 +42,7 @@ const fireAndForgetCloudinaryDelete = (publicIds = []) => {
 // @desc create variant controller (batch)
 exports.createVariant = asynchandeler(async (req, res) => {
   const { variants } = req.body;
-  const files = req.files || [];
+  const allFiles = req.files || [];
 
   if (!variants || !Array.isArray(variants) || variants.length === 0) {
     throw new customError(
@@ -56,21 +56,45 @@ exports.createVariant = asynchandeler(async (req, res) => {
 
   for (let i = 0; i < variants.length; i++) {
     const v = variants[i];
-    const validatedData = await validateVariant(v);
+    const validatedData = await validateVariant({ ...v, index: i }, allFiles);
 
-    // Prepare variant with pending image if file exists
-    const variantImages = [];
-    if (files[i]) {
-      variantImages.push({
+    // 1. Collect Gallery Images
+    const currentGalleryFiles = allFiles.filter(
+      (f) => f.fieldname === "image" || f.fieldname === `variants[${i}][image]`,
+    );
+    
+    // If they used flat 'image' name, we should only take the one that corresponds to this variant index
+    // UNLESS they only sent one variant, then we take all 'image' files for it.
+    // However, the best practice is nested naming variants[i][image].
+    // If we find nested names, we use those exclusively for this variant.
+    const nestedGalleryFiles = allFiles.filter((f) => f.fieldname === `variants[${i}][image]`);
+    const finalGalleryFiles = nestedGalleryFiles.length > 0 
+      ? nestedGalleryFiles 
+      : (allFiles.filter(f => f.fieldname === "image")[i] ? [allFiles.filter(f => f.fieldname === "image")[i]] : []);
+
+    // 2. Collect OG Image
+    const nestedOgImage = allFiles.find((f) => f.fieldname === `variants[${i}][ogImage]`);
+    const flatOgImage = allFiles.filter(f => f.fieldname === "ogImage")[i];
+    const finalOgImage = nestedOgImage || flatOgImage;
+
+    const variantImages = finalGalleryFiles.map(file => ({
+      status: "pending",
+      localPath: file.path,
+      tries: 0,
+    }));
+
+    const seoData = validatedData.seo || {};
+    if (finalOgImage) {
+      seoData.ogImage = {
         status: "pending",
-        localPath: files[i].path,
-        tries: 0,
-      });
+        localPath: finalOgImage.path,
+      };
     }
 
     const newVariant = new variant({
       ...validatedData,
       image: variantImages,
+      seo: seoData,
     });
 
     await newVariant.save();
@@ -80,16 +104,28 @@ exports.createVariant = asynchandeler(async (req, res) => {
       $push: { variant: newVariant._id },
     });
 
-    // Enqueue job if image exists
-    if (files[i]) {
+    // Enqueue jobs
+    finalGalleryFiles.forEach((file, index) => {
       jobs.push({
-        name: "add-product-image", // Reuse existing worker job name or similar
+        name: "add-product-image",
         data: {
           modelName: NS,
           documentId: newVariant._id,
-          localPath: files[i].path,
+          localPath: file.path,
           fieldName: "image",
-          index: 0,
+          index: index,
+        },
+      });
+    });
+
+    if (finalOgImage) {
+      jobs.push({
+        name: "add-product-image",
+        data: {
+          modelName: NS,
+          documentId: newVariant._id,
+          localPath: finalOgImage.path,
+          fieldName: "seo.ogImage",
         },
       });
     }
@@ -129,7 +165,8 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
     .find()
     .populate({
       path: "product",
-      populate: [{ path: "subcategory", select: "name" }],
+      select:
+        "name category brand subcategory discount  barCode sku stock retailPrice wholesalePrice purchasePrice slug",
     })
     .populate("stockVariantAdjust byReturn salesReturn")
     .select("-updatedAt")
@@ -146,7 +183,7 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
     res,
     statusCodes.OK,
     "Variants fetched successfully",
-    { variants },
+    variants ,
   );
 });
 
@@ -168,7 +205,8 @@ exports.getSingleVariant = asynchandeler(async (req, res, next) => {
     .findOne({ slug })
     .populate({
       path: "product",
-      populate: [{ path: "subcategory", select: "name" }],
+      select:
+        "name category brand subcategory discount  barCode sku stock retailPrice wholesalePrice purchasePrice slug",
     })
     .populate("stockVariantAdjust byReturn salesReturn")
     .lean();
@@ -183,14 +221,14 @@ exports.getSingleVariant = asynchandeler(async (req, res, next) => {
     res,
     statusCodes.OK,
     "Variant fetched successfully",
-    { variant: singleVariant },
+    singleVariant,
   );
 });
 
 // @desc update variant
 exports.updateVariant = asynchandeler(async (req, res) => {
   const { slug } = req.params;
-  const files = req.files || [];
+  const allFiles = req.files || [];
 
   const existingVariant = await variant.findOne({ slug });
   if (!existingVariant) {
@@ -201,15 +239,18 @@ exports.updateVariant = asynchandeler(async (req, res) => {
   const jobs = [];
   const initialImageCount = existingVariant.image.length;
 
-  if (files.length > 0) {
-    const newImages = files.map((file) => ({
+  const galleryFiles = allFiles.filter((f) => f.fieldname === "image");
+  const ogFiles = allFiles.filter((f) => f.fieldname === "ogImage");
+
+  if (galleryFiles.length > 0) {
+    const newImages = galleryFiles.map((file) => ({
       status: "pending",
       localPath: file.path,
       tries: 0,
     }));
     existingVariant.image.push(...newImages);
 
-    files.forEach((file, i) => {
+    galleryFiles.forEach((file, i) => {
       jobs.push({
         name: "add-product-image",
         data: {
@@ -223,8 +264,32 @@ exports.updateVariant = asynchandeler(async (req, res) => {
     });
   }
 
+  if (ogFiles.length > 0) {
+    const ogFile = ogFiles[0];
+    const oldPublicId = existingVariant.seo?.ogImage?.publicId || null;
+
+    if (!existingVariant.seo) existingVariant.seo = {};
+    existingVariant.seo.ogImage = {
+      status: "pending",
+      localPath: ogFile.path,
+      publicId: oldPublicId,
+    };
+
+    jobs.push({
+      name: "update-product-ogimage", // Or similar job name for ogImage replacement
+      data: {
+        modelName: NS,
+        documentId: existingVariant._id,
+        localPath: ogFile.path,
+        fieldName: "seo.ogImage",
+        oldPublicId,
+      },
+    });
+  }
+
   // Update other fields
-  Object.assign(existingVariant, req.body);
+  const validatedData = await validateVariantUpdate(req.body, allFiles, existingVariant._id);
+  Object.assign(existingVariant, validatedData);
   await existingVariant.save();
 
   if (jobs.length > 0) {
