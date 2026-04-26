@@ -3,6 +3,22 @@ const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
 
+const imageSchema = new mongoose.Schema(
+  {
+    url: { type: String, default: "" },
+    publicId: { type: String, default: "" },
+    status: {
+      type: String,
+      enum: ["pending", "processing", "uploaded", "failed"],
+      default: "pending",
+    },
+    localPath: { type: String, default: "" },
+    tries: { type: Number, default: 0 },
+    lastError: { type: String, default: "" },
+  },
+  { _id: false },
+);
+
 const categorySchema = new mongoose.Schema(
   {
     name: {
@@ -23,15 +39,9 @@ const categorySchema = new mongoose.Schema(
       },
     ],
     image: {
-      type: String,
-      default: "https://via.placeholder.com/150",
+      type: imageSchema,
+      default: () => ({}),
     },
-    subcategories: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Subcategory",
-      },
-    ],
     discount: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Discount",
@@ -46,7 +56,10 @@ const categorySchema = new mongoose.Schema(
   },
 );
 
-// Pre-save middleware to generate slug from name
+// Compound index: most queries filter isActive and sort by createdAt
+categorySchema.index({ isActive: 1, createdAt: -1 });
+categorySchema.index({ name: 1 });
+
 categorySchema.pre("save", function (next) {
   if (this.isModified("name")) {
     this.slug = slugify(this.name, { lower: true, strict: true });
@@ -54,19 +67,16 @@ categorySchema.pre("save", function (next) {
   next();
 });
 
-//check if slug is unique
 categorySchema.pre("save", async function (next) {
   try {
-    const existingCategory = await this.constructor.findOne({
+    const existing = await this.constructor.findOne({
       slug: this.slug,
+      _id: { $ne: this._id },
     });
-    if (
-      existingCategory &&
-      existingCategory._id.toString() !== this._id.toString()
-    ) {
+    if (existing) {
       return next(
         new customError(
-          `Category with slug ${this.slug} or ${this.name} already exists`,
+          `Category "${this.name}" already exists`,
           statusCodes.BAD_REQUEST,
         ),
       );

@@ -3,335 +3,447 @@ const Category = require("../models/category.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { validateCategory } = require("../validation/category.validation");
-const {
-  cloudinaryFileUpload,
-  deleteCloudinaryFile,
-} = require("../helpers/cloudinary");
+const { deleteCloudinaryFile } = require("../helpers/cloudinary");
 const { statusCodes } = require("../constant/constant");
+const {
+  getCache,
+  setCache,
+  bumpNsVersion,
+  buildCacheKey,
+} = require("@/utils/cache.util");
+const { imageQueue } = require("@/queues/image.queue");
 
-// @desc    Create a new category
+// ─── constants ────────────────────────────────────────────────────────────────
 
-exports.createCategory = asynchandeler(async (req, res, next) => {
-  const { name, image } = await validateCategory(req, res, next);
+const NS = "category";
+const CACHE_TTL = 60 * 60; // 1 hour — general lists
+const CACHE_TTL_SEARCH = 60 * 5; // 5 min — search results change faster
 
-  const category = await Category.create({
-    name,
-    image: null,
+const ALLOWED_SORT_FIELDS = new Set(["name", "createdAt", "isActive"]);
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const parseSortParam = (sort) => {
+  if (!sort || typeof sort !== "string") return { createdAt: -1 };
+  const dir = sort.startsWith("-") ? -1 : 1;
+  const field = sort.replace(/^-/, "");
+  return ALLOWED_SORT_FIELDS.has(field) ? { [field]: dir } : { createdAt: -1 };
+};
+
+// ─── controller class ─────────────────────────────────────────────────────────
+
+class CategoryController {
+  // CREATE
+  createCategory = asynchandeler(async (req, res) => {
+    const { name, image } = await validateCategory(req);
+
+    const category = await Category.create({
+      name,
+      image: {
+        status: "pending",
+        localPath: image.path,
+      },
+    });
+
+    // Enqueue image upload — worker handles upload, DB update, and cache bump
+    await imageQueue.add("create-category-image", {
+      categoryId: category._id,
+      localPath: image.path,
+    });
+
+    // Bump now so any stale "all" / "active" lists are invalidated immediately
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.CREATED,
+      "Category created successfully",
+      category.name,
+    );
   });
-  if (!category) {
-    throw new customError("Category creation failed", statusCodes.SERVER_ERROR);
-  }
 
-  //  Send response immediately (non-blocking)
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.CREATED,
-    "Categories are being created ",
-  );
-
-  //  Handle upload & DB insert in background (fire and forget)
-  (async () => {
-    try {
-      const { optimizeUrl } = await cloudinaryFileUpload(image.path);
-
-      await Category.findByIdAndUpdate(category._id, { image: optimizeUrl });
-
-      console.log("✅ Background Category Creation Completed:");
-    } catch (error) {
-      console.error("❌ Background category creation failed:", error.message);
-    }
-  })();
-});
-
-// @desc    Get all categories
-exports.getAllCategories = asynchandeler(async (req, res) => {
-  const categories = await Category.find({ isActive: true })
-    .populate({
-      path: "subcategories",
-      select: "-updatedAt -createdAt",
-    })
-    .populate("discount")
-    .select("-updatedAt -createdAt")
-    .sort({ createdAt: -1 });
-  if (!categories || categories.length === 0) {
-    throw new customError("Categories not found", statusCodes.NOT_FOUND);
-  }
-  // send success response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Categories fetched successfully",
-    {
-      categories,
-    },
-  );
-});
-
-// @desc    Get a single category by slug
-exports.getCategoryBySlug = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-  const category = await Category.findOne({ slug, isActive: true })
-    .populate({
-      path: "subcategories",
-      select: "-updatedAt -createdAt",
-    })
-    .populate("discount")
-    .select("-updatedAt -createdAt");
-
-  if (!category) {
-    throw new customError("Category not found", statusCodes.NOT_FOUND);
-  }
-  // send success response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Category fetched successfully",
-    category,
-  );
-});
-
-// @desc    Update a category by slug
-exports.updateCategory = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-
-  // Step 1: Find the existing category
-  const category = await Category.findOne({ slug, isActive: true });
-  if (!category) {
-    throw new customError("Category not found", statusCodes.NOT_FOUND);
-  }
-
-  // Step 2: Send immediate response (non-blocking)
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Category update is successfully ",
-    { category },
-  );
-
-  // Step 3: Handle background update (fire and forget)
-  (async () => {
-    try {
-      let optimizeUrlCloudinary = null;
-
-      // If new image provided
-      if (req?.files?.length) {
-        const imageUrl = category.image;
-
-        // Extract Cloudinary public ID
-        const match = imageUrl.split("/");
-        const publicId = match[match.length - 1].split(".")[0];
-
-        if (!publicId) {
-          console.error(
-            "⚠️ Invalid Cloudinary image URL for category:",
-            category._id,
-          );
-        } else {
-          //  Delete old image from Cloudinary
-          await deleteCloudinaryFile(publicId.split("?")[0]);
-        }
-
-        // Upload new image to Cloudinary
-        const { optimizeUrl } = await cloudinaryFileUpload(req.files[0].path);
-        optimizeUrlCloudinary = optimizeUrl;
-      }
-
-      //  Update fields in DB
-      category.name = req.body.name || category.name;
-      category.image = optimizeUrlCloudinary || category.image;
-      await category.save();
-
-      console.log("✅ Background category update completed:", category._id);
-    } catch (error) {
-      console.error("❌ Background category update failed:", error.message);
-    }
-  })();
-});
-
-// @desc    Delete a category by slug
-exports.deleteCategory = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-
-  //  Step 1: Find the category
-  const category = await Category.findOneAndDelete({ slug });
-  if (!category) {
-    throw new customError("Category not found", statusCodes.NOT_FOUND);
-  }
-
-  //  Step 2: Send response immediately (non-blocking)
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Category deletion is being processed in the background",
-    { slug },
-  );
-
-  //  Step 3: Run deletion process in background
-  (async () => {
-    try {
-      const imageUrl = category.image;
-
-      // Extract Cloudinary public ID
-      const match = imageUrl.split("/");
-      const publicId = match[match.length - 1].split(".")[0];
-
-      if (publicId) {
-        //  Delete image from Cloudinary
-        await deleteCloudinaryFile(publicId.split("?")[0]);
-        console.log(`🗑️ Cloudinary image deleted for category: ${slug}`);
-      } else {
-        console.warn(` Invalid image URL for category: ${slug}`);
-      }
-
-      console.log(` Background category deletion completed: ${slug}`);
-    } catch (error) {
-      console.error(
-        `❌ Background deletion failed for ${slug}:`,
-        error.message,
+  // GET ALL
+  getAllCategories = asynchandeler(async (req, res) => {
+    const cacheKey = await buildCacheKey(NS, "all");
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Categories fetched successfully",
+        { categories: cached, fromCache: true },
       );
     }
-  })();
-});
 
-// @desc activate a category by slug
-exports.activateCategory = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-  const category = await Category.findOne({ slug, isActive: false });
-  if (!category) {
-    throw new customError("Category not found", statusCodes.NOT_FOUND);
-  }
-  // now activate the category in the database
-  category.isActive = true;
-  await category.save();
-  // send success response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Category activated successfully",
-    {
-      category,
-    },
-  );
-});
-// @desc deactivate a category by slug
-exports.deactivateCategory = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-  const category = await Category.findOne({ slug, isActive: true });
-  if (!category) {
-    throw new customError("Category not found", statusCodes.NOT_FOUND);
-  }
-  // now deactivate the category in the database
-  category.isActive = false;
-  await category.save();
-  // send success response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Category deactivated successfully",
-    {
-      category,
-    },
-  );
-});
-// @desc get all active categories
-exports.getActiveCategories = asynchandeler(async (req, res) => {
-  const categories = await Category.find({ isActive: true });
-  if (!categories || categories.length === 0) {
-    throw new customError("Categories not found", statusCodes.NOT_FOUND);
-  }
-  // send success response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Categories fetched successfully",
-    {
-      categories,
-    },
-  );
-});
-// @desc get all inactive categories
-exports.getInactiveCategories = asynchandeler(async (req, res) => {
-  const categories = await Category.find({ isActive: false });
-  if (!categories || categories.length === 0) {
-    throw new customError("Categories not found", statusCodes.NOT_FOUND);
-  }
-  // send success response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Categories fetched successfully",
-    {
-      categories,
-    },
-  );
-});
+    const categories = await Category.find({ isActive: true })
+      .populate({ path: "subcategories", select: "-updatedAt -createdAt" })
+      .populate("discount")
+      .select("-updatedAt -createdAt")
+      .sort({ createdAt: -1 })
+      .lean();
 
-// @desc get all categories with search
-exports.getCategoriesWithSearch = asynchandeler(async (req, res) => {
-  const { search } = req.query;
-  const categories = await Category.find({
-    name: { $regex: search, $options: "i" },
-    isActive: true,
+    if (!categories.length) {
+      throw new customError("No categories found", statusCodes.NOT_FOUND);
+    }
+
+    await setCache(cacheKey, categories, CACHE_TTL);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Categories fetched successfully",
+      { categories },
+    );
   });
-  if (!categories || categories.length === 0) {
-    throw new customError("Categories not found", statusCodes.NOT_FOUND);
-  }
-  // send success response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Categories fetched successfully",
-    {
-      categories,
-    },
-  );
-});
-// @desc get all categories with sort
-exports.getCategoriesWithSort = asynchandeler(async (req, res) => {
-  const { sort } = req.query;
-  const categories = await Category.find({ isActive: true }).sort(sort);
-  if (!categories || categories.length === 0) {
-    throw new customError("Categories not found", statusCodes.NOT_FOUND);
-  }
-  // send success response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Categories fetched successfully",
-    {
-      categories,
-    },
-  );
-});
 
-//@desc pagination of category
-exports.getCategoryPagination = asynchandeler(async (req, res) => {
-  const { limit, page } = req.query;
-  const skip = (page - 1) * limit;
-  const categories = await Category.find()
-    .skip(skip)
-    .limit(limit)
-    .sort({
-      createdAt: -1,
+  // GET BY SLUG
+  getCategoryBySlug = asynchandeler(async (req, res) => {
+    const { slug } = req.params;
+    const cacheKey = await buildCacheKey(NS, `slug:${slug}`);
+
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Category fetched successfully",
+        { category: cached, fromCache: true },
+      );
+    }
+
+    const category = await Category.findOne({ slug, isActive: true })
+      .populate({ path: "subcategories", select: "-updatedAt -createdAt" })
+      .populate("discount")
+      .select("-updatedAt -createdAt")
+      .lean();
+
+    if (!category) {
+      throw new customError("Category not found", statusCodes.NOT_FOUND);
+    }
+
+    await setCache(cacheKey, category, CACHE_TTL);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Category fetched successfully",
+      { category },
+    );
+  });
+
+  // UPDATE
+  updateCategory = asynchandeler(async (req, res) => {
+    const { slug } = req.params;
+
+    const category = await Category.findOne({ slug });
+    if (!category) {
+      throw new customError("Category not found", statusCodes.NOT_FOUND);
+    }
+
+    if (req.body.name) category.name = req.body.name;
+
+    if (req.files?.length) {
+      const oldPublicId = category.image?.publicId || null;
+
+      // Keep old URL visible until worker finishes uploading the new one
+      category.image.status = "pending";
+      category.image.localPath = req.files[0].path;
+      category.image.tries = 0;
+      category.image.lastError = "";
+
+      await imageQueue.add("update-category-image", {
+        categoryId: category._id,
+        localPath: req.files[0].path,
+        oldPublicId,
+      });
+    }
+
+    const updated = await category.save();
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Category updated successfully",
+      updated,
+    );
+  });
+
+  // DELETE
+  deleteCategory = asynchandeler(async (req, res) => {
+    const { slug } = req.params;
+
+    const category = await Category.findOneAndDelete({ slug });
+    if (!category) {
+      throw new customError("Category not found", statusCodes.NOT_FOUND);
+    }
+
+    await bumpNsVersion(NS);
+
+    // Delete Cloudinary image in background — non-critical after DB delete
+    const publicId = category.image?.publicId;
+    if (publicId) {
+      setImmediate(() =>
+        deleteCloudinaryFile(publicId).catch((e) =>
+          console.error("[Cloudinary] Delete failed:", e.message),
+        ),
+      );
+    }
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Category deleted successfully",
+      { slug },
+    );
+  });
+
+  // ACTIVATE
+  activateCategory = asynchandeler(async (req, res) => {
+    const { slug } = req.params;
+
+    const category = await Category.findOneAndUpdate(
+      { slug, isActive: false },
+      { isActive: true },
+      { new: true },
+    );
+    if (!category) {
+      throw new customError(
+        "Category not found or already active",
+        statusCodes.NOT_FOUND,
+      );
+    }
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Category activated successfully",
+      category,
+    );
+  });
+
+  // DEACTIVATE
+  deactivateCategory = asynchandeler(async (req, res) => {
+    const { slug } = req.params;
+
+    const category = await Category.findOneAndUpdate(
+      { slug, isActive: true },
+      { isActive: false },
+      { new: true },
+    );
+    if (!category) {
+      throw new customError(
+        "Category not found or already inactive",
+        statusCodes.NOT_FOUND,
+      );
+    }
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Category deactivated successfully",
+      category,
+    );
+  });
+
+  // ACTIVE LIST
+  getActiveCategories = asynchandeler(async (req, res) => {
+    const cacheKey = await buildCacheKey(NS, "active");
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Active categories fetched successfully",
+        { categories: cached, fromCache: true },
+      );
+    }
+
+    const categories = await Category.find({ isActive: true })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!categories.length) {
+      throw new customError(
+        "No active categories found",
+        statusCodes.NOT_FOUND,
+      );
+    }
+
+    await setCache(cacheKey, categories, CACHE_TTL);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Active categories fetched successfully",
+      { categories },
+    );
+  });
+
+  // INACTIVE LIST
+  getInactiveCategories = asynchandeler(async (req, res) => {
+    const cacheKey = await buildCacheKey(NS, "inactive");
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Inactive categories fetched successfully",
+        { categories: cached, fromCache: true },
+      );
+    }
+
+    const categories = await Category.find({ isActive: false })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!categories.length) {
+      throw new customError(
+        "No inactive categories found",
+        statusCodes.NOT_FOUND,
+      );
+    }
+
+    await setCache(cacheKey, categories, CACHE_TTL);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Inactive categories fetched successfully",
+      { categories },
+    );
+  });
+
+  // SEARCH
+  getCategoriesWithSearch = asynchandeler(async (req, res) => {
+    const search = String(req.query.search || "").trim();
+
+    if (!search) {
+      throw new customError(
+        "Search query is required",
+        statusCodes.BAD_REQUEST,
+      );
+    }
+
+    const cacheKey = await buildCacheKey(NS, `search:${search.toLowerCase()}`);
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Categories fetched successfully",
+        { categories: cached, fromCache: true },
+      );
+    }
+
+    const safeSearch = escapeRegex(search);
+
+    const categories = await Category.find({
+      name: { $regex: safeSearch, $options: "i" },
+      isActive: true,
     })
-    .populate("subcategories discount");
+      .sort({ createdAt: -1 })
+      .lean();
 
-  if (!categories || categories.length === 0) {
-    throw new customError("Categories not found", statusCodes.NOT_FOUND);
-  }
-  const total = await Category.countDocuments();
-  const totalPages = Math.ceil(total / limit);
-  // send success response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Categories fetched successfully",
-    {
-      categories,
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  );
-});
+    if (!categories.length) {
+      throw new customError("No categories found", statusCodes.NOT_FOUND);
+    }
+
+    await setCache(cacheKey, categories, CACHE_TTL_SEARCH);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Categories fetched successfully",
+      { categories },
+    );
+  });
+
+  // SORT
+  getCategoriesWithSort = asynchandeler(async (req, res) => {
+    const sortObj = parseSortParam(req.query.sort);
+    const cacheKey = await buildCacheKey(NS, `sort:${JSON.stringify(sortObj)}`);
+
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Categories fetched successfully",
+        { categories: cached, fromCache: true },
+      );
+    }
+
+    const categories = await Category.find({ isActive: true })
+      .sort(sortObj)
+      .lean();
+
+    if (!categories.length) {
+      throw new customError("No categories found", statusCodes.NOT_FOUND);
+    }
+
+    await setCache(cacheKey, categories, CACHE_TTL);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Categories fetched successfully",
+      { categories },
+    );
+  });
+
+  // PAGINATION
+  getCategoryPagination = asynchandeler(async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(req.query.limit, 10) || 10),
+    );
+    const skip = (page - 1) * limit;
+
+    const cacheKey = await buildCacheKey(NS, `page:${page}:limit:${limit}`);
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Categories fetched successfully",
+        { ...cached, fromCache: true },
+      );
+    }
+
+    const [categories, total] = await Promise.all([
+      Category.find()
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .populate("subcategories discount")
+        .lean(),
+      Category.countDocuments(),
+    ]);
+
+    if (!categories.length) {
+      throw new customError("No categories found", statusCodes.NOT_FOUND);
+    }
+
+    const totalPages = Math.ceil(total / limit);
+    const payload = { categories, page, limit, total, totalPages };
+
+    await setCache(cacheKey, payload, CACHE_TTL);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Categories fetched successfully",
+      payload,
+    );
+  });
+}
+
+module.exports = new CategoryController();
