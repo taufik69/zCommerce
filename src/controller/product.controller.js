@@ -1,6 +1,5 @@
 const crypto = require("crypto");
 const Product = require("../models/product.model");
-const Review = require("../models/review.model");
 const Variant = require("../models/variant.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
@@ -9,7 +8,7 @@ const { deleteCloudinaryFile } = require("../helpers/cloudinary");
 const {
   validateProduct,
   validateProductUpdate,
-  validateProductImageUpload,
+  validateProductGalleryUpload,
   MAX_GALLERY_IMAGES,
 } = require("../validation/product.validation");
 const { statusCodes } = require("../constant/constant");
@@ -117,7 +116,9 @@ class ProductController {
     // Uniqueness checks (parallel)
     const [skuTaken, barCodeTaken] = await Promise.all([
       productData.sku ? Product.exists({ sku: productData.sku }) : null,
-      productData.barCode ? Product.exists({ barCode: productData.barCode }) : null,
+      productData.barCode
+        ? Product.exists({ barCode: productData.barCode })
+        : null,
     ]);
 
     if (skuTaken) {
@@ -229,7 +230,10 @@ class ProductController {
     const products = await Product.find(query)
       .populate("category brand discount")
       .populate({ path: "subcategory", populate: "discount" })
-      .populate({ path: "variant", select: "variantName retailPrice stockVariant size color image" })
+      .populate({
+        path: "variant",
+        select: "variantName retailPrice stockVariant size color image",
+      })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -379,54 +383,64 @@ class ProductController {
   // ─── ADD a single gallery image ────────────────────────────────────────────
   addProductImage = asynchandeler(async (req, res) => {
     const { slug } = req.params;
-    const file = validateProductImageUpload(req);
+    const images = validateProductGalleryUpload(req);
 
     const product = await Product.findOne({ slug });
     if (!product) {
       throw new customError("Product not found", statusCodes.NOT_FOUND);
     }
 
-    if (product.image.length >= MAX_GALLERY_IMAGES) {
+    const currentCount = product.image.length;
+    if (currentCount + images.length > MAX_GALLERY_IMAGES) {
       throw new customError(
-        `Gallery already has ${MAX_GALLERY_IMAGES} images (max)`,
+        `Adding ${images.length} images would exceed gallery limit (${MAX_GALLERY_IMAGES}). Current: ${currentCount}`,
         statusCodes.BAD_REQUEST,
       );
     }
 
-    const nextIndex = product.image.length;
-    product.image.push({
+    // Add images to DB (pending status)
+    const newImages = images.map((file) => ({
       status: "pending",
       localPath: file.path,
       tries: 0,
-    });
-
+    }));
+    product.image.push(...newImages);
     await product.save();
 
-    await imageQueue.add("add-product-image", {
-      modelName: NS,
-      documentId: product._id,
-      localPath: file.path,
-      fieldName: "image",
-      index: nextIndex,
-    });
+    // Enqueue background uploads
+    const jobs = images.map((file, i) => ({
+      name: "add-product-image",
+      data: {
+        modelName: NS,
+        documentId: product._id,
+        localPath: file.path,
+        fieldName: "image",
+        index: currentCount + i,
+      },
+    }));
 
+    await imageQueue.addBulk(jobs);
     await bumpNsVersion(NS);
 
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
-      "Image upload started in background",
-      { slug, index: nextIndex },
+      `${images.length} image(s) upload started in background`,
+      { slug, count: images.length },
     );
   });
 
   // ─── DELETE a single gallery image (or thumbnail) ──────────────────────────
   deleteProductImage = asynchandeler(async (req, res) => {
     const { slug } = req.params;
-    const { imageUrl } = req.body;
+    let { publicId } = req.body;
 
-    if (!imageUrl) {
-      throw new customError("imageUrl is required", statusCodes.BAD_REQUEST);
+    if (!publicId) {
+      throw new customError("publicId is required", statusCodes.BAD_REQUEST);
+    }
+
+    if (!Array.isArray(publicId)) {
+      publicId = [publicId];
     }
 
     const product = await Product.findOne({ slug });
@@ -436,45 +450,56 @@ class ProductController {
 
     const toDelete = [];
 
-    // Match thumbnail
-    if (product.thumbnail?.url === imageUrl) {
-      if (product.thumbnail.publicId) toDelete.push(product.thumbnail.publicId);
-      product.thumbnail = { status: "pending" };
-    } else {
-      // Match in gallery
-      const beforeLen = product.image.length;
-      product.image = product.image.filter((img) => {
-        if (img.url === imageUrl) {
-          if (img.publicId) toDelete.push(img.publicId);
-          return false;
-        }
-        return true;
-      });
+    // 1. Check thumbnail
+    if (publicId.includes(product.thumbnail?.publicId)) {
+      toDelete.push(product.thumbnail.publicId);
+      product.thumbnail = { status: "pending" }; // Reset to pending/empty
+    }
 
-      if (product.image.length === beforeLen) {
-        throw new customError(
-          "Image not found in this product",
-          statusCodes.NOT_FOUND,
-        );
+    // 2. Check gallery (image array)
+    const initialLen = product.image.length;
+    product.image = product.image.filter((img) => {
+      if (publicId.includes(img.publicId)) {
+        toDelete.push(img.publicId);
+        return false;
       }
+      return true;
+    });
+
+    if (toDelete.length === 0) {
+      throw new customError(
+        "No matching images found with provided publicIds",
+        statusCodes.NOT_FOUND,
+      );
     }
 
     await product.save();
     await bumpNsVersion(NS);
-    fireAndForgetCloudinaryDelete(toDelete);
+
+    // Enqueue background deletions
+    const jobs = toDelete.map((pid) => ({
+      name: "delete-cloudinary-image",
+      data: { publicId: pid },
+    }));
+
+    await imageQueue.addBulk(jobs);
 
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
-      "Image deleted successfully",
-      { slug, removed: toDelete.length },
+      `${toDelete.length} image(s) removal started in background`,
+      { slug, deletedCount: toDelete.length },
     );
   });
+
 
   // ─── PAGINATION ────────────────────────────────────────────────────────────
   getProductsWithPagination = asynchandeler(async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(req.query.limit, 10) || 10),
+    );
     const skip = (page - 1) * limit;
 
     const cacheKey = await buildCacheKey(NS, `page:${page}:limit:${limit}`);
@@ -539,71 +564,6 @@ class ProductController {
       statusCodes.OK,
       "Product deleted successfully",
       { slug },
-    );
-  });
-
-  // ─── REVIEWS ───────────────────────────────────────────────────────────────
-  getProductReviewBySlug = asynchandeler(async (req, res) => {
-    const { slug } = req.params;
-    const product = await Product.findOne({ slug }).select("_id").lean();
-    if (!product) {
-      throw new customError("Product not found", statusCodes.NOT_FOUND);
-    }
-
-    const reviews = await Review.find({ product: product._id })
-      .populate("reviewer", "name email image phone")
-      .lean();
-
-    return apiResponse.sendSuccess(
-      res,
-      statusCodes.OK,
-      "Reviews fetched successfully",
-      { reviews },
-    );
-  });
-
-  updateProductReviewBySlug = asynchandeler(async (req, res) => {
-    const { slug } = req.params;
-    const product = await Product.findOne({ slug }).select("_id").lean();
-    if (!product) {
-      throw new customError("Product not found", statusCodes.NOT_FOUND);
-    }
-
-    const review = await Review.create({
-      product: product._id,
-      reviewer: req.user._id,
-      rating: req.body.rating,
-      comment: req.body.comment,
-    });
-
-    await bumpNsVersion(NS);
-
-    return apiResponse.sendSuccess(
-      res,
-      statusCodes.OK,
-      "Product review added successfully",
-      review,
-    );
-  });
-
-  removeProductReviewBySlug = asynchandeler(async (req, res) => {
-    const { id } = req.body;
-    if (!id) {
-      throw new customError("Review id is required", statusCodes.BAD_REQUEST);
-    }
-
-    const review = await Review.findByIdAndDelete(id);
-    if (!review) {
-      throw new customError("Review not found", statusCodes.NOT_FOUND);
-    }
-
-    await bumpNsVersion(NS);
-
-    return apiResponse.sendSuccess(
-      res,
-      statusCodes.OK,
-      "Product review removed successfully",
-      null,
     );
   });
 
@@ -767,10 +727,7 @@ class ProductController {
       .lean();
 
     if (!products.length) {
-      throw new customError(
-        "No related products found",
-        statusCodes.NOT_FOUND,
-      );
+      throw new customError("No related products found", statusCodes.NOT_FOUND);
     }
 
     return apiResponse.sendSuccess(
@@ -886,17 +843,19 @@ class ProductController {
   getNameWiseSearch = asynchandeler(async (req, res) => {
     const name = String(req.query.name || "").trim();
     const barCode = String(req.query.barCode || "").trim();
+    const sku = String(req.query.sku || "").trim();
+    const slug = String(req.query.slug || "").trim();
 
-    if (!name && !barCode) {
+    if (!name && !barCode && !sku && !slug) {
       throw new customError(
-        "name or barCode query is required",
+        "name, barCode, sku or slug query is required",
         statusCodes.BAD_REQUEST,
       );
     }
 
     const cacheKey = await buildCacheKey(
       NS,
-      `search:${name.toLowerCase()}:${barCode.toLowerCase()}`,
+      `search:${name}:${barCode}:${sku}:${slug}`,
     );
     const cached = await getCache(cacheKey);
     if (cached) {
@@ -913,12 +872,23 @@ class ProductController {
       const safe = escapeRegex(name);
       matchConditions.push(
         { name: { $regex: safe, $options: "i" } },
+        { slug: { $regex: safe, $options: "i" } },
+        { sku: { $regex: safe, $options: "i" } },
+        { barCode: { $regex: safe, $options: "i" } },
         { "variant.variantName": { $regex: safe, $options: "i" } },
       );
     }
     if (barCode) {
       const safe = escapeRegex(barCode);
       matchConditions.push({ barCode: { $regex: safe, $options: "i" } });
+    }
+    if (sku) {
+      const safe = escapeRegex(sku);
+      matchConditions.push({ sku: { $regex: safe, $options: "i" } });
+    }
+    if (slug) {
+      const safe = escapeRegex(slug);
+      matchConditions.push({ slug: { $regex: safe, $options: "i" } });
     }
 
     const products = await Product.aggregate([

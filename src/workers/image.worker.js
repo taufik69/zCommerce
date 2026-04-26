@@ -37,6 +37,13 @@ function startImageWorker() {
   const worker = new Worker(
     IMAGE_QUEUE_NAME,
     async (job) => {
+      if (job.name === "delete-cloudinary-image") {
+        const { publicId } = job.data;
+        console.log(`[Worker] Deleting image from Cloudinary: ${publicId}`);
+        await deleteCloudinaryFile(publicId);
+        return { publicId, deleted: true };
+      }
+
       const {
         modelName,
         documentId,

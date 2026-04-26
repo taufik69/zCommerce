@@ -222,20 +222,29 @@ const validateProductUpdate = async (req) => {
 };
 
 /**
- * Validate single image upload (for addProductImage endpoint).
+ * Validate multiple image uploads (for addProductImage endpoint).
  */
-const validateProductImageUpload = (req) => {
-  const file = req.files?.image?.[0];
-  if (!file) {
-    throw new customError("Image file is required", statusCodes.BAD_REQUEST);
+const validateProductGalleryUpload = (req) => {
+  const images = req.files?.image || [];
+  if (images.length === 0) {
+    throw new customError("At least one image file is required", statusCodes.BAD_REQUEST);
   }
-  validateImageFile(file, "Image");
-  return file;
+
+  images.forEach((img, idx) => validateImageFile(img, `Image ${idx + 1}`));
+
+  if (images.length > MAX_GALLERY_IMAGES) {
+    throw new customError(
+      `You can upload a maximum of ${MAX_GALLERY_IMAGES} gallery images at once`,
+      statusCodes.BAD_REQUEST,
+    );
+  }
+
+  return images;
 };
 
 module.exports = {
   validateProduct,
   validateProductUpdate,
-  validateProductImageUpload,
+  validateProductGalleryUpload,
   MAX_GALLERY_IMAGES,
 };
