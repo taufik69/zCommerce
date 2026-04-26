@@ -65,6 +65,16 @@ const VariantSchema = Joi.object({
     "number.base": "Alert quantity must be a number",
     "number.min": "Alert quantity cannot be less than 0",
   }),
+  sku: Joi.string().trim().optional(),
+  barCode: Joi.string().trim().optional(),
+  qrCode: Joi.string().trim().optional(),
+  weight: Joi.number().min(0).optional(),
+  dimensions: Joi.object({
+    width: Joi.number().min(0).optional(),
+    height: Joi.number().min(0).optional(),
+    depth: Joi.number().min(0).optional(),
+  }).optional(),
+  seo: Joi.object().optional(),
 }).options({ abortEarly: false, allowUnknown: true });
 
 const validateVariant = async (variantObj) => {
