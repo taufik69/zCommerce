@@ -1,11 +1,14 @@
 const express = require("express");
 const _ = express.Router();
 const cartController = require("../../controller/cart.controller");
+const { guestOrAuth } = require("../../middleware/guestOrAuth");
+const { authGuard } = require("../../middleware/authMiddleware");
 
-_.route("/addtocart").post(cartController.addToCart);
-_.route("/decreasecart/:cartId").post(cartController.decreaseCartQuantity);
-_.route("/delete-cart/:cartId").delete(cartController.deleteCart);
-_.route("/allcarts").get(cartController.getAllCart);
-_.route("/usercartlist/:id").get(cartController.getCartByUserId);
+_.route("/").get(guestOrAuth, cartController.getCartController);
+_.route("/add").post(guestOrAuth, cartController.addToCartController);
+_.route("/update/:itemId").patch(guestOrAuth, cartController.updateQuantityController);
+_.route("/remove/:itemId").delete(guestOrAuth, cartController.removeFromCartController);
+_.route("/clear").delete(guestOrAuth, cartController.clearCartController);
+_.route("/merge").post(authGuard, cartController.mergeCartController);
 
 module.exports = _;
