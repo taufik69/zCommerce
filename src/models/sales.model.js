@@ -24,8 +24,9 @@ const searchItemSchema = new mongoose.Schema(
 
     salesStatus: {
       type: String,
-      enum: ["sale", "return"],
+      enum: ["sale", "return" , "exchange"],
       default: "sale",
+      
     },
 
     barcode: { type: String, trim: true },

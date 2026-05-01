@@ -8,8 +8,10 @@ const productModel = require("../models/product.model");
 const variantModel = require("../models/variant.model");
 const { sendSMS } = require("../helpers/sms");
 const { sendEmail } = require("../helpers/nodemailer");
-const { customerModel } = require("../models/customer.model");
-const _ = require("../routes/api/sales.api");
+const {
+  customerModel,
+  customerAdvancePaymentModel,
+} = require("../models/customer.model");
 
 // @desc create a new sales
 // @desc create a new sales (transaction safe + background notifications)
@@ -93,6 +95,45 @@ exports.createSales = asynchandeler(async (req, res) => {
             statusCodes.SERVER_ERROR,
           );
         }
+      }
+
+      // 3) Update customer opening dues if listed
+      if (
+        createdSale.customerType?.type === "listed" &&
+        createdSale.customerType?.customerId
+      ) {
+        await customerModel.findByIdAndUpdate(
+          createdSale.customerType.customerId,
+          { openingDues: req.body.balance || 0 },
+          { session },
+        );
+      }
+
+      // 4) Adjust customer advance payment if applicable
+      const advanceAdjust = Number(req.body.customerAdvancePaymentAdjust || 0);
+      if (advanceAdjust > 0 && createdSale.customerType?.customerId) {
+        const advanceDoc = await customerAdvancePaymentModel
+          .findOne({ customer: createdSale.customerType.customerId })
+          .session(session);
+
+        if (!advanceDoc || advanceDoc.balance < advanceAdjust) {
+          throw new customError(
+            `Insufficient advance balance. Available: ${advanceDoc?.balance || 0}`,
+            statusCodes.BAD_REQUEST,
+          );
+        }
+
+        // Reduce paidAmount and update balance
+        advanceDoc.paidAmount -= advanceAdjust;
+        advanceDoc.balance -= advanceAdjust;
+
+        // Reset rule: if balance becomes 0, reset paidAmount and advanceCashBack
+        if (advanceDoc.balance === 0) {
+          advanceDoc.paidAmount = 0;
+          advanceDoc.advanceCashBack = 0;
+        }
+
+        await advanceDoc.save({ session });
       }
     });
 
@@ -556,6 +597,18 @@ exports.updateSales = asynchandeler(async (req, res) => {
       if (!updatedSale) {
         throw new customError("Sales update failed", statusCodes.SERVER_ERROR);
       }
+
+      // 7) Update customer opening dues if listed
+      if (
+        updatedSale.customerType?.type === "listed" &&
+        updatedSale.customerType?.customerId
+      ) {
+        await customerModel.findByIdAndUpdate(
+          updatedSale.customerType.customerId,
+          { openingDues: updatedSale.balance || 0 },
+          { session },
+        );
+      }
     });
 
     session.endSession();
@@ -687,6 +740,33 @@ exports.deleteSales = asynchandeler(async (req, res) => {
 
       // 5️ Delete sale
       await salesModel.findByIdAndDelete(saleId, { session });
+
+      // 6️ Revert customer opening dues if listed
+      if (
+        sale.customerType?.type === "listed" &&
+        sale.customerType?.customerId
+      ) {
+        await customerModel.findByIdAndUpdate(
+          sale.customerType.customerId,
+          { openingDues: sale.previousDue || 0 },
+          { session },
+        );
+      }
+
+      // 7️ Restore customer advance payment if applicable
+      const advanceAdjust = Number(sale.customerAdvancePaymentAdjust || 0);
+      if (advanceAdjust > 0 && sale.customerType?.customerId) {
+        await customerAdvancePaymentModel.findOneAndUpdate(
+          { customer: sale.customerType.customerId },
+          {
+            $inc: {
+              paidAmount: advanceAdjust,
+              balance: advanceAdjust,
+            },
+          },
+          { session, upsert: true },
+        );
+      }
     });
 
     session.endSession();
