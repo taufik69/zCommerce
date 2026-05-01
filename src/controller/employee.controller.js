@@ -24,6 +24,20 @@ const {
   employeeDepartmentDTO,
 } = require("../dtos/all.dto");
 const { statusCodes } = require("../constant/constant");
+const {
+  getCache,
+  setCache,
+  bumpNsVersion,
+  buildCacheKey,
+} = require("../utils/cache.util");
+
+// ─── cache constants ──────────────────────────────────────────────────────────
+const NS_EMPLOYEE = "employee";
+const NS_DESIGNATION = "designation";
+const NS_DEPARTMENT = "department";
+const NS_SECTION = "section";
+const NS_ADVANCE = "employeeAdvance";
+const CACHE_TTL = 60 * 60; // 1 hour
 
 //  CREATE EMPLOYEE
 exports.createEmployee = asynchandeler(async (req, res, next) => {
@@ -39,6 +53,9 @@ exports.createEmployee = asynchandeler(async (req, res, next) => {
     "Employee created successfully",
     newEmployee,
   );
+
+  // Invalidate employee cache
+  await bumpNsVersion(NS_EMPLOYEE);
 
   // Background Async Task
   (async () => {
@@ -62,18 +79,57 @@ exports.createEmployee = asynchandeler(async (req, res, next) => {
 // get all employee or single employee by id
 exports.getEmployeeList = asynchandeler(async (req, res) => {
   if (req.query.id) {
-    const employee = await employeeModel.findOne({ employeeId: req.query.id });
+    const cacheKey = await buildCacheKey(NS_EMPLOYEE, `id:${req.query.id}`);
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Employee fetch successfully",
+        { ...cached, fromCache: true },
+      );
+    }
+
+    const employee = await employeeModel
+      .findOne({ employeeId: req.query.id })
+      .populate("designation")
+      .populate("deapartment")
+      .populate("section");
+
     if (!employee) {
       apiResponse.sendError(res, statusCodes.NOT_FOUND, "Employee not found");
+      return;
     }
-    apiResponse.sendSuccess(
+
+    await setCache(cacheKey, employee, CACHE_TTL);
+
+    return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
       "Employee fetch successfully",
       employee,
     );
   }
-  const employeeList = await employeeModel.find().sort({ createdAt: -1 });
+
+  const cacheKey = await buildCacheKey(NS_EMPLOYEE, "all");
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(res, 200, "Employee list fetch successfully", {
+      count: cached.length,
+      employees: cached,
+      fromCache: true,
+    });
+  }
+
+  const employeeList = await employeeModel
+    .find()
+    .populate("designation")
+    .populate("deapartment")
+    .populate("section")
+    .sort({ createdAt: -1 });
+
+  await setCache(cacheKey, employeeList, CACHE_TTL);
+
   apiResponse.sendSuccess(res, 200, "Employee list fetch successfully", {
     count: employeeList.length,
     employees: employeeList,
@@ -122,6 +178,9 @@ exports.updateEmployee = asynchandeler(async (req, res, next) => {
     "Employee updated successfully",
     updatedEmployee,
   );
+
+  // Invalidate employee cache
+  await bumpNsVersion(NS_EMPLOYEE);
 
   // 5) Background image flow (safe order)
   if (image) {
@@ -190,6 +249,9 @@ exports.deleteEmployeeHard = asynchandeler(async (req, res) => {
       employeeId: employee.employeeId,
     },
   );
+
+  // Invalidate employee cache
+  await bumpNsVersion(NS_EMPLOYEE);
 });
 
 // soft delete employee
@@ -217,6 +279,9 @@ exports.deleteEmployeeSoft = asynchandeler(async (req, res) => {
       employeeId: employee.employeeId,
     },
   );
+
+  // Invalidate employee cache
+  await bumpNsVersion(NS_EMPLOYEE);
 });
 
 //restor employee
@@ -316,6 +381,10 @@ exports.createEmployeeAdvancePayment = asynchandeler(async (req, res) => {
 
     session.endSession();
 
+    // Invalidate caches
+    await bumpNsVersion(NS_ADVANCE);
+    await bumpNsVersion(NS_EMPLOYEE);
+
     return apiResponse.sendSuccess(
       res,
       statusCodes.CREATED,
@@ -380,6 +449,10 @@ exports.updateEmployeeAdvancePayment = asynchandeler(async (req, res) => {
     "Advance Payment updated successfully",
     employeeAdvancePaymentDTO(advancePayment),
   );
+
+  // Invalidate caches
+  await bumpNsVersion(NS_ADVANCE);
+  await bumpNsVersion(NS_EMPLOYEE);
 });
 
 // delete advance payment
@@ -427,6 +500,10 @@ exports.createEmployeeDesignation = asynchandeler(async (req, res) => {
     "Designation created successfully",
     employeeDesignationDTO(employeeDesignation),
   );
+
+  // Invalidate caches
+  await bumpNsVersion(NS_DESIGNATION);
+  await bumpNsVersion(NS_EMPLOYEE); // Employee list populates designation
 });
 
 //  get all employee designation or get designnation using slug by req.query
@@ -477,6 +554,10 @@ exports.updateEmployeeDesignation = asynchandeler(async (req, res) => {
     "Designation updated successfully",
     employeeDesignationDTO(designation),
   );
+
+  // Invalidate caches
+  await bumpNsVersion(NS_DESIGNATION);
+  await bumpNsVersion(NS_EMPLOYEE);
 });
 
 // delete designation using slug
@@ -522,6 +603,10 @@ exports.createEmployeeDepartment = asynchandeler(async (req, res) => {
     "Department created successfully",
     employeeDepartmentDTO(employeeDepartment),
   );
+
+  // Invalidate caches
+  await bumpNsVersion(NS_DEPARTMENT);
+  await bumpNsVersion(NS_EMPLOYEE);
 });
 
 // get all deapartment or get department using slug by req.query
@@ -569,6 +654,10 @@ exports.updateEmployeeDepartment = asynchandeler(async (req, res) => {
     "Department updated successfully",
     employeeDepartmentDTO(department),
   );
+
+  // Invalidate caches
+  await bumpNsVersion(NS_DEPARTMENT);
+  await bumpNsVersion(NS_EMPLOYEE);
 });
 
 // delete deparment using slug
@@ -611,6 +700,10 @@ exports.createEmployeeSection = asynchandeler(async (req, res) => {
     "Section created successfully",
     employeeDepartmentDTO(employeeSection),
   );
+
+  // Invalidate caches
+  await bumpNsVersion(NS_SECTION);
+  await bumpNsVersion(NS_EMPLOYEE);
 });
 
 // get all section list or get section using slug by req.query
@@ -659,6 +752,10 @@ exports.updateEmployeeSection = asynchandeler(async (req, res) => {
     "Section updated successfully",
     employeeDepartmentDTO(section),
   );
+
+  // Invalidate caches
+  await bumpNsVersion(NS_SECTION);
+  await bumpNsVersion(NS_EMPLOYEE);
 });
 
 // delete section using slug
