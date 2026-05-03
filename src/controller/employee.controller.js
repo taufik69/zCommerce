@@ -732,7 +732,7 @@ exports.getEmployeeSection = asynchandeler(async (req, res) => {
   );
 });
 
-// update section using slug
+// update section using slug  and add caching
 exports.updateEmployeeSection = asynchandeler(async (req, res) => {
   const section = await sectionModel.findOneAndUpdate(
     { slug: req.params.slug },
