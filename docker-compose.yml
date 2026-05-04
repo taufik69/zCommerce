@@ -1,0 +1,151 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: zcommerce-mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-admin123}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-jahir}
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+      - mongo_backup:/backup
+    ports:
+      - "27017:27017"
+    networks:
+      - zcommerce-net
+    healthcheck:
+      test:
+        ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: zcommerce-redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - zcommerce-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zcommerce-backend
+    restart: always
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD:-admin123}@mongo:27017/${MONGO_DB:-jahir}?authSource=admin
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - public_uploads:/app/public/temp
+    networks:
+      - zcommerce-net
+
+  image-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zcommerce-image-worker
+    restart: always
+    command: ["node", "src/workers/image.worker.js"]
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD:-admin123}@mongo:27017/${MONGO_DB:-jahir}?authSource=admin
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - public_uploads:/app/public/temp
+    networks:
+      - zcommerce-net
+
+  mongo-backup:
+    image: mongo:7
+    container_name: zcommerce-mongo-backup
+    restart: always
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      MONGO_USERNAME: ${MONGO_USERNAME:-admin}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:-admin123}
+      MONGO_DB: ${MONGO_DB:-jahir}
+      BACKUP_CRON: ${BACKUP_CRON:-0 2 * * *}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - mongo_backup:/backup
+    networks:
+      - zcommerce-net
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        apt-get update -qq && apt-get install -y -qq cron >/dev/null
+        echo "$$BACKUP_CRON root /usr/local/bin/run-backup.sh >> /backup/backup.log 2>&1" > /etc/cron.d/mongo-backup
+        chmod 0644 /etc/cron.d/mongo-backup
+        crontab /etc/cron.d/mongo-backup
+        cat > /usr/local/bin/run-backup.sh <<'SH'
+        #!/bin/bash
+        set -e
+        TS=$$(date +%Y%m%d_%H%M%S)
+        OUT=/backup/dump_$${TS}
+        echo "[$$(date)] starting mongodump -> $${OUT}"
+        mongodump --host mongo:27017 \
+          --username "$$MONGO_USERNAME" \
+          --password "$$MONGO_PASSWORD" \
+          --authenticationDatabase admin \
+          --db "$$MONGO_DB" \
+          --gzip \
+          --out "$${OUT}"
+        tar -czf "$${OUT}.tar.gz" -C /backup "dump_$${TS}" && rm -rf "$${OUT}"
+        echo "[$$(date)] backup done: $${OUT}.tar.gz"
+        find /backup -name 'dump_*.tar.gz' -mtime +$${BACKUP_RETENTION_DAYS} -delete
+        SH
+        chmod +x /usr/local/bin/run-backup.sh
+        touch /backup/backup.log
+        echo "[boot] backup schedule: $$BACKUP_CRON (retention: $$BACKUP_RETENTION_DAYS days)"
+        cron -f
+
+volumes:
+  mongo_data:
+    driver: local
+  mongo_config:
+    driver: local
+  mongo_backup:
+    driver: local
+  redis_data:
+    driver: local
+  public_uploads:
+    driver: local
+
+networks:
+  zcommerce-net:
+    driver: bridge
