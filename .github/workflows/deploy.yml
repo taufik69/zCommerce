@@ -1,0 +1,30 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p ~/zcommerce
+            cd ~/zcommerce
+            if [ -d ".git" ]; then
+              git pull origin main
+            else
+              git clone https://github.com/taufik69/zCommerce.git .
+            fi
+            echo "${{ secrets.ENV_FILE_CONTENT }}" > .env
+            docker-compose up -d --build
+            docker image prune -f
