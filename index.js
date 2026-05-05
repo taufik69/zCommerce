@@ -9,8 +9,8 @@ const { customError } = require("./src/lib/CustomError");
 dbConnect()
   .then(() => {
     const PORT = process.env.PORT || 3000;
-    server.listen(PORT, "0.0.0.0", () => {
-      console.log(`🚀 Server is running on http://0.0.0.0:${PORT}`);
+    server.listen(PORT, () => {
+      console.log(`🚀 Server is running on http://localhost:${PORT}`);
       console.log(`🌐 Accessible externally via VPS IP at port ${PORT}`);
     });
   })
