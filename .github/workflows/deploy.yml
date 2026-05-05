@@ -18,13 +18,16 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            mkdir -p ~/zcommerce
             cd ~/zcommerce
-            if [ -d ".git" ]; then
-              git pull origin main
-            else
-              git clone https://github.com/taufik69/zCommerce.git .
-            fi
-            echo "${{ secrets.ENV_FILE_CONTENT }}" > .env
-            docker-compose up -d --build
-            docker image prune -f
+            # pull the code from the repository
+            git pull origin main
+
+            # depencencies install
+            npm install --production
+
+            # PM2 process restart or start
+
+            pm2 restart all || (pm2 start index.js --name "zcommerce-backend" && pm2 start npm --name "zcommerce-worker" -- run worker:image)
+
+            # save the PM2 process list
+            pm2 save
