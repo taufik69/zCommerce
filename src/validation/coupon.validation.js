@@ -4,9 +4,9 @@ const { statusCodes } = require("../constant/constant");
 
 const couponSchema = joi
   .object({
-    code: joi.string().trim().required().messages({
-      "string.empty": "Code is required.",
-      "any.required": "Code is required.",
+    code: joi.string().trim().uppercase().required().messages({
+      "string.empty": "Coupon code is required.",
+      "any.required": "Coupon code is required.",
     }),
     discountType: joi
       .string()
@@ -18,38 +18,48 @@ const couponSchema = joi
         "any.required": "Discount type is required.",
         "any.only": "Discount type must be either 'percentage' or 'fixed'.",
       }),
-    discountValue: joi.number().required().messages({
-      "number.empty": "Discount value is required.",
+    discountValue: joi.number().min(0).required().messages({
+      "number.base": "Discount value must be a number.",
+      "number.min": "Discount value must be positive.",
       "any.required": "Discount value is required.",
     }),
+    minOrderAmount: joi.number().min(0).default(0).messages({
+      "number.min": "Minimum order amount must be at least 0.",
+    }),
+    maxDiscountAmount: joi.number().min(0).allow(null).messages({
+      "number.min": "Maximum discount amount must be at least 0.",
+    }),
     couponStartAt: joi.date().required().messages({
-      "date.empty": "Coupon start date is required.",
+      "date.base": "Invalid start date.",
       "any.required": "Coupon start date is required.",
     }),
-    expireAt: joi.date().required().messages({
-      "date.empty": "Expire at date is required.",
-      "any.required": "Expire at date is required.",
+    expireAt: joi
+      .date()
+      .greater(joi.ref("couponStartAt"))
+      .required()
+      .messages({
+        "date.base": "Invalid expiry date.",
+        "date.greater": "Expiry date must be after start date.",
+        "any.required": "Expiry date is required.",
+      }),
+    usageLimit: joi.number().integer().min(1).allow(null).messages({
+      "number.min": "Usage limit must be at least 1.",
     }),
-    usageLimit: joi.number().integer().allow(null).messages({
-      "number.empty": "Usage limit is required.",
-      "any.required": "Usage limit is required.",
+    isActive: joi.boolean().default(true),
+    applicableProducts: joi.array().items(joi.string().trim()).messages({
+      "array.base": "Applicable products must be an array of IDs.",
     }),
-    usedCount: joi.number().integer().default(0).messages({
-      "number.empty": "Used count is required.",
-      "any.required": "Used count is required.",
+    applicableCategories: joi.array().items(joi.string().trim()).messages({
+      "array.base": "Applicable categories must be an array of IDs.",
     }),
-
-    products: joi.array().items(joi.string().trim()).messages({
-      "array.empty": "Products is required.",
-      "any.required": "Products is required.",
+    applicableSubCategories: joi.array().items(joi.string().trim()).messages({
+      "array.base": "Applicable sub-categories must be an array of IDs.",
     }),
-    categories: joi.array().items(joi.string().trim()).messages({
-      "array.empty": "Categories is required.",
-      "any.required": "Categories is required.",
+    applicableBrands: joi.array().items(joi.string().trim()).messages({
+      "array.base": "Applicable brands must be an array of IDs.",
     }),
-    subcategories: joi.array().items(joi.string().trim()).messages({
-      "array.empty": "Subcategories is required.",
-      "any.required": "Subcategories is required.",
+    applicableVariants: joi.array().items(joi.string().trim()).messages({
+      "array.base": "Applicable variants must be an array of IDs.",
     }),
   })
   .options({ abortEarly: false, allowUnknown: true });

@@ -28,37 +28,89 @@ const applyDeliveryCharge = async (deliveryChargeID) => {
 
 // testing command
 // Coupon utility
-const applyCouponDiscount = async (code, subtotal) => {
+// Coupon utility
+const applyCouponDiscount = async (code, subtotal, items = []) => {
   if (!code)
     return { discountedAmount: subtotal, discountAmount: 0, coupon: null };
 
-  const coupon = await Coupon.findOne({ code, isActive: true });
+  const coupon = await Coupon.findOne({
+    code: code.toUpperCase(),
+    isActive: true,
+  });
   if (!coupon)
-    throw new customError("Invalid or expired coupon", statusCodes.BAD_REQUEST);
+    throw new customError("Invalid coupon code", statusCodes.BAD_REQUEST);
 
   const now = new Date();
-  if (coupon.expiry && now > coupon.expiry)
+  if (now < coupon.couponStartAt) {
+    throw new customError(
+      "This coupon is not active yet",
+      statusCodes.BAD_REQUEST,
+    );
+  }
+  if (now > coupon.expireAt) {
     throw new customError("Coupon expired", statusCodes.BAD_REQUEST);
+  }
 
-  if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit)
+  if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) {
     throw new customError(
       "Coupon usage limit exceeded",
       statusCodes.BAD_REQUEST,
     );
+  }
+
+  if (subtotal < coupon.minOrderAmount) {
+    throw new customError(
+      `Minimum order amount for this coupon is ${coupon.minOrderAmount}`,
+      statusCodes.BAD_REQUEST,
+    );
+  }
+
+  // Check scope constraints
+  const hasRestrictedScope =
+    (coupon.applicableProducts?.length > 0) ||
+    (coupon.applicableCategories?.length > 0) ||
+    (coupon.applicableSubCategories?.length > 0) ||
+    (coupon.applicableBrands?.length > 0) ||
+    (coupon.applicableVariants?.length > 0);
+
+  if (hasRestrictedScope && items.length > 0) {
+    const isApplicable = items.some((item) => {
+      const productId = item.product?._id?.toString() || item.product?.toString();
+      const variantId = item.variant?._id?.toString() || item.variant?.toString();
+      const categoryId = item.product?.category?._id?.toString() || item.product?.category?.toString();
+      const subCategoryId = item.product?.subcategory?._id?.toString() || item.product?.subcategory?.toString();
+      const brandId = item.product?.brand?._id?.toString() || item.product?.brand?.toString();
+
+      return (
+        (coupon.applicableProducts?.map(id => id.toString()).includes(productId)) ||
+        (coupon.applicableCategories?.map(id => id.toString()).includes(categoryId)) ||
+        (coupon.applicableSubCategories?.map(id => id.toString()).includes(subCategoryId)) ||
+        (coupon.applicableBrands?.map(id => id.toString()).includes(brandId)) ||
+        (coupon.applicableVariants?.map(id => id.toString()).includes(variantId))
+      );
+    });
+
+    if (!isApplicable) {
+      throw new customError(
+        "This coupon is not applicable to any items in your cart",
+        statusCodes.BAD_REQUEST,
+      );
+    }
+  }
 
   let discountAmount = 0;
   if (coupon.discountType === "percentage") {
-    coupon.usedCount += 1;
     discountAmount = Math.round((subtotal * coupon.discountValue) / 100);
+    if (coupon.maxDiscountAmount !== null && discountAmount > coupon.maxDiscountAmount) {
+      discountAmount = coupon.maxDiscountAmount;
+    }
   } else if (coupon.discountType === "fixed") {
-    coupon.usedCount += 1;
     discountAmount = Math.round(coupon.discountValue);
   }
 
   // ensure the discounted amount is not negative
   const discountedAmount = Math.max(0, subtotal - discountAmount);
 
-  // Do NOT update coupon usage here. We will update after order is successful.
   return { discountedAmount, discountAmount, coupon };
 };
 
@@ -153,7 +205,11 @@ exports.createOrder = asynchandeler(async (req, res) => {
 
   // Step 3: Apply Coupon
   const { discountedAmount, discountAmount, coupon } =
-    await applyCouponDiscount(couponCode, totalPriceofProducts);
+    await applyCouponDiscount(
+      couponCode,
+      totalPriceofProducts,
+      totalProductInfo,
+    );
 
   // Step 4: Delivery Charge
   const deliveryChargeAmount = await applyDeliveryCharge(deliveryCharge);

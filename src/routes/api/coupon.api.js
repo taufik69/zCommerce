@@ -7,5 +7,6 @@ _.get("/serach-coupon/:slug", couponController.searchCoupon);
 _.put("/update-coupon/:slug", couponController.updateCoupon);
 _.delete("/delete-coupon/:slug", couponController.deleteCoupon);
 _.get("/getallcoupon", couponController.getAllCoupons);
+_.get("/check-validity", couponController.checkCouponValidity);
 
 module.exports = _;
