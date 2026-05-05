@@ -14,7 +14,14 @@ const {
 } = require("../helpers/cloudinary");
 const { statusCodes } = require("../constant/constant");
 const { imageQueue } = require("@/queues/image.queue");
-const { bumpNsVersion } = require("@/utils/cache.util");
+const {
+  getCache,
+  setCache,
+  bumpNsVersion,
+  buildCacheKey,
+} = require("@/utils/cache.util");
+
+const CACHE_TTL = 60 * 60; // 1 hour
 
 const NS = "user";
 // user registraion/ or add user
@@ -504,11 +511,27 @@ exports.addUser = asynchandeler(async (req, res) => {
 
 // get user added by admin
 exports.getUserAddedByAdmin = asynchandeler(async (req, res) => {
+  const cacheKey = await buildCacheKey(NS, "added-by-admin");
+  const cached = await getCache(cacheKey);
+
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Users fetched successfully (from cache)",
+      cached,
+    );
+  }
+
   const users = await User.find({ "roles.0": { $exists: true } })
     .select(
       "-__v -password -refreshToken -createdAt -twoFactorEnabled -newsLetterSubscribe",
     )
     .populate("roles");
+
+  if (users.length > 0) {
+    await setCache(cacheKey, users, CACHE_TTL);
+  }
 
   apiResponse.sendSuccess(
     res,
