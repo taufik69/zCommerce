@@ -25,35 +25,23 @@ const bannerSchema = joi.object(
 exports.validateBanner = async (req, res, next) => {
   try {
     const value = await bannerSchema.validateAsync(req.body, {
-      abortEarly: false, // show all validation errors
+      abortEarly: false,
       allowUnknown: true,
     });
 
     if (req.file) {
-      if (!req.file) {
-        return next(
-          new customError(
-            "Please provide a banner image",
-            statusCodes.BAD_REQUEST,
-          ),
-        );
-      }
       if (req.file.fieldname !== "image") {
-        next(
-          new customError(
-            "Please provide a valid image field name (image)",
-            statusCodes.BAD_REQUEST,
-          ),
+        throw new customError(
+          "Please provide a valid image field name (image)",
+          statusCodes.BAD_REQUEST,
         );
       }
 
-      //Validate image size (limit 10MB)
+      //Validate image size (limit 5MB)
       if (req.file.size > 5 * 1024 * 1024) {
-        return next(
-          new customError(
-            "Image size should be less than 5MB",
-            statusCodes.BAD_REQUEST,
-          ),
+        throw new customError(
+          "Image size should be less than 5MB",
+          statusCodes.BAD_REQUEST,
         );
       }
     }
@@ -63,19 +51,12 @@ exports.validateBanner = async (req, res, next) => {
     if (error.details) {
       // Joi error
       const message = error?.details?.map((err) => err.message).join(", ");
-      return next(
-        new customError(
-          "Validation error: " + message,
-          statusCodes.BAD_REQUEST,
-        ),
+      throw new customError(
+        "Validation error: " + message,
+        statusCodes.BAD_REQUEST,
       );
     }
 
-    return next(
-      new customError(
-        error.message || "Validation failed",
-        statusCodes.BAD_REQUEST,
-      ),
-    );
+    throw error;
   }
 };
