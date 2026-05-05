@@ -174,15 +174,18 @@ exports.createCustomer = asynchandeler(async (req, res) => {
   const { image: imageFile, ...rest } = req.body;
 
   // Create customer immediately with pending image status
-  const customer = await customerModel.create({
+  const customerData = {
     ...rest,
-    image: imageFile
-      ? {
-          status: "pending",
-          localPath: imageFile.path,
-        }
-      : undefined,
-  });
+  };
+
+  if (imageFile) {
+    customerData.image = {
+      status: "pending",
+      localPath: imageFile.path,
+    };
+  }
+
+  const customer = await customerModel.create(customerData);
 
   if (!customer) {
     throw new customError("Customer creation failed", statusCodes.SERVER_ERROR);
@@ -289,11 +292,7 @@ exports.updateCustomer = asynchandeler(async (req, res) => {
   const customer = await customerModel.findOne({ customerId });
 
   if (!customer) {
-    return apiResponse.sendError(
-      res,
-      statusCodes.NOT_FOUND,
-      "Customer not found",
-    );
+    throw new customError("Customer not found", statusCodes.NOT_FOUND);
   }
 
   // 2) Prevent forbidden updates
@@ -305,19 +304,19 @@ exports.updateCustomer = asynchandeler(async (req, res) => {
   const { image: imageFile, ...rest } = req.body;
 
   // 3) Handle image update via queue
-  if (imageFile && imageFile.path) {
+  if (req.files?.length) {
     const oldPublicId = customer.image?.publicId || null;
 
     // Set status to pending while worker uploads
-    customer.image = {
-      status: "pending",
-      localPath: imageFile.path,
-    };
+    customer.image.status = "pending";
+    customer.image.localPath = req.files[0].path;
+    customer.image.tries = 0;
+    customer.image.lastError = "";
 
     await imageQueue.add("update-customer-image", {
       modelName: NS_CUSTOMER,
       documentId: customer._id,
-      localPath: imageFile.path,
+      localPath: req.files[0].path,
       oldPublicId,
     });
   }
@@ -349,27 +348,21 @@ exports.deleteCustomer = asynchandeler(async (req, res) => {
       "Customer not found",
     );
   }
+  // Invalidate cache
+  await bumpNsVersion(NS_CUSTOMER);
+
+  // Delete image from Cloudinary via queue
+  const publicId = customer.image?.publicId;
+  if (publicId) {
+    await imageQueue.add("delete-cloudinary-image", { publicId });
+  }
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Customer deleted successfully",
     customer,
   );
-
-  // Invalidate cache
-  await bumpNsVersion(NS_CUSTOMER);
-  // Delete  image from cludinary
-  (async () => {
-    try {
-      const parts = customer.image.split("/");
-      const publicId = parts[parts.length - 1].split("?")[0];
-      if (publicId) {
-        await deleteCloudinaryFile(publicId);
-      }
-    } catch (err) {
-      console.log("Old image delete failed:", err.message);
-    }
-  })();
 });
 
 // customer payment recived controller

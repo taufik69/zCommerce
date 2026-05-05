@@ -63,6 +63,7 @@ const customerCreateSchema = Joi.object({
   remarks: Joi.string().trim().max(1000).allow("").optional(),
   presentAddress: Joi.string().trim().max(1000).allow("").optional(),
   permanentAddress: Joi.string().trim().max(1000).allow("").optional(),
+  image: Joi.any().optional(),
 }).options({ abortEarly: false, stripUnknown: true });
 
 const validateCustomerImage = (req) => {
