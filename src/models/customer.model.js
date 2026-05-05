@@ -63,7 +63,7 @@ const CustomerType =
   mongoose.models.CustomerType ||
   mongoose.model("CustomerType", customerTypeSchema);
 
-// customer model
+// customer model here
 
 const customerSchema = new mongoose.Schema(
   {
