@@ -13,6 +13,10 @@ const {
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
 const { statusCodes } = require("../constant/constant");
+const { imageQueue } = require("@/queues/image.queue");
+const { bumpNsVersion } = require("@/utils/cache.util");
+
+const NS = "user";
 // user registraion/ or add user
 exports.registerUser = asynchandeler(async (req, res) => {
   // Validate input
@@ -455,24 +459,36 @@ exports.isSuperAdmin = asynchandeler(async (req, res) => {
 // add user
 exports.addUser = asynchandeler(async (req, res) => {
   const value = await validateUser(req);
+  const { image: imageFile, ...rest } = value;
 
-  // Create user first
+  // Create user first with pending image status if image provided
   const user = await User.create({
-    ...value,
-    image: null,
+    ...rest,
+    image: imageFile
+      ? {
+          status: "pending",
+          localPath: imageFile.path,
+        }
+      : undefined,
     roles: value.role ? [value.role] : [],
     createdBy: req.user?._id || null,
   });
 
-  // Start upload in background (non-blocking)
-  (async () => {
-    try {
-      const { optimizeUrl } = await cloudinaryFileUpload(value.image.path);
-      await User.findByIdAndUpdate(user._id, { image: optimizeUrl });
-    } catch (err) {
-      console.error("Background image upload failed:", err.message);
-    }
-  })();
+  if (!user) {
+    throw new customError("User creation failed", statusCodes.SERVER_ERROR);
+  }
+
+  // Enqueue image upload if provided
+  if (imageFile && imageFile.path) {
+    await imageQueue.add("create-user-image", {
+      modelName: NS,
+      documentId: user._id,
+      localPath: imageFile.path,
+    });
+  }
+
+  // Invalidate cache
+  await bumpNsVersion(NS);
 
   apiResponse.sendSuccess(
     res,
@@ -488,23 +504,17 @@ exports.addUser = asynchandeler(async (req, res) => {
 
 // get user added by admin
 exports.getUserAddedByAdmin = asynchandeler(async (req, res) => {
-  const users = await User.find({})
+  const users = await User.find({ "roles.0": { $exists: true } })
     .select(
       "-__v -password -refreshToken -createdAt -twoFactorEnabled -newsLetterSubscribe",
     )
     .populate("roles");
 
-  // filter users added by admin and roles array have some value
-
-  const filteredUsers = users.filter(
-    (user) => user.roles && user.roles.length > 0,
-  );
-
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Users fetched successfully",
-    filteredUsers,
+    users,
   );
 });
 
@@ -526,6 +536,7 @@ exports.updateUser = asynchandeler(async (req, res) => {
     name: data.name,
     email: data.email,
     phone: data.phone,
+    discountLimit: data.discountLimit,
   };
 
   //  Add password only if given
@@ -538,41 +549,7 @@ exports.updateUser = asynchandeler(async (req, res) => {
     updateData.roles = [data.role];
   }
 
-  //  Handle image upload & old image deletion
-  if (req.file) {
-    const validTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
-    if (!validTypes.includes(req.file.mimetype)) {
-      throw new customError(
-        "Invalid image format. Only JPG, PNG, and WEBP are allowed.",
-        statusCodes.BAD_REQUEST,
-      );
-    }
-    if (req.file.size > 2 * 1024 * 1024) {
-      throw new customError(
-        "Image size should be less than 2MB.",
-        statusCodes.BAD_REQUEST,
-      );
-    }
-
-    // Find existing user to get old image
-    const existingUser = await User.findById(id);
-    if (!existingUser) {
-      throw new customError("User not found", statusCodes.NOT_FOUND);
-    }
-
-    // Delete old image from Cloudinary if it exists
-    if (existingUser.image) {
-      const match = existingUser.image.split("/");
-      const publicId = match[match.length - 1].split(".")[0];
-      if (publicId) {
-        await deleteCloudinaryFile(publicId.split("?")[0]);
-      }
-    }
-
-    // Upload new image
-    const upload = await cloudinaryFileUpload(req.file.path);
-    updateData.image = upload.optimizeUrl;
-  }
+  //  Handle image upload & old image deletion (handled by queue after findByIdAndUpdate)
 
   //  Update user in DB
   const updatedUser = await User.findByIdAndUpdate(id, updateData, {
@@ -588,6 +565,28 @@ exports.updateUser = asynchandeler(async (req, res) => {
   if (!updatedUser) {
     throw new customError("User not found", statusCodes.NOT_FOUND);
   }
+
+  // Handle image update via queue if file present
+  if (req.file) {
+    const oldPublicId = updatedUser.image?.publicId || null;
+
+    // Update status to pending
+    updatedUser.image.status = "pending";
+    updatedUser.image.localPath = req.file.path;
+    updatedUser.image.tries = 0;
+    updatedUser.image.lastError = "";
+    await updatedUser.save();
+
+    await imageQueue.add("update-user-image", {
+      modelName: NS,
+      documentId: updatedUser._id,
+      localPath: req.file.path,
+      oldPublicId,
+    });
+  }
+
+  // Invalidate cache
+  await bumpNsVersion(NS);
 
   apiResponse.sendSuccess(
     res,
@@ -607,13 +606,10 @@ exports.deleteUser = asynchandeler(async (req, res) => {
     throw new customError("User not found", statusCodes.NOT_FOUND);
   }
 
-  // Delete image from Cloudinary if exists
-  if (user.image) {
-    const match = user.image.split("/");
-    const publicId = match[match.length - 1].split(".")[0];
-    if (publicId) {
-      await deleteCloudinaryFile(publicId.split("?")[0]);
-    }
+  // Delete image from Cloudinary via queue
+  const publicId = user.image?.publicId;
+  if (publicId) {
+    await imageQueue.add("delete-cloudinary-image", { publicId });
   }
 
   // Delete user from DB

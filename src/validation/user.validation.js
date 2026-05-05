@@ -36,6 +36,7 @@ const userSchema = joi
         "string.pattern.base":
           "Phone must be a valid Bangladeshi number (e.g. 01XXXXXXXXX)",
       }),
+    discountLimit: joi.number().min(0).default(0).optional(),
   })
   .options({
     abortEarly: true,

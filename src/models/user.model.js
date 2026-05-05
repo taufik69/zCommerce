@@ -4,13 +4,33 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
+const { default: slugify } = require("slugify");
+
+const imageSchema = new mongoose.Schema(
+  {
+    url: { type: String, default: "" },
+    publicId: { type: String, default: "" },
+    status: {
+      type: String,
+      enum: ["pending", "processing", "uploaded", "failed"],
+      default: "pending",
+    },
+    localPath: { type: String, default: "" },
+    tries: { type: Number, default: 0 },
+    lastError: { type: String, default: "" },
+  },
+  { _id: false },
+);
 
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    image: { type: String },
+    image: {
+      type: imageSchema,
+      default: () => ({}),
+    },
     isEmailVerified: { type: Boolean, default: false },
     isPhoneVerified: { type: Boolean, default: false },
     roles: [{ type: mongoose.Schema.Types.ObjectId, ref: "Role" }],
@@ -44,6 +64,10 @@ const userSchema = new mongoose.Schema(
     resetPasswordExpires: {
       type: Date,
     },
+    discountLimit: {
+      type: Number,
+      default: 0,
+    },
     twoFactorEnabled: { type: Boolean, default: false },
     isBlocked: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
@@ -54,6 +78,11 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+// Performance Indexes
+userSchema.index({ name: 1 });
+userSchema.index({ roles: 1 });
+userSchema.index({ isActive: 1, isBlocked: 1 });
 
 // Hash password before saving
 userSchema.pre("save", async function (next) {
@@ -154,7 +183,7 @@ userSchema.methods.generateJwtAccessToken = function () {
 // veryfy JWT token
 userSchema.methods.verifyJwtRefreshToken = function (token) {
   try {
-    return jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+    return jwt.verify(token, process.env.REFRESH_TOKEN_SECRET || process.env.REFRESH_TOKEN_SCCERET);
   } catch (error) {
     if (error.name === "TokenExpiredError") {
       throw new customError("Refresh token expired", statusCodes.UNAUTHORIZED);
