@@ -63,7 +63,7 @@ const CustomerType =
   mongoose.models.CustomerType ||
   mongoose.model("CustomerType", customerTypeSchema);
 
-// customer model here
+// customer model 
 
 const customerSchema = new mongoose.Schema(
   {
@@ -203,7 +203,7 @@ customerSchema.pre("save", function (next) {
 });
 
 /**
- * Uniqueness check with customError (same style as your Brand model)
+ * Uniqueness check with customError 
  * - customerId unique
  * - mobileNumber unique
  */
