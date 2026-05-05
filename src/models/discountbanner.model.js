@@ -3,6 +3,22 @@ const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
 
+const imageSchema = new mongoose.Schema(
+  {
+    url: { type: String, default: "" },
+    publicId: { type: String, default: "" },
+    status: {
+      type: String,
+      enum: ["pending", "processing", "uploaded", "failed"],
+      default: "pending",
+    },
+    localPath: { type: String, default: "" },
+    tries: { type: Number, default: 0 },
+    lastError: { type: String, default: "" },
+  },
+  { _id: false },
+);
+
 const discountBannerSchema = new mongoose.Schema(
   {
     title: {
@@ -17,8 +33,8 @@ const discountBannerSchema = new mongoose.Schema(
       trim: true,
     },
     image: {
-      type: String,
-      trim: true,
+      type: imageSchema,
+      default: () => ({}),
     },
     link: {
       type: String,

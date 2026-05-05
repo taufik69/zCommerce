@@ -8,58 +8,74 @@ const {
 const discountBanner = require("../models/discountbanner.model");
 const { validateBanner } = require("../validation/banner.Validation");
 const { statusCodes } = require("../constant/constant");
+const { imageQueue } = require("@/queues/image.queue");
+const {
+  getCache,
+  setCache,
+  bumpNsVersion,
+  buildCacheKey,
+} = require("@/utils/cache.util");
+
+const NS = "discountBanner";
+const CACHE_TTL = 60 * 60; // 1 hour
 
 // create banner
 exports.createDiscountBanner = asynchandeler(async (req, res, next) => {
   const validatedData = await validateBanner(req, res, next);
+  const { image: imageFile, ...rest } = validatedData;
 
-  //  Create banner in DB immediately (without waiting for image)
+  //  Create banner in DB immediately with pending image status
   const banner = await discountBanner.create({
-    ...validatedData,
-    image: null,
+    ...rest,
+    image: imageFile
+      ? {
+          status: "pending",
+          localPath: imageFile.path,
+        }
+      : undefined,
   });
 
   if (!banner) {
-    throw new customError("Banner not created", statusCodes.SERVER_ERROR);
+    throw new customError("Banner creation failed", statusCodes.SERVER_ERROR);
   }
-  //  Send early response to client
+
+  // Enqueue image upload if provided
+  if (imageFile && imageFile.path) {
+    await imageQueue.add("create-discountBanner-image", {
+      modelName: NS,
+      documentId: banner._id,
+      localPath: imageFile.path,
+    });
+  }
+
+  // Invalidate cache
+  await bumpNsVersion(NS);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.CREATED,
-    "Banner information saved. Image uploading...",
+    "Banner created successfully (image uploading in background)",
+    banner.title,
   );
-
-  //  Background image upload and DB update
-  (async () => {
-    try {
-      if (req.file) {
-        const imageUpload = await cloudinaryFileUpload(
-          validatedData?.image?.path,
-        );
-
-        //  Update banner with uploaded image URL
-        await discountBanner.findByIdAndUpdate(banner._id, {
-          image: imageUpload.optimizeUrl,
-        });
-
-        console.log(
-          `✅ Banner image uploaded and updated for ID: ${banner._id}`,
-        );
-      } else {
-        console.log(`ℹ️ No image file found for banner ID: ${banner._id}`);
-      }
-    } catch (error) {
-      console.error(
-        `❌ Image upload failed for banner ID: ${banner._id}:`,
-        error.message,
-      );
-    }
-  })();
 });
 
 exports.getAllDiscountBanner = asynchandeler(async (req, res) => {
   // Optional query params: isActive, priority sorting, limit, etc.
   const { isActive, limit, sort } = req.query;
+
+  const cacheKey = await buildCacheKey(
+    NS,
+    `all:${JSON.stringify({ isActive, limit, sort })}`,
+  );
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Banners fetched successfully (from cache)",
+      cached,
+    );
+  }
 
   // Build filter dynamically
   const filter = {};
@@ -76,6 +92,8 @@ exports.getAllDiscountBanner = asynchandeler(async (req, res) => {
     throw new customError("No banners found", statusCodes.NOT_FOUND);
   }
 
+  await setCache(cacheKey, banners, CACHE_TTL);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -88,11 +106,24 @@ exports.getAllDiscountBanner = asynchandeler(async (req, res) => {
 exports.getSingleDiscountBanner = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
+  const cacheKey = await buildCacheKey(NS, `slug:${slug}`);
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Banner fetched successfully (from cache)",
+      cached,
+    );
+  }
+
   const banner = await discountBanner.findOne({ slug, isActive: true });
 
   if (!banner) {
     throw new customError("Banner not found", statusCodes.NOT_FOUND);
   }
+
+  await setCache(cacheKey, banner, CACHE_TTL);
 
   apiResponse.sendSuccess(
     res,
@@ -109,68 +140,46 @@ exports.updateDiscountBanner = asynchandeler(async (req, res, next) => {
   const { slug } = req.params;
 
   //  Step 1: Find existing banner
-  const banner = await discountBanner.findOne({ slug, isActive: true });
+  const banner = await discountBanner.findOne({ slug });
   if (!banner) {
     throw new customError("Banner not found", statusCodes.NOT_FOUND);
   }
 
-  //  Step 2: Validate banner input (only basic fields)
+  //  Step 2: Validate banner input
   const validatedData = await validateBanner(req, res, next);
+  const { image: imageFile, ...rest } = validatedData;
 
-  //  Step 3: Send immediate success response
+  // Step 3: Handle image update via queue if file present
+  if (req.file) {
+    const oldPublicId = banner.image?.publicId || null;
+
+    // Update status to pending
+    banner.image.status = "pending";
+    banner.image.localPath = req.file.path;
+    banner.image.tries = 0;
+    banner.image.lastError = "";
+
+    await imageQueue.add("update-discountBanner-image", {
+      modelName: NS,
+      documentId: banner._id,
+      localPath: req.file.path,
+      oldPublicId,
+    });
+  }
+
+  // Step 4: Update other fields
+  Object.assign(banner, rest);
+  const updatedBanner = await banner.save();
+
+  // Step 5: Invalidate cache and send response
+  await bumpNsVersion(NS);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
-    "Banner update request accepted. Processing in background...",
-    { slug },
+    "Banner updated successfully",
+    updatedBanner,
   );
-
-  // Step 4: Background update logic (non-blocking)
-  (async () => {
-    try {
-      let newImageUrl = banner.image;
-
-      //  If a new image is uploaded
-      if (req.file) {
-        // --- Delete old image from Cloudinary ---
-        if (banner.image) {
-          try {
-            const parts = banner.image.split("/");
-            const publicId = parts[parts.length - 1].split(".")[0];
-            if (publicId) {
-              await deleteCloudinaryFile(publicId.split("?")[0]);
-              console.log(`🗑️ Old banner image deleted for: ${banner._id}`);
-            }
-          } catch (err) {
-            console.warn(
-              `⚠️ Failed to delete old image for banner ${banner._id}: ${err.message}`,
-            );
-          }
-        }
-
-        // --- Upload new image ---
-        const uploadResult = await cloudinaryFileUpload(req.file.path);
-        if (!uploadResult) {
-          throw new customError(
-            "New image upload failed",
-            statusCodes.SERVER_ERROR,
-          );
-        }
-        newImageUrl = uploadResult.optimizeUrl;
-      }
-
-      //  Update banner fields
-      banner.headLine = validatedData.headLine || banner.headLine;
-      banner.details = validatedData.details || banner.details;
-      banner.image = newImageUrl;
-
-      await banner.save();
-
-      console.log(`✅ Banner successfully updated: ${banner._id}`);
-    } catch (error) {
-      console.error(`❌ Background banner update failed: ${error.message}`);
-    }
-  })();
 });
 
 // ===============================
@@ -178,52 +187,26 @@ exports.updateDiscountBanner = asynchandeler(async (req, res, next) => {
 // ===============================
 exports.deleteDiscountBanner = asynchandeler(async (req, res) => {
   const { slug } = req.params;
-  //  Step 1: Find banner by slug
-  const banner = await discountBanner.findOne({ slug, isActive: true });
+
+  //  Step 1: Find and delete banner
+  const banner = await discountBanner.findOneAndDelete({ slug });
   if (!banner) {
-    throw new customError("discount Banner not found", statusCodes.NOT_FOUND);
+    throw new customError("Banner not found", statusCodes.NOT_FOUND);
   }
 
-  //  Step 2: Immediately mark banner inactive (soft delete)
-  banner.isActive = false;
-  await banner.save();
+  // Step 2: Invalidate cache
+  await bumpNsVersion(NS);
 
-  //  Step 3: Send immediate success response
+  // Step 3: Delete image from Cloudinary via queue
+  const publicId = banner.image?.publicId;
+  if (publicId) {
+    await imageQueue.add("delete-cloudinary-image", { publicId });
+  }
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
-    "Banner delete request accepted. Processing in background...",
+    "Banner deleted successfully",
     { slug },
   );
-
-  // Step 4: Background cleanup (non-blocking)
-  (async () => {
-    try {
-      // --- Delete image from Cloudinary ---
-      if (banner.image) {
-        try {
-          const parts = banner.image.split("/");
-          const publicId = parts[parts.length - 1].split(".")[0];
-          if (publicId) {
-            await deleteCloudinaryFile(publicId.split("?")[0]);
-            console.log(
-              `🗑️ Cloudinary image deleted for banner: ${banner._id}`,
-            );
-          }
-        } catch (err) {
-          console.warn(
-            `⚠️ Failed to delete Cloudinary image for banner ${banner._id}: ${err.message}`,
-          );
-        }
-      }
-
-      // --- Delete discount banner from DB ---
-      await discountBanner.findByIdAndDelete(banner._id);
-      console.log(`✅ discount Banner permanently deleted: ${banner._id}`);
-    } catch (error) {
-      console.error(
-        `❌ Background discount Banner delete failed: ${error.message}`,
-      );
-    }
-  })();
 });

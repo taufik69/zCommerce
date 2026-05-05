@@ -14,6 +14,7 @@ const {
 const categoryModel = require("@/models/category.model");
 const brandModel = require("@/models/brand.model");
 const productModel = require("@/models/product.model");
+const discountBannerModel = require("@/models/discountbanner.model");
 const variantModel = require("@/models/variant.model");
 const bannerModel = require("@/models/banner.model");
 const { customerModel } = require("@/models/customer.model");
@@ -29,6 +30,7 @@ const MODELS = {
   customer: customerModel,
   user: userModel,
   banner: bannerModel,
+  discountBanner: discountBannerModel,
 };
 
 dbConnect()
