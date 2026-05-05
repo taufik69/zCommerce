@@ -67,6 +67,7 @@ const userSchema = new mongoose.Schema(
     discountLimit: {
       type: Number,
       default: 0,
+      max:[100 , "Discount limit cannot be greater than 100"]
     },
     twoFactorEnabled: { type: Boolean, default: false },
     isBlocked: { type: Boolean, default: false },

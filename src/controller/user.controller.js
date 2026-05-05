@@ -531,6 +531,16 @@ exports.updateUser = asynchandeler(async (req, res) => {
     }
   }
 
+  if (data.discountLimit !== undefined) {
+    const limit = Number(data.discountLimit);
+    if (isNaN(limit) || limit < 0 || limit > 100) {
+      throw new customError(
+        "Discount limit must be a number between 0 and 100",
+        statusCodes.BAD_REQUEST,
+      );
+    }
+  }
+
   //  Prepare update object
   const updateData = {
     name: data.name,
