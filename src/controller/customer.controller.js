@@ -173,19 +173,15 @@ exports.deleteCustomerType = asynchandeler(async (req, res) => {
 exports.createCustomer = asynchandeler(async (req, res) => {
   const { image: imageFile, ...rest } = req.body;
 
-  // Create customer immediately with pending image status
-  const customerData = {
+  const customer = await customerModel.create({
     ...rest,
-  };
-
-  if (imageFile) {
-    customerData.image = {
-      status: "pending",
-      localPath: imageFile.path,
-    };
-  }
-
-  const customer = await customerModel.create(customerData);
+    image: imageFile
+      ? {
+          status: "pending",
+          localPath: imageFile.path,
+        }
+      : undefined,
+  });
 
   if (!customer) {
     throw new customError("Customer creation failed", statusCodes.SERVER_ERROR);

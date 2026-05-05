@@ -63,22 +63,6 @@ const CustomerType =
   mongoose.models.CustomerType ||
   mongoose.model("CustomerType", customerTypeSchema);
 
-const imageSchema = new mongoose.Schema(
-  {
-    url: { type: String, default: "" },
-    publicId: { type: String, default: "" },
-    status: {
-      type: String,
-      enum: ["pending", "processing", "uploaded", "failed"],
-      default: "pending",
-    },
-    localPath: { type: String, default: "" },
-    tries: { type: Number, default: 0 },
-    lastError: { type: String, default: "" },
-  },
-  { _id: false },
-);
-
 // customer model
 
 const customerSchema = new mongoose.Schema(
@@ -163,8 +147,16 @@ const customerSchema = new mongoose.Schema(
     },
 
     image: {
-      type: imageSchema,
-      default: () => ({}),
+      url: { type: String, default: "" },
+      publicId: { type: String, default: "" },
+      status: {
+        type: String,
+        enum: ["pending", "processing", "uploaded", "failed"],
+        default: "pending",
+      },
+      localPath: { type: String, default: "" },
+      tries: { type: Number, default: 0 },
+      lastError: { type: String, default: "" },
     },
 
     remarks: {
