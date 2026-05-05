@@ -6,7 +6,9 @@ const {
   deleteCloudinaryFile,
 } = require("../helpers/cloudinary");
 const discountBanner = require("../models/discountbanner.model");
-const { validateBanner } = require("../validation/banner.Validation");
+const {
+  validateDiscountBanner,
+} = require("../validation/discountBanner.validation");
 const { statusCodes } = require("../constant/constant");
 const { imageQueue } = require("@/queues/image.queue");
 const {
@@ -21,7 +23,7 @@ const CACHE_TTL = 60 * 60; // 1 hour
 
 // create banner
 exports.createDiscountBanner = asynchandeler(async (req, res, next) => {
-  const validatedData = await validateBanner(req, res, next);
+  const validatedData = await validateDiscountBanner(req);
   const { image: imageFile, ...rest } = validatedData;
 
   //  Create banner in DB immediately with pending image status
@@ -146,7 +148,7 @@ exports.updateDiscountBanner = asynchandeler(async (req, res, next) => {
   }
 
   //  Step 2: Validate banner input
-  const validatedData = await validateBanner(req, res, next);
+  const validatedData = await validateDiscountBanner(req, true);
   const { image: imageFile, ...rest } = validatedData;
 
   // Step 3: Handle image update via queue if file present
