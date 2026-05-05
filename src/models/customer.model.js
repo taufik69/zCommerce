@@ -63,6 +63,22 @@ const CustomerType =
   mongoose.models.CustomerType ||
   mongoose.model("CustomerType", customerTypeSchema);
 
+const imageSchema = new mongoose.Schema(
+  {
+    url: { type: String, default: "" },
+    publicId: { type: String, default: "" },
+    status: {
+      type: String,
+      enum: ["pending", "processing", "uploaded", "failed"],
+      default: "pending",
+    },
+    localPath: { type: String, default: "" },
+    tries: { type: Number, default: 0 },
+    lastError: { type: String, default: "" },
+  },
+  { _id: false },
+);
+
 // customer model
 
 const customerSchema = new mongoose.Schema(
@@ -126,6 +142,11 @@ const customerSchema = new mongoose.Schema(
       min: [0, "Discount cannot be negative"],
       max: [100, "Discount cannot be more than 100"],
     },
+    dueLimit: {
+      type: Number,
+      default: 0,
+      min: [0, "Due limit cannot be negative"],
+    },
 
     emailAddress: {
       type: String,
@@ -142,10 +163,8 @@ const customerSchema = new mongoose.Schema(
     },
 
     image: {
-      type: String,
-      trim: true,
-      default: "",
-      // store Cloudinary URL or file URL
+      type: imageSchema,
+      default: () => ({}),
     },
 
     remarks: {

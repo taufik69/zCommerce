@@ -20,6 +20,20 @@ const {
 } = require("../dtos/all.dto");
 const { statusCodes } = require("../constant/constant");
 const { default: mongoose } = require("mongoose");
+const {
+  getCache,
+  setCache,
+  bumpNsVersion,
+  buildCacheKey,
+} = require("../utils/cache.util");
+const { imageQueue } = require("../queues/image.queue");
+
+// ─── constants ────────────────────────────────────────────────────────────────
+const NS_CUSTOMER = "customer";
+const NS_CUSTOMER_TYPE = "customerType";
+const NS_CUSTOMER_PAYMENT = "customerPayment";
+const NS_CUSTOMER_ADVANCE = "customerAdvance";
+const CACHE_TTL = 60 * 60; // 1 hour
 
 // @desc crate CustomerType document
 // @route POST /api/customers/create-customertype
@@ -39,6 +53,9 @@ exports.createCustomerType = asynchandeler(async (req, res) => {
     );
   }
 
+  // Invalidate cache
+  await bumpNsVersion(NS_CUSTOMER_TYPE);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.CREATED,
@@ -53,21 +70,51 @@ exports.createCustomerType = asynchandeler(async (req, res) => {
 exports.getAllCustomersTypes = asynchandeler(async (req, res) => {
   let { slug } = req.query;
   if (slug) {
+    const cacheKey = await buildCacheKey(NS_CUSTOMER_TYPE, `slug:${slug}`);
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Customer fetched successfully",
+        { ...cached, fromCache: true },
+      );
+    }
+
     const customer = await CustomerType.findOne({ slug });
     if (!customer) {
       throw new customError("Customer not found", statusCodes.NOT_FOUND);
     }
+
+    await setCache(cacheKey, customer, CACHE_TTL);
+
     apiResponse.sendSuccess(
       res,
       statusCodes.OK,
       "Customer fetched successfully",
       customer,
     );
+    return;
   }
+
+  const cacheKey = await buildCacheKey(NS_CUSTOMER_TYPE, "all");
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Customers fetched successfully",
+      { customers: cached, fromCache: true },
+    );
+  }
+
   const customers = await CustomerType.find().sort({ createdAt: -1 });
   if (!customers || customers.length === 0) {
     throw new customError("No customer found", statusCodes.NOT_FOUND);
   }
+
+  await setCache(cacheKey, customers, CACHE_TTL);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -87,6 +134,10 @@ exports.updateCustomerType = asynchandeler(async (req, res) => {
   if (!customerType) {
     throw new customError("Customer Type not found", statusCodes.NOT_FOUND);
   }
+
+  // Invalidate cache
+  await bumpNsVersion(NS_CUSTOMER_TYPE);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -104,6 +155,10 @@ exports.deleteCustomerType = asynchandeler(async (req, res) => {
   if (!customerType) {
     throw new customError("Customer Type not found", statusCodes.NOT_FOUND);
   }
+
+  // Invalidate cache
+  await bumpNsVersion(NS_CUSTOMER_TYPE);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -116,48 +171,41 @@ exports.deleteCustomerType = asynchandeler(async (req, res) => {
 // @route POST /api/customers/create-customer
 // @access Private
 exports.createCustomer = asynchandeler(async (req, res) => {
-  // Create customer immediately
+  const { image: imageFile, ...rest } = req.body;
+
+  // Create customer immediately with pending image status
   const customer = await customerModel.create({
-    ...req.body,
-    image: null,
+    ...rest,
+    image: imageFile
+      ? {
+          status: "pending",
+          localPath: imageFile.path,
+        }
+      : undefined,
   });
+
   if (!customer) {
     throw new customError("Customer creation failed", statusCodes.SERVER_ERROR);
   }
 
-  // Send Immediate Response (client won't wait for upload)
+  // Enqueue image upload if provided
+  if (imageFile) {
+    await imageQueue.add("create-customer-image", {
+      modelName: NS_CUSTOMER,
+      documentId: customer._id,
+      localPath: imageFile.path,
+    });
+  }
+
+  // Invalidate cache
+  await bumpNsVersion(NS_CUSTOMER);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.CREATED,
-    "Customer creation started. Processing image in background...",
+    "Customer created successfully",
     customer.fullName,
   );
-
-  //  Background upload + update
-  (async () => {
-    try {
-      // if no file, nothing to upload
-      if (!req?.body?.image?.path) {
-        console.log("ℹ Customer created without image:", customer.fullName);
-        return;
-      }
-
-      const { optimizeUrl } = await cloudinaryFileUpload(
-        req?.body?.image?.path,
-      );
-
-      await customerModel.findByIdAndUpdate(
-        customer._id,
-        { image: optimizeUrl },
-        { new: true },
-      );
-
-      console.log("✅ Customer Created (BG Task):", customer.fullName);
-    } catch (error) {
-      console.error("❌ Background Customer Creation Failed:", error.message);
-      await customerModel.findByIdAndUpdate(customer._id, { image: null });
-    }
-  })();
 });
 
 // @desc get all customer or get single customer with query parmas using customer id
@@ -165,6 +213,23 @@ exports.createCustomer = asynchandeler(async (req, res) => {
 // @access Private
 exports.getAllCustomers = asynchandeler(async (req, res) => {
   const { customerId, customerType, q } = req.query;
+
+  // Build cache key based on query params
+  const cacheParams = { customerId, customerType, q };
+  const cacheKey = await buildCacheKey(
+    NS_CUSTOMER,
+    `query:${JSON.stringify(cacheParams)}`,
+  );
+
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Customers retrieved successfully",
+      { ...cached, fromCache: true },
+    );
+  }
 
   const query = { isActive: true };
 
@@ -201,11 +266,14 @@ exports.getAllCustomers = asynchandeler(async (req, res) => {
     );
   }
 
+  const dto = customerListDTO(customers);
+  await setCache(cacheKey, dto, CACHE_TTL);
+
   return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Customers retrieved successfully",
-    customerListDTO(customers),
+    dto,
   );
 });
 
@@ -234,37 +302,29 @@ exports.updateCustomer = asynchandeler(async (req, res) => {
   delete req.body.updatedAt;
   delete req.body.deletedAt;
 
-  // 3) Handle image update (if new image comes)
-  if (req.body.image && req.body.image.path) {
-    // Upload new image first
-    const { optimizeUrl } = await cloudinaryFileUpload(req.body.image.path);
+  const { image: imageFile, ...rest } = req.body;
 
-    // Delete old image (if exists)
-    if (customer.image) {
-      try {
-        const parts = customer.image.split("/");
-        const publicId = parts[parts.length - 1].split("?")[0];
-        if (publicId) {
-          await deleteCloudinaryFile(publicId);
-        }
-      } catch (err) {
-        console.log("Old image delete failed:", err.message);
-      }
-    }
+  // 3) Handle image update via queue
+  if (imageFile && imageFile.path) {
+    const oldPublicId = customer.image?.publicId || null;
 
-    // Replace with new image URL
-    req.body.image = optimizeUrl;
-  } else {
-    // If no new image, don't overwrite existing image
-    delete req.body.image;
+    // Set status to pending while worker uploads
+    customer.image = {
+      status: "pending",
+      localPath: imageFile.path,
+    };
+
+    await imageQueue.add("update-customer-image", {
+      modelName: NS_CUSTOMER,
+      documentId: customer._id,
+      localPath: imageFile.path,
+      oldPublicId,
+    });
   }
 
-  // 4) Update customer
-  const updatedCustomer = await customerModel.findByIdAndUpdate(
-    customer._id,
-    { $set: req.body },
-    { new: true, runValidators: true },
-  );
+  // 4) Update other fields
+  Object.assign(customer, rest);
+  const updatedCustomer = await customer.save();
 
   // 5) Send response
   apiResponse.sendSuccess(
@@ -273,6 +333,9 @@ exports.updateCustomer = asynchandeler(async (req, res) => {
     "Customer updated successfully",
     updatedCustomer,
   );
+
+  // Invalidate cache
+  await bumpNsVersion(NS_CUSTOMER);
 });
 
 // delete customer
@@ -292,6 +355,9 @@ exports.deleteCustomer = asynchandeler(async (req, res) => {
     "Customer deleted successfully",
     customer,
   );
+
+  // Invalidate cache
+  await bumpNsVersion(NS_CUSTOMER);
   // Delete  image from cludinary
   (async () => {
     try {
@@ -373,6 +439,10 @@ exports.createCustomerPaymentRecived = asynchandeler(async (req, res) => {
       "Customer payment received successfully",
       customerPaymentDetailsDTO(paymentDoc),
     );
+
+    // Invalidate cache
+    await bumpNsVersion(NS_CUSTOMER_PAYMENT);
+    await bumpNsVersion(NS_CUSTOMER); // Due might change
   } catch (err) {
     session.endSession();
     throw err; // asyncHandler -> global middleware asyncHandler -> global error middleware
@@ -385,6 +455,20 @@ exports.createCustomerPaymentRecived = asynchandeler(async (req, res) => {
 // @query ?name=rahim
 exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
   const { customer } = req.query;
+
+  const cacheKey = await buildCacheKey(
+    NS_CUSTOMER_PAYMENT,
+    customer ? `customer:${customer}` : "all",
+  );
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Customer payment retrieved successfully",
+      { ...cached, fromCache: true },
+    );
+  }
 
   // 1) Get single by slug
   if (customer) {
@@ -403,6 +487,8 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
         "Customer payment not found",
       );
     }
+
+    await setCache(cacheKey, doc, CACHE_TTL);
 
     return apiResponse.sendSuccess(
       res,
@@ -428,6 +514,8 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
       "No customer payments found",
     );
   }
+
+  await setCache(cacheKey, docs, CACHE_TTL);
 
   //  Return list
   apiResponse.sendSuccess(
@@ -525,6 +613,10 @@ exports.updateCustomerPaymentRecived = asynchandeler(async (req, res) => {
 
     session.endSession();
 
+    // Invalidate cache
+    await bumpNsVersion(NS_CUSTOMER_PAYMENT);
+    await bumpNsVersion(NS_CUSTOMER);
+
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
@@ -552,12 +644,16 @@ exports.deleteCustomerPaymentRecived = asynchandeler(async (req, res) => {
       "Customer payment not found",
     );
   }
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Customer payment deleted successfully",
-    customerPaymentDetailsDTO(paymentRecived),
-  );
+    // Invalidate cache
+    await bumpNsVersion(NS_CUSTOMER_PAYMENT);
+    await bumpNsVersion(NS_CUSTOMER);
+
+    apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Customer payment deleted successfully",
+      customerPaymentDetailsDTO(paymentRecived),
+    );
 });
 
 // customerAdvancePayment controlle
@@ -620,6 +716,9 @@ exports.createCustomerAdvancePaymentRecived = asynchandeler(
       { new: true, upsert: true, runValidators: true },
     );
 
+    // Invalidate cache
+    await bumpNsVersion(NS_CUSTOMER_ADVANCE);
+
     return apiResponse.sendSuccess(
       res,
       statusCodes.CREATED,
@@ -635,6 +734,20 @@ exports.createCustomerAdvancePaymentRecived = asynchandeler(
 // @query ?name=rahim
 exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
   const { customer } = req.query;
+
+  const cacheKey = await buildCacheKey(
+    NS_CUSTOMER_ADVANCE,
+    customer ? `customer:${customer}` : "all",
+  );
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Customer payment retrieved successfully",
+      { ...cached, fromCache: true },
+    );
+  }
 
   //  Get single by slug
   if (customer) {
@@ -653,6 +766,8 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
         "Customer payment not found",
       );
     }
+
+    await setCache(cacheKey, doc, CACHE_TTL);
 
     return apiResponse.sendSuccess(
       res,
@@ -679,6 +794,8 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
     );
   }
 
+  await setCache(cacheKey, docs, CACHE_TTL);
+
   //  Return list
   apiResponse.sendSuccess(
     res,
@@ -704,6 +821,9 @@ exports.deleteCustomerAdvancePaymentRecived = asynchandeler(
         "Customer payment not found",
       );
     }
+    // Invalidate cache
+    await bumpNsVersion(NS_CUSTOMER_ADVANCE);
+
     apiResponse.sendSuccess(
       res,
       statusCodes.OK,

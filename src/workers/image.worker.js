@@ -15,6 +15,7 @@ const categoryModel = require("@/models/category.model");
 const brandModel = require("@/models/brand.model");
 const productModel = require("@/models/product.model");
 const variantModel = require("@/models/variant.model");
+const { customerModel } = require("@/models/customer.model");
 const { bumpNsVersion } = require("@/utils/cache.util");
 const { dbConnect } = require("@/database/db");
 
@@ -23,6 +24,7 @@ const MODELS = {
   brand: brandModel,
   product: productModel,
   variant: variantModel,
+  customer: customerModel,
 };
 
 dbConnect()

@@ -45,6 +45,11 @@ const customerCreateSchema = Joi.object({
     "number.max": "Discount cannot be more than 100.",
   }),
 
+  dueLimit: Joi.number().min(0).default(0).messages({
+    "number.base": "Due limit must be a number.",
+    "number.min": "Due limit cannot be negative.",
+  }),
+
   emailAddress: Joi.string()
     .trim()
     .lowercase()
