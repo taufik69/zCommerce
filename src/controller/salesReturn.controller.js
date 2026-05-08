@@ -97,7 +97,10 @@ exports.getAllSalesReturn = asynchandeler(async (req, res) => {
   }
 
   const salesReturns = await SalesReturn.find()
-    .populate("invoiceNumber") // Ref to Sales
+    .populate({
+      path: "invoiceNumber",
+      select: "-paymentMethod -searchItem",
+    })
     .populate("refundMethod")
     .populate("allproduct.product")
     .populate("allproduct.variant")
@@ -138,7 +141,10 @@ exports.getSingleSalesReturn = asynchandeler(async (req, res) => {
   }
 
   const salesReturn = await SalesReturn.findById(id)
-    .populate("invoiceNumber")
+    .populate({
+      path: "invoiceNumber",
+      select: "-paymentMethod -searchItem",
+    })
     .populate("refundMethod")
     .populate("allproduct.product")
     .populate("allproduct.variant")
