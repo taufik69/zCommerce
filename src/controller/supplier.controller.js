@@ -42,7 +42,7 @@ exports.getAllSupplier = asynchandeler(async (req, res) => {
     {
       $lookup: {
         from: "purchases",
-        localField: "supplierId",
+        localField: "_id",
         foreignField: "supplierId",
         as: "purchases",
       },

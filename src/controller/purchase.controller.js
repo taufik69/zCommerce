@@ -110,18 +110,14 @@ exports.createPurchase = asynchandeler(async (req, res) => {
 
     if (supplierId && dueamount !== 0) {
       // Find supplier by _id first, then by supplierId (mobile number) if not found
-      let supplier = await SupplierModel.findById(supplierId).session(session);
+      let supplier = await SupplierModel.findById( supplierId).session(session);
       if (!supplier) {
-        supplier = await SupplierModel.findOne({ supplierId }).session(session);
+        supplier = await SupplierModel.findOne({ _id:  supplierId }).session(session);
       }
 
       if (supplier) {
         supplier.openingDues = (supplier.openingDues || 0) + dueamount;
         await supplier.save({ session });
-        
-        // Ensure we store the mobile number supplierId in the purchase record 
-        // for compatibility with aggregation lookups
-        req.body.supplierId = supplier.supplierId;
       }
     }
 
