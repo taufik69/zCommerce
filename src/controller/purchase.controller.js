@@ -29,6 +29,10 @@ exports.createPurchase = asynchandeler(async (req, res) => {
     category,
     subCategory,
     brand,
+    dueamount,
+    payable,
+
+
   } = req.body;
 
   if (!allproduct || !Array.isArray(allproduct) || allproduct.length === 0) {
@@ -101,8 +105,8 @@ exports.createPurchase = asynchandeler(async (req, res) => {
       }
     }
 
-    const payable = subTotal + shipping + commission;
-    const dueamount = payable - paid;
+    // const payable = subTotal + shipping + commission;
+    // const dueamount = payable - paid;
 
     if (supplierId && dueamount !== 0) {
       // Find supplier by _id first, then by supplierId (mobile number) if not found
@@ -112,7 +116,7 @@ exports.createPurchase = asynchandeler(async (req, res) => {
       }
 
       if (supplier) {
-        supplier.openingDues =  dueamount;
+        supplier.openingDues = (supplier.openingDues || 0) + dueamount;
         await supplier.save({ session });
         
         // Ensure we store the mobile number supplierId in the purchase record 
@@ -152,7 +156,7 @@ exports.createPurchase = asynchandeler(async (req, res) => {
       res,
       statusCodes.CREATED,
       "Purchase created successfully",
-      purchase,
+      purchase.invoiceNumber,
     );
   } catch (error) {
     await session.abortTransaction();
