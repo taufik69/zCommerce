@@ -2,64 +2,79 @@ const joi = require("joi");
 const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
 
-const byReturnSchema = joi
-  .object(
-    {
-      product: joi
-        .string()
-        .regex(/^[0-9a-fA-F]{24}$/)
+const salesReturnSchema = joi.object({
 
-        .messages({
-          "string.empty": "Product is required.",
-          "string.pattern.base": "Product must be a valid ObjectId.",
-          "any.required": "Product is required.",
-        }),
 
-      variant: joi
-        .string()
-        .regex(/^[0-9a-fA-F]{24}$/)
+  invoiceNumber: joi
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/)
+    .required()
+    .messages({
+      "string.empty": "Invoice number is required.",
+      "string.pattern.base": "Invoice number must be a valid ObjectId.",
+      "any.required": "Invoice number is required.",
+    }),
 
-        .messages({
-          "string.empty": "Variant is required.",
-          "string.pattern.base": "Variant must be a valid ObjectId.",
-        }),
+  refundMethod: joi
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/)
+    .required()
+    .messages({
+      "string.empty": "Refund method is required.",
+      "string.pattern.base": "Refund method must be a valid ObjectId.",
+      "any.required": "Refund method is required.",
+    }),
 
-      productBarCode: joi.string().trim().min(3).max(50).messages({
-        "string.empty": "Product barcode is required.",
-        "any.required": "Product barcode is required.",
+  returnReason: joi.string().trim().required().messages({
+    "string.empty": "Return reason is required.",
+    "any.required": "Return reason is required.",
+  }),
+
+  allproduct: joi
+    .array()
+    .items(
+      joi.object({
+        product: joi
+          .string()
+          .regex(/^[0-9a-fA-F]{24}$/)
+          .required(),
+        variant: joi
+          .string()
+          .regex(/^[0-9a-fA-F]{24}$/)
+          .allow(null, ""),
+        quantity: joi.number().min(1).required(),
+        unitPrice: joi.number().min(0).required(),
+        subtotal: joi.number().min(0).required(),
       }),
+    )
+    .min(1)
+    .required()
+    .messages({
+      "array.min": "At least one product is required for return.",
+      "any.required": "Products are required.",
+    }),
 
-      quantity: joi.number().integer().min(1).required().messages({
-        "number.base": "Quantity must be a number.",
-        "number.min": "Quantity must be at least 1.",
-        "any.required": "Quantity is required.",
-      }),
+  totalReturnAmount: joi.number().min(0).required().messages({
+    "number.base": "Total return amount must be a number.",
+    "any.required": "Total return amount is required.",
+  }),
 
-      cashReturnMode: joi.string().messages({
-        "any.only": "Cash return mode must be cash, bank, or mobile_banking.",
-        "any.required": "Cash return mode is required.",
-      }),
-    },
-    {
-      allowUnknown: true,
-      abortEarly: false,
-    },
-  )
-  .unknown(true);
+  remarks: joi.string().trim().allow(""),
+  
+  date: joi.date().allow(""),
+});
 
-exports.validateByReturn = async (req) => {
+exports.validateSalesReturn = async (req) => {
   try {
-    const value = await byReturnSchema.validateAsync(req.body);
+    const value = await salesReturnSchema.validateAsync(req.body, {
+      abortEarly: false,
+      allowUnknown: true,
+    });
     return value;
   } catch (error) {
     if (error.details) {
-      console.log(
-        "Validation error: " + error.details.map((err) => err.message),
-      );
-      throw new customError(
-        "Validation error: " + error.details.map((err) => err.message),
-        statusCodes.BAD_REQUEST,
-      );
+      const errorMessage = error.details.map((err) => err.message).join(", ");
+      throw new customError(errorMessage, statusCodes.BAD_REQUEST);
     }
     throw error;
   }

@@ -1,27 +1,56 @@
 const mongoose = require("mongoose");
-const slugify = require("slugify");
 const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
 
 const salesReturnSchema = new mongoose.Schema(
   {
-    product: {
+  
+    invoiceNumber: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Product",
-    },
-    variant: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Variant",
-    },
-    productBarCode: {
-      type: String,
+      ref: "Sales",
       required: true,
-      trim: true,
+      index:true,
     },
-    quantity: {
+    refundMethod: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Account",
+      required: true,
+    },
+    returnReason: {
+      type: String,
+      trim: true,
+      required: true,
+    },
+    allproduct: [
+      {
+        product: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+        variant: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Variant",
+        },
+        quantity: {
+          type: Number,
+          required: true,
+          min: 1,
+        },
+        unitPrice: {
+          type: Number,
+          required: true,
+        },
+        subtotal: {
+          type: Number,
+          required: true,
+        },
+      },
+    ],
+    totalReturnAmount: {
       type: Number,
       required: true,
-      min: 1,
+      default: 0,
     },
     date: {
       type: Date,
@@ -31,44 +60,28 @@ const salesReturnSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    cashReturnMode: {
-      type: String,
-      enum: ["cash", "bank", "mobile_banking"],
-    },
-    slug: {
-      type: String,
-      unique: true,
-      lowercase: true,
-      trim: true,
-    },
   },
   { timestamps: true },
 );
 
-// make a slug using name
-salesReturnSchema.pre("save", function (next) {
-  if (this.isModified("productBarCode")) {
-    this.slug = slugify(this.productBarCode, { lower: true, strict: true });
-  }
-  next();
-});
 
-// check if slug already exist or not
+
+// Duplicate check hook for invoiceNumber (redundant due to unique:true but good for custom error)
 salesReturnSchema.pre("save", async function (next) {
   try {
-    const existingSalesReturn = await this.constructor.findOne({
-      slug: this.slug,
-    });
-    if (
-      existingSalesReturn &&
-      existingSalesReturn._id.toString() !== this._id.toString()
-    ) {
-      return next(
-        new customError(
-          `SalesReturn with slug ${this.slug} or productBarCode ${this.productBarCode} already exists`,
-          statusCodes.BAD_REQUEST,
-        ),
-      );
+    if (this.isModified("invoiceNumber")) {
+      const existing = await this.constructor.findOne({
+        invoiceNumber: this.invoiceNumber,
+        _id: { $ne: this._id },
+      });
+      if (existing) {
+        return next(
+          new customError(
+            `SalesReturn with invoice number ${this.invoiceNumber} already exists`,
+            statusCodes.BAD_REQUEST,
+          ),
+        );
+      }
     }
     next();
   } catch (error) {
@@ -76,6 +89,8 @@ salesReturnSchema.pre("save", async function (next) {
   }
 });
 
-module.exports =
+const SalesReturn =
   mongoose.models.SalesReturn ||
   mongoose.model("SalesReturn", salesReturnSchema);
+
+module.exports = SalesReturn;
