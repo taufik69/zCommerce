@@ -22,9 +22,8 @@ const purchaseSchema = new mongoose.Schema(
     },
 
     cashType: {
-      type: String,
-      // enum: ["cash", "bank", "mobile_banking"],
-      // required: true,
+      type: mongoose.Schema.Types.ObjectId,
+      ref:"Account"
     },
 
     // inline product schema

@@ -1,17 +1,28 @@
+const mongoose = require("mongoose");
 const Purchase = require("../models/purchase.model");
 const Product = require("../models/product.model");
 const Variant = require("../models/variant.model");
+const { SupplierModel } = require("../models/supplier.model");
 const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { statusCodes } = require("../constant/constant");
+const {
+  getCache,
+  setCache,
+  bumpNsVersion,
+  buildCacheKey,
+} = require("@/utils/cache.util");
+
+const NS = "purchase";
+const CACHE_TTL = 60 * 60; // 1 hour
 
 exports.createPurchase = asynchandeler(async (req, res) => {
   const {
     invoiceNumber,
     supplierId,
     cashType,
-    allproduct, // [{ product, variant, price, wholesalePrice, retailPrice, quantity, size, color }]
+    allproduct,
     commission = 0,
     shipping = 0,
     paid = 0,
@@ -20,7 +31,6 @@ exports.createPurchase = asynchandeler(async (req, res) => {
     brand,
   } = req.body;
 
-  // Validate request
   if (!allproduct || !Array.isArray(allproduct) || allproduct.length === 0) {
     throw new customError(
       "At least one product or variant is required",
@@ -28,120 +38,143 @@ exports.createPurchase = asynchandeler(async (req, res) => {
     );
   }
 
-  // Calculate totals
-  let subTotal = 0;
-  const purchaseProducts = [];
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  for (const item of allproduct) {
-    const {
-      product,
-      variant,
-      purchasePrice,
-      retailPrice,
-      wholesalePrice,
-      quantity,
-      size,
-      color,
-    } = item;
+  try {
+    let subTotal = 0;
+    const purchaseProducts = [];
 
-    if (!purchasePrice || !retailPrice || !quantity) continue; // skip invalid entries
+    for (const item of allproduct) {
+      const {
+        product,
+        variant,
+        purchasePrice,
+        retailPrice,
+        wholesalePrice,
+        quantity,
+        size,
+        color,
+      } = item;
 
-    const subTotalItem = purchasePrice * quantity;
-    subTotal += subTotalItem;
+      if (!purchasePrice || !retailPrice || !quantity) continue;
 
-    // Prepare purchase product entry
-    purchaseProducts.push({
-      product: product || null,
-      variant: variant || null,
-      purchasePrice,
-      retailPrice,
-      wholesalePrice,
-      subTotal: subTotalItem,
-      quantity,
-      size: size || null,
-      color: color || null,
-    });
+      const subTotalItem = purchasePrice * quantity;
+      subTotal += subTotalItem;
 
-    /** ------------------------------
-     * 🔹 Update Product or Variant Stock & Info
-     * ------------------------------ */
-    if (product) {
-      const productInfo = await Product.findById(product);
-      if (productInfo) {
-        productInfo.stock = (productInfo.stock || 0) + quantity;
-        productInfo.wholesalePrice = wholesalePrice;
-        productInfo.purchasePrice = purchasePrice;
-        productInfo.retailPrice = retailPrice;
+      purchaseProducts.push({
+        product: product || null,
+        variant: variant || null,
+        purchasePrice,
+        retailPrice,
+        wholesalePrice,
+        subTotal: subTotalItem,
+        quantity,
+        size: size || null,
+        color: color || null,
+      });
 
-        if (size)
-          productInfo.size = Array.from(
-            new Set([...(productInfo.size || []), size]),
-          );
-        if (color)
-          productInfo.color = Array.from(
-            new Set([...(productInfo.color || []), color]),
-          );
-        await productInfo.save();
+      if (product) {
+        const productInfo = await Product.findById(product).session(session);
+        if (productInfo) {
+          productInfo.stock = (productInfo.stock || 0) + quantity;
+          productInfo.wholesalePrice = wholesalePrice;
+          productInfo.purchasePrice = purchasePrice;
+          productInfo.retailPrice = retailPrice;
+          if (size) productInfo.size = size;
+          if (color) productInfo.color = color;
+          await productInfo.save({ session });
+        }
+      }
+
+      if (variant) {
+        const variantInfo = await Variant.findById(variant).session(session);
+        if (variantInfo) {
+          variantInfo.stockVariant = (variantInfo.stockVariant || 0) + quantity;
+          variantInfo.wholesalePrice = wholesalePrice;
+          variantInfo.purchasePrice = purchasePrice;
+          variantInfo.retailPrice = retailPrice;
+          if (size) variantInfo.size = size;
+          if (color) variantInfo.color = color;
+          await variantInfo.save({ session });
+        }
       }
     }
 
-    if (variant) {
-      const variantInfo = await Variant.findById(variant);
-      if (variantInfo) {
-        variantInfo.stockVariant = (variantInfo.stockVariant || 0) + quantity;
-        variantInfo.wholesalePrice = wholesalePrice;
-        variantInfo.purchasePrice = purchasePrice;
-        variantInfo.retailPrice = retailPrice;
-        if (size)
-          variantInfo.size = Array.from(
-            new Set([...(variantInfo.size || []), size]),
-          );
-        if (color)
-          variantInfo.color = Array.from(
-            new Set([...(variantInfo.color || []), color]),
-          );
-        await variantInfo.save();
+    const payable = subTotal + shipping + commission;
+    const dueamount = payable - paid;
+
+    if (supplierId && dueamount !== 0) {
+      // Find supplier by _id first, then by supplierId (mobile number) if not found
+      let supplier = await SupplierModel.findById(supplierId).session(session);
+      if (!supplier) {
+        supplier = await SupplierModel.findOne({ supplierId }).session(session);
+      }
+
+      if (supplier) {
+        // Increase the dues we owe the supplier
+        supplier.openingDues = (supplier.openingDues || 0) + dueamount;
+        await supplier.save({ session });
+        
+        // Ensure we store the mobile number supplierId in the purchase record 
+        // for compatibility with aggregation lookups
+        req.body.supplierId = supplier.supplierId;
       }
     }
-  }
 
-  const payable = subTotal + shipping + commission;
-  const dueamount = payable - paid;
-
-  // Create Purchase document
-  const purchase = await Purchase.create({
-    invoiceNumber,
-    supplierId,
-    cashType,
-    allproduct: purchaseProducts,
-    subTotal,
-    commission,
-    shipping,
-    payable,
-    paid,
-    dueamount,
-    category,
-    subCategory,
-    brand,
-    ...req.body,
-  });
-
-  if (!purchase)
-    throw new customError(
-      "Failed to create purchase",
-      statusCodes.SERVER_ERROR,
+    const [purchase] = await Purchase.create(
+      [
+        {
+          invoiceNumber,
+          supplierId,
+          cashType,
+          allproduct: purchaseProducts,
+          subTotal,
+          commission,
+          shipping,
+          payable,
+          paid,
+          dueamount,
+          category,
+          subCategory,
+          brand,
+          ...req.body,
+        },
+      ],
+      { session },
     );
 
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.CREATED,
-    "Purchase created successfully",
-    purchase,
-  );
+    await session.commitTransaction();
+    session.endSession();
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.CREATED,
+      "Purchase created successfully",
+      purchase,
+    );
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
 });
 
 // get all purchases
 exports.getAllPurchases = asynchandeler(async (req, res) => {
+  const cacheKey = await buildCacheKey(NS, "all");
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Purchases fetched successfully",
+      { purchases: cached, fromCache: true },
+    );
+  }
+
   const purchases = await Purchase.find()
     .populate({
       path: "allproduct.product",
@@ -149,22 +182,25 @@ exports.getAllPurchases = asynchandeler(async (req, res) => {
     .populate({
       path: "allproduct.variant",
     })
-    .populate("category subCategory brand")
-    .sort({ createdAt: -1 });
+    .populate("category subCategory brand cashType")
+    .sort({ createdAt: -1 })
+    .lean();
 
   if (!purchases || purchases.length === 0) {
     throw new customError("Purchases not found", statusCodes.NOT_FOUND);
   }
-  // serial যোগ করা হলো
+
   const purchasesWithSerial = purchases.map((p, index) => {
-    const serialNumber = (index + 1).toString().padStart(6, "0");
+    const serialNumber = (index + 1).toString().padStart(2, "0");
     return {
-      serial: `BUYRTN-${serialNumber}`, // prefix = BUYRTN-
-      ...p.toObject(),
+      serial: `PUR-SI-${serialNumber}`,
+      ...p,
     };
   });
 
-  apiResponse.sendSuccess(
+  await setCache(cacheKey, purchasesWithSerial, CACHE_TTL);
+
+  return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Purchases fetched successfully",
@@ -178,6 +214,18 @@ exports.getSinglePurchase = asynchandeler(async (req, res) => {
   if (!id) {
     throw new customError("ID is required", statusCodes.BAD_REQUEST);
   }
+
+  const cacheKey = await buildCacheKey(NS, `id:${id}`);
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Purchase fetched successfully",
+      { purchase: cached, fromCache: true },
+    );
+  }
+
   const purchase = await Purchase.findById(id)
     .populate({
       path: "allproduct.product",
@@ -185,10 +233,15 @@ exports.getSinglePurchase = asynchandeler(async (req, res) => {
     .populate({
       path: "allproduct.variant",
     })
-    .populate("category subCategory brand");
+    .populate("category subCategory brand cashType")
+    .lean();
+
   if (!purchase) {
     throw new customError("Purchase not found", statusCodes.NOT_FOUND);
   }
+
+  await setCache(cacheKey, purchase, CACHE_TTL);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -199,12 +252,12 @@ exports.getSinglePurchase = asynchandeler(async (req, res) => {
 
 // update purchase
 exports.updatePurchase = asynchandeler(async (req, res) => {
-  const { id } = req.params; // purchase ID
+  const { id } = req.params;
   const {
     invoiceNumber,
-    supplierName,
+    supplierId,
     cashType,
-    allproduct, // [{ product, variant, purchasePrice, retailPrice, wholesalePrice, quantity, size, color }]
+    allproduct,
     commission = 0,
     shipping = 0,
     paid = 0,
@@ -213,184 +266,197 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
     brand,
   } = req.body;
 
-  // Find existing purchase
-  const existingPurchase = await Purchase.findById(id);
-  if (!existingPurchase) {
-    throw new customError("Purchase not found", statusCodes.NOT_FOUND);
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const existingPurchase = await Purchase.findById(id).session(session);
+    if (!existingPurchase) {
+      throw new customError("Purchase not found", statusCodes.NOT_FOUND);
+    }
+
+    // Revert Old Stock using $inc for efficiency and atomicity
+    for (const item of existingPurchase.allproduct) {
+      const { product, variant, quantity } = item;
+      if (product) {
+        await Product.findByIdAndUpdate(product, { $inc: { stock: -quantity } }).session(session);
+      }
+      if (variant) {
+        await Variant.findByIdAndUpdate(variant, { $inc: { stockVariant: -quantity } }).session(session);
+      }
+    }
+
+    // Revert Old Supplier Dues (Subtract the old due amount from supplier balance)
+    if (existingPurchase.supplierId && existingPurchase.dueamount !== 0) {
+      const oldSupplier = await SupplierModel.findOne({ supplierId: existingPurchase.supplierId }).session(session);
+      if (oldSupplier) {
+        oldSupplier.openingDues = Math.max(0, (oldSupplier.openingDues || 0) - existingPurchase.dueamount);
+        await oldSupplier.save({ session });
+      }
+    }
+
+    // Apply New Products & Stock
+    let subTotal = 0;
+    const updatedProducts = [];
+
+    for (const item of allproduct) {
+      const {
+        product,
+        variant,
+        purchasePrice,
+        retailPrice,
+        wholesalePrice,
+        quantity,
+        size,
+        color,
+      } = item;
+
+      if (!purchasePrice || !retailPrice || !quantity) continue;
+
+      const subTotalItem = purchasePrice * quantity;
+      subTotal += subTotalItem;
+
+      updatedProducts.push({
+        product: product || null,
+        variant: variant || null,
+        purchasePrice,
+        retailPrice,
+        wholesalePrice,
+        subTotal: subTotalItem,
+        quantity,
+        size: size || null,
+        color: color || null,
+      });
+
+      if (product) {
+        const productInfo = await Product.findById(product).session(session);
+        if (productInfo) {
+          productInfo.stock = (productInfo.stock || 0) + quantity;
+          productInfo.wholesalePrice = wholesalePrice;
+          productInfo.purchasePrice = purchasePrice;
+          productInfo.retailPrice = retailPrice;
+          if (size) productInfo.size = size;
+          if (color) productInfo.color = color;
+          await productInfo.save({ session });
+        }
+      }
+
+      if (variant) {
+        const variantInfo = await Variant.findById(variant).session(session);
+        if (variantInfo) {
+          variantInfo.stockVariant = (variantInfo.stockVariant || 0) + quantity;
+          variantInfo.wholesalePrice = wholesalePrice;
+          variantInfo.purchasePrice = purchasePrice;
+          variantInfo.retailPrice = retailPrice;
+          if (size) variantInfo.size = size;
+          if (color) variantInfo.color = color;
+          await variantInfo.save({ session });
+        }
+      }
+    }
+
+    const payable = subTotal + shipping + commission;
+    const dueamount = payable - paid;
+
+    // Apply New Supplier Dues
+    if (supplierId && dueamount !== 0) {
+      let supplier = await SupplierModel.findById(supplierId).session(session);
+      if (!supplier) {
+        supplier = await SupplierModel.findOne({ supplierId }).session(session);
+      }
+      
+      if (supplier) {
+        supplier.openingDues = (supplier.openingDues || 0) + dueamount;
+        await supplier.save({ session });
+        // Use the supplier mobile number for the purchase record
+        req.body.supplierId = supplier.supplierId;
+      }
+    }
+
+    // Update Purchase Document
+    existingPurchase.invoiceNumber = invoiceNumber || existingPurchase.invoiceNumber;
+    existingPurchase.supplierId = req.body.supplierId || existingPurchase.supplierId;
+    existingPurchase.cashType = cashType || existingPurchase.cashType;
+    existingPurchase.allproduct = updatedProducts;
+    existingPurchase.subTotal = subTotal;
+    existingPurchase.commission = commission;
+    existingPurchase.shipping = shipping;
+    existingPurchase.payable = payable;
+    existingPurchase.paid = paid;
+    existingPurchase.dueamount = dueamount;
+    existingPurchase.category = category || existingPurchase.category;
+    existingPurchase.subCategory = subCategory || existingPurchase.subCategory;
+    existingPurchase.brand = brand || existingPurchase.brand;
+
+    await existingPurchase.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Purchase updated successfully",
+      existingPurchase,
+    );
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
   }
-
-  /** -----------------------------------
-   * 🔹 Revert Old Stock
-   * ----------------------------------- */
-  for (const item of existingPurchase.allproduct) {
-    const { product, variant, quantity } = item;
-
-    if (product) {
-      const productInfo = await Product.findById(product);
-      if (productInfo) {
-        productInfo.stock = (productInfo.stock || 0) - quantity;
-        await productInfo.save();
-      }
-    }
-
-    if (variant) {
-      const variantInfo = await Variant.findById(variant);
-      if (variantInfo) {
-        variantInfo.stockVariant = (variantInfo.stockVariant || 0) - quantity;
-        await variantInfo.save();
-      }
-    }
-  }
-
-  /** -----------------------------------
-   * 🔹 Apply New Products
-   * ----------------------------------- */
-  let subTotal = 0;
-  const updatedProducts = [];
-
-  for (const item of allproduct) {
-    const {
-      product,
-      variant,
-      purchasePrice,
-      retailPrice,
-      wholesalePrice,
-      quantity,
-      size,
-      color,
-    } = item;
-
-    if (!purchasePrice || !retailPrice || !quantity) continue;
-
-    const subTotalItem = purchasePrice * quantity;
-    subTotal += subTotalItem;
-
-    updatedProducts.push({
-      product: product || null,
-      variant: variant || null,
-      purchasePrice,
-      retailPrice,
-      wholesalePrice,
-      subTotal: subTotalItem,
-      quantity,
-      size: size || null,
-      color: color || null,
-    });
-
-    // Update Product
-    if (product) {
-      const productInfo = await Product.findById(product);
-      if (productInfo) {
-        productInfo.stock = (productInfo.stock || 0) + quantity;
-        productInfo.wholesalePrice = wholesalePrice;
-        productInfo.purchasePrice = purchasePrice;
-        productInfo.retailPrice = retailPrice;
-        if (size)
-          productInfo.size = Array.from(
-            new Set([...(productInfo.size || []), size]),
-          );
-        if (color)
-          productInfo.color = Array.from(
-            new Set([...(productInfo.color || []), color]),
-          );
-        await productInfo.save();
-      }
-    }
-
-    // Update Variant
-    if (variant) {
-      const variantInfo = await Variant.findById(variant);
-      if (variantInfo) {
-        variantInfo.stockVariant = (variantInfo.stockVariant || 0) + quantity;
-        variantInfo.wholesalePrice = wholesalePrice;
-        variantInfo.purchasePrice = purchasePrice;
-        variantInfo.retailPrice = retailPrice;
-        if (size)
-          variantInfo.size = Array.from(
-            new Set([...(variantInfo.size || []), size]),
-          );
-        if (color)
-          variantInfo.color = Array.from(
-            new Set([...(variantInfo.color || []), color]),
-          );
-        await variantInfo.save();
-      }
-    }
-  }
-
-  const payable = subTotal + shipping + commission;
-  const dueamount = payable - paid;
-
-  /** -----------------------------------
-   * 🔹 Update Purchase Document
-   * ----------------------------------- */
-  existingPurchase.invoiceNumber =
-    invoiceNumber || existingPurchase.invoiceNumber;
-  existingPurchase.supplierName = supplierName || existingPurchase.supplierName;
-  existingPurchase.cashType = cashType || existingPurchase.cashType;
-  existingPurchase.allproduct = updatedProducts;
-  existingPurchase.subTotal = subTotal;
-  existingPurchase.commission = commission;
-  existingPurchase.shipping = shipping;
-  existingPurchase.payable = payable;
-  existingPurchase.paid = paid;
-  existingPurchase.dueamount = dueamount;
-  existingPurchase.category = category || existingPurchase.category;
-  existingPurchase.subCategory = subCategory || existingPurchase.subCategory;
-  existingPurchase.brand = brand || existingPurchase.brand;
-
-  await existingPurchase.save();
-
-  return apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Purchase updated successfully",
-    existingPurchase,
-  );
 });
 
 // delete purchase
 exports.deletePurchase = asynchandeler(async (req, res) => {
   const { id } = req.params;
 
-  // Find purchase
-  const purchase = await Purchase.findById(id);
-  if (!purchase) {
-    throw new customError("Purchase not found", statusCodes.NOT_FOUND);
-  }
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  /** -----------------------------------
-   * 🔹 Rollback Stock Before Deleting
-   * ----------------------------------- */
-  for (const item of purchase.allproduct) {
-    const { product, variant, quantity } = item;
+  try {
+    const purchase = await Purchase.findById(id).session(session);
+    if (!purchase) {
+      throw new customError("Purchase not found", statusCodes.NOT_FOUND);
+    }
 
-    if (product) {
-      const productInfo = await Product.findById(product);
-      if (productInfo) {
-        productInfo.stock = (productInfo.stock || 0) - quantity;
-        if (productInfo.stock < 0) productInfo.stock = 0; // prevent negative
-        await productInfo.save();
+    // Rollback Stock
+    for (const item of purchase.allproduct) {
+      const { product, variant, quantity } = item;
+      if (product) {
+        await Product.findByIdAndUpdate(product, { $inc: { stock: -quantity } }).session(session);
+      }
+      if (variant) {
+        await Variant.findByIdAndUpdate(variant, { $inc: { stockVariant: -quantity } }).session(session);
       }
     }
 
-    if (variant) {
-      const variantInfo = await Variant.findById(variant);
-      if (variantInfo) {
-        variantInfo.stockVariant = (variantInfo.stockVariant || 0) - quantity;
-        if (variantInfo.stockVariant < 0) variantInfo.stockVariant = 0; // prevent negative
-        await variantInfo.save();
+    // Rollback Supplier Dues
+    if (purchase.supplierId && purchase.dueamount !== 0) {
+      const supplier = await SupplierModel.findOne({ supplierId: purchase.supplierId }).session(session);
+      if (supplier) {
+        supplier.openingDues = Math.max(0, (supplier.openingDues || 0) - purchase.dueamount);
+        await supplier.save({ session });
       }
     }
+
+    await Purchase.findByIdAndDelete(id).session(session);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Purchase deleted successfully",
+      null,
+    );
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
   }
-
-  // Delete purchase
-  await Purchase.findByIdAndDelete(id);
-
-  return apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Purchase deleted successfully",
-    null,
-  );
 });
