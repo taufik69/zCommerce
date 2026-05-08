@@ -27,7 +27,18 @@ exports.createSalesReturn = asynchandeler(async (req, res) => {
 
   try {
     const salesReturn = await SalesReturn.create([data], { session });
-    const returnDoc = salesReturn[0];
+    let returnDoc = salesReturn[0];
+
+    // Populate the newly created document to verify immediately
+    returnDoc = await SalesReturn.findById(returnDoc._id)
+      .populate({
+        path: "invoiceNumber",
+        select: "-paymentMethod -searchItem",
+      })
+      .populate("refundMethod")
+      .populate("allproduct.product")
+      .populate("allproduct.variant")
+      .session(session);
 
     // 1. Restock products and variants & Update Sales searchItem status
     const originalSale = await Sales.findById(data.invoiceNumber).session(session);
