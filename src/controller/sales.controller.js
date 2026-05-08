@@ -12,6 +12,7 @@ const {
   customerModel,
   customerAdvancePaymentModel,
 } = require("../models/customer.model");
+const { clientCommandMessageReg } = require("bullmq");
 
 // @desc create a new sales
 // @desc create a new sales (transaction safe + background notifications)
@@ -115,7 +116,6 @@ exports.createSales = asynchandeler(async (req, res) => {
         const advanceDoc = await customerAdvancePaymentModel
           .findOne({ customer: createdSale.customerType.customerId })
           .session(session);
-
         if (!advanceDoc || advanceDoc.balance < advanceAdjust) {
           throw new customError(
             `Insufficient advance balance. Available: ${advanceDoc?.balance || 0}`,
