@@ -181,7 +181,7 @@ exports.getAllPurchases = asynchandeler(async (req, res) => {
     .populate({
       path: "allproduct.variant",
     })
-    .populate("category subCategory brand cashType")
+    .populate("category subCategory brand cashType supplierId")
     .sort({ createdAt: -1 })
     .lean();
 
@@ -232,7 +232,7 @@ exports.getSinglePurchase = asynchandeler(async (req, res) => {
     .populate({
       path: "allproduct.variant",
     })
-    .populate("category subCategory brand cashType")
+    .populate("category subCategory brand cashType supplierId")
     .lean();
 
   if (!purchase) {
@@ -263,6 +263,10 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
     category,
     subCategory,
     brand,
+    dueamount,
+    payable,
+  
+
   } = req.body;
 
   const session = await mongoose.startSession();
@@ -354,14 +358,14 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
       }
     }
 
-    const payable = subTotal + shipping + commission;
-    const dueamount = payable - paid;
+    // const payable = subTotal + shipping + commission;
+    // const dueamount = payable - paid;
 
     // Apply New Supplier Dues
     if (supplierId && dueamount !== 0) {
       let supplier = await SupplierModel.findById(supplierId).session(session);
       if (!supplier) {
-        supplier = await SupplierModel.findOne({ supplierId }).session(session);
+        supplier = await SupplierModel.findOne({ _id: supplierId }).session(session);
       }
       
       if (supplier) {
