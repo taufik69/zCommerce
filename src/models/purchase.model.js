@@ -16,8 +16,8 @@ const purchaseSchema = new mongoose.Schema(
     },
 
     supplierId: {
-      type: String,
-      trim: true,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Supplier",
       required: true,
     },
 

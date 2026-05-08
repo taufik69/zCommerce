@@ -291,7 +291,7 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
 
     // Revert Old Supplier Dues (Subtract the old due amount from supplier balance)
     if (existingPurchase.supplierId && existingPurchase.dueamount !== 0) {
-      const oldSupplier = await SupplierModel.findOne({ supplierId: existingPurchase.supplierId }).session(session);
+      const oldSupplier = await SupplierModel.findById(existingPurchase.supplierId).session(session);
       if (oldSupplier) {
         oldSupplier.openingDues = Math.max(0, (oldSupplier.openingDues || 0) - existingPurchase.dueamount);
         await oldSupplier.save({ session });
@@ -371,14 +371,12 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
       if (supplier) {
         supplier.openingDues = (supplier.openingDues || 0) + dueamount;
         await supplier.save({ session });
-        // Use the supplier mobile number for the purchase record
-        req.body.supplierId = supplier.supplierId;
       }
     }
 
     // Update Purchase Document
     existingPurchase.invoiceNumber = invoiceNumber || existingPurchase.invoiceNumber;
-    existingPurchase.supplierId = req.body.supplierId || existingPurchase.supplierId;
+    existingPurchase.supplierId = supplierId || existingPurchase.supplierId;
     existingPurchase.cashType = cashType || existingPurchase.cashType;
     existingPurchase.allproduct = updatedProducts;
     existingPurchase.subTotal = subTotal;
@@ -437,7 +435,7 @@ exports.deletePurchase = asynchandeler(async (req, res) => {
 
     // Rollback Supplier Dues
     if (purchase.supplierId && purchase.dueamount !== 0) {
-      const supplier = await SupplierModel.findOne({ supplierId: purchase.supplierId }).session(session);
+      const supplier = await SupplierModel.findById(purchase.supplierId).session(session);
       if (supplier) {
         supplier.openingDues = Math.max(0, (supplier.openingDues || 0) - purchase.dueamount);
         await supplier.save({ session });
