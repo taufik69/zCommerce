@@ -112,8 +112,7 @@ exports.createPurchase = asynchandeler(async (req, res) => {
       }
 
       if (supplier) {
-        // Increase the dues we owe the supplier
-        supplier.openingDues = (supplier.openingDues || 0) + dueamount;
+        supplier.openingDues =  dueamount;
         await supplier.save({ session });
         
         // Ensure we store the mobile number supplierId in the purchase record 
