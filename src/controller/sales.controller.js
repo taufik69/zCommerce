@@ -22,7 +22,7 @@ exports.createSales = asynchandeler(async (req, res) => {
 
   try {
     await session.withTransaction(async () => {
-      // 1) Create sales (must be inside txn)
+      // Create sales (must be inside txn)
       const docs = await salesModel.create([req.body], { session });
       createdSale = docs[0];
 
@@ -30,7 +30,7 @@ exports.createSales = asynchandeler(async (req, res) => {
         throw new customError("Sales not created", statusCodes.SERVER_ERROR);
       }
 
-      // 2) Build bulk stock operations (fast + atomic)
+      //  Build bulk stock operations (fast + atomic)
       const productOps = [];
       const variantOps = [];
 
@@ -98,7 +98,7 @@ exports.createSales = asynchandeler(async (req, res) => {
         }
       }
 
-      // 3) Update customer opening dues if listed
+      //  Update customer opening dues if listed
       if (
         createdSale.customerType?.type === "listed" &&
         createdSale.customerType?.customerId
@@ -110,7 +110,7 @@ exports.createSales = asynchandeler(async (req, res) => {
         );
       }
 
-      // 4) Adjust customer advance payment if applicable
+      // Adjust customer advance payment if applicable
       const advanceAdjust = Number(req.body.customerAdvancePaymentAdjust || 0);
       if (advanceAdjust > 0 && createdSale.customerType?.customerId) {
         const advanceDoc = await customerAdvancePaymentModel
