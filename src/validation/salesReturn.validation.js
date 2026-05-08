@@ -37,7 +37,7 @@ const salesReturnSchema = joi.object({
         product: joi
           .string()
           .regex(/^[0-9a-fA-F]{24}$/)
-          .required(),
+          .allow(null, ""),
         variant: joi
           .string()
           .regex(/^[0-9a-fA-F]{24}$/)
@@ -45,7 +45,7 @@ const salesReturnSchema = joi.object({
         quantity: joi.number().min(1).required(),
         unitPrice: joi.number().min(0).required(),
         subtotal: joi.number().min(0).required(),
-      }),
+      }).or('product', 'variant'),
     )
     .min(1)
     .required()
