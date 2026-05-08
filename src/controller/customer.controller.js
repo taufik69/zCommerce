@@ -226,7 +226,7 @@ exports.getAllCustomers = asynchandeler(async (req, res) => {
       res,
       statusCodes.OK,
       "Customers retrieved successfully",
-      { ...cached, fromCache: true },
+      { customers: cached, fromCache: true },
     );
   }
 
@@ -272,7 +272,7 @@ exports.getAllCustomers = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Customers retrieved successfully",
-    dto,
+    { customers: dto },
   );
 });
 
