@@ -18,6 +18,11 @@ const {
 
 const NS = "subcategory";
 const CACHE_TTL = 60 * 60; // 1 hour
+const CACHE_TTL_SEARCH = 60 * 5; // 5 min — search results change faster
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // @desc    Create a new subcategory
 exports.createSubCategory = asynchandeler(async (req, res) => {
@@ -65,12 +70,10 @@ exports.getAllSubCategory = asynchandeler(async (req, res) => {
   const cached = await getCache(cacheKey);
 
   if (cached) {
-    return apiResponse.sendSuccess(
-      res,
-      statusCodes.OK,
-      "Subcategories found",
-      { subCategories: cached, fromCache: true },
-    );
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Subcategories found", {
+      subCategories: cached,
+      fromCache: true,
+    });
   }
 
   const subCategories = await Subcategory.find()
@@ -93,7 +96,7 @@ exports.getAllSubCategory = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Subcategories found",
-    subCategories,
+    { subCategories, fromCache: false },
   );
 });
 
@@ -104,12 +107,10 @@ exports.getSubCategoryBySlug = asynchandeler(async (req, res) => {
   const cached = await getCache(cacheKey);
 
   if (cached) {
-    return apiResponse.sendSuccess(
-      res,
-      statusCodes.OK,
-      "Subcategory found",
-      { subCategory: cached, fromCache: true },
-    );
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Subcategory found", {
+      subCategories: cached,
+      fromCache: true,
+    });
   }
 
   const subCategory = await Subcategory.findOne({ slug })
@@ -130,7 +131,7 @@ exports.getSubCategoryBySlug = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Subcategory found",
-    subCategory,
+    { subCategories: subCategory, fromCache: false },
   );
 });
 
@@ -176,7 +177,7 @@ exports.updateSubCategory = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Subcategory updated",
-    subCategory,
+    { subCategories: subCategory, fromCache: false },
   );
 });
 
@@ -207,7 +208,7 @@ exports.deleteSubCategory = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Subcategory deleted",
-    subCategory,
+    { subCategories: subCategory, fromCache: false },
   );
 });
 
@@ -233,9 +234,7 @@ exports.activateSubCategory = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Subcategory activated successfully",
-    {
-      subCategory,
-    },
+    { subCategories: subCategory, fromCache: false },
   );
 });
 
@@ -258,9 +257,7 @@ exports.deactivateSubCategory = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Subcategory deactivated successfully",
-    {
-      subCategory,
-    },
+    { subCategories: subCategory, fromCache: false },
   );
 });
 
@@ -295,7 +292,7 @@ exports.getInactiveSubCategories = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Inactive subcategories found",
-    subCategories,
+    { subCategories, fromCache: false },
   );
 });
 // @desc    Get all active subcategories
@@ -329,7 +326,44 @@ exports.getActiveSubCategories = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Active subcategories found",
-    subCategories,
+    { subCategories, fromCache: false },
   );
 });
 
+// @desc    Search subcategories by name (case-insensitive regex)
+exports.searchSubCategories = asynchandeler(async (req, res) => {
+  const search = String(req.query.search || "").trim();
+
+  if (!search) {
+    throw new customError("Search query is required", statusCodes.BAD_REQUEST);
+  }
+
+  const cacheKey = await buildCacheKey(NS, `search:${search.toLowerCase()}`);
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Subcategories found", {
+      subCategories: cached,
+      fromCache: true,
+    });
+  }
+
+  const safeSearch = escapeRegex(search);
+
+  const subCategories = await Subcategory.find({
+    name: { $regex: safeSearch, $options: "i" },
+  })
+    .populate("category", { name: 1, slug: 1, isActive: 1 })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  if (!subCategories.length) {
+    throw new customError("No subcategories found", statusCodes.NOT_FOUND);
+  }
+
+  await setCache(cacheKey, subCategories, CACHE_TTL_SEARCH);
+
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Subcategories found", {
+    subCategories,
+    fromCache: false,
+  });
+});
