@@ -77,7 +77,7 @@ exports.getAllCustomersTypes = asynchandeler(async (req, res) => {
         res,
         statusCodes.OK,
         "Customer fetched successfully",
-        { ...cached, fromCache: true },
+        { customerType: cached, fromCache: true },
       );
     }
 
@@ -86,14 +86,13 @@ exports.getAllCustomersTypes = asynchandeler(async (req, res) => {
       throw new customError("Customer not found", statusCodes.NOT_FOUND);
     }
 
-    const responseData = { customerType: customer, fromCache: false };
-    await setCache(cacheKey, responseData, CACHE_TTL);
+    await setCache(cacheKey, customer, CACHE_TTL);
 
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
       "Customer fetched successfully",
-      responseData,
+      { customerType: customer, fromCache: false },
     );
   }
 
@@ -104,7 +103,7 @@ exports.getAllCustomersTypes = asynchandeler(async (req, res) => {
       res,
       statusCodes.OK,
       "Customers fetched successfully",
-      { ...cached, fromCache: true },
+      { customerTypes: cached, fromCache: true },
     );
   }
 
@@ -113,14 +112,13 @@ exports.getAllCustomersTypes = asynchandeler(async (req, res) => {
     throw new customError("No customer found", statusCodes.NOT_FOUND);
   }
 
-  const responseData = { customerTypes: customers, fromCache: false };
-  await setCache(cacheKey, responseData, CACHE_TTL);
+  await setCache(cacheKey, customers, CACHE_TTL);
 
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Customers fetched successfully",
-    responseData,
+    { customerTypes: customers, fromCache: false },
   );
 });
 
@@ -227,7 +225,7 @@ exports.getAllCustomers = asynchandeler(async (req, res) => {
       res,
       statusCodes.OK,
       "Customers retrieved successfully",
-      { ...cached, fromCache: true },
+      { customers: cached, fromCache: true },
     );
   }
 
@@ -267,14 +265,13 @@ exports.getAllCustomers = asynchandeler(async (req, res) => {
   }
 
   const dto = customerListDTO(customers);
-  const responseData = { customers: dto, fromCache: false };
-  await setCache(cacheKey, responseData, CACHE_TTL);
+  await setCache(cacheKey, dto, CACHE_TTL);
 
   return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Customers retrieved successfully",
-    responseData,
+    { customers: dto, fromCache: false },
   );
 });
 
@@ -453,11 +450,12 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
   );
   const cached = await getCache(cacheKey);
   if (cached) {
+    const dataKey = customer ? "customerPayment" : "customerPayments";
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
       "Customer payment retrieved successfully",
-      { customerPayment: cached, fromCache: true },
+      { [dataKey]: cached, fromCache: true },
     );
   }
 
@@ -479,17 +477,14 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
       );
     }
 
-    const responseData = {
-      customerPayment: customerPaymentDetailsDTO(doc),
-      fromCache: false,
-    };
-    await setCache(cacheKey, responseData, CACHE_TTL);
+    const dto = customerPaymentDetailsDTO(doc);
+    await setCache(cacheKey, dto, CACHE_TTL);
 
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
       "Customer payment retrieved successfully",
-      responseData,
+      { customerPayment: dto, fromCache: false },
     );
   }
 
@@ -510,18 +505,15 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
     );
   }
 
-  const responseData = {
-    customerPayments: customerPaymentListDTO(docs),
-    fromCache: false,
-  };
-  await setCache(cacheKey, responseData, CACHE_TTL);
+  const dto = customerPaymentListDTO(docs);
+  await setCache(cacheKey, dto, CACHE_TTL);
 
   //  Return list
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Customer payments retrieved successfully",
-    responseData,
+    { customerPayments: dto, fromCache: false },
   );
 });
 
@@ -740,11 +732,14 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
   );
   const cached = await getCache(cacheKey);
   if (cached) {
+    const dataKey = customer
+      ? "customerAdvancePayment"
+      : "customerAdvancePayments";
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
       "Customer payment retrieved successfully",
-      { ...cached, fromCache: true },
+      { [dataKey]: cached, fromCache: true },
     );
   }
 
@@ -766,17 +761,14 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
       );
     }
 
-    const responseData = {
-      customerAdvancePayment: customerAdvancePaymentDetailsDTO(doc),
-      fromCache: false,
-    };
-    await setCache(cacheKey, responseData, CACHE_TTL);
+    const dto = customerAdvancePaymentDetailsDTO(doc);
+    await setCache(cacheKey, dto, CACHE_TTL);
 
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
       "Customer payment retrieved successfully",
-      responseData,
+      { customerAdvancePayment: dto, fromCache: false },
     );
   }
 
@@ -797,18 +789,15 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
     );
   }
 
-  const responseData = {
-    customerAdvancePayments: customerAdvancePaymentListDTO(docs),
-    fromCache: false,
-  };
-  await setCache(cacheKey, responseData, CACHE_TTL);
+  const dto = customerAdvancePaymentListDTO(docs);
+  await setCache(cacheKey, dto, CACHE_TTL);
 
   //  Return list
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Customer payments retrieved successfully",
-    responseData,
+    { customerAdvancePayments: dto, fromCache: false },
   );
 });
 

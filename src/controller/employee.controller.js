@@ -542,12 +542,13 @@ exports.getEmployeeDesignation = asynchandeler(async (req, res) => {
   );
   const cached = await getCache(cacheKey);
   if (cached) {
+    const dataKey = slug ? "designation" : "designations";
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
       "Designation fetch successfully",
       {
-        ...(slug ? { designation: cached } : { designations: cached }),
+        [dataKey]: cached,
         fromCache: true,
       },
     );
@@ -575,12 +576,13 @@ exports.getEmployeeDesignation = asynchandeler(async (req, res) => {
   const dataToCache = slug ? dto[0] : dto;
   await setCache(cacheKey, dataToCache, CACHE_TTL);
 
+  const dataKey = slug ? "designation" : "designations";
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Designation fetch successfully",
     {
-      ...(slug ? { designation: dto[0] } : { designations: dto }),
+      [dataKey]: slug ? dto[0] : dto,
       fromCache: false,
     },
   );
@@ -671,12 +673,13 @@ exports.getEmployeeDepartment = asynchandeler(async (req, res) => {
   );
   const cached = await getCache(cacheKey);
   if (cached) {
+    const dataKey = slug ? "department" : "departments";
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
       "Department fetch successfully",
       {
-        ...(slug ? { department: cached } : { departments: cached }),
+        [dataKey]: cached,
         fromCache: true,
       },
     );
@@ -703,12 +706,13 @@ exports.getEmployeeDepartment = asynchandeler(async (req, res) => {
   const dataToCache = slug ? dto[0] : dto;
   await setCache(cacheKey, dataToCache, CACHE_TTL);
 
+  const dataKey = slug ? "department" : "departments";
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Department fetch successfully",
     {
-      ...(slug ? { department: dto[0] } : { departments: dto }),
+      [dataKey]: slug ? dto[0] : dto,
       fromCache: false,
     },
   );
@@ -792,12 +796,13 @@ exports.getEmployeeSection = asynchandeler(async (req, res) => {
   const cacheKey = await buildCacheKey(NS_SECTION, slug ? `slug:${slug}` : "all");
   const cached = await getCache(cacheKey);
   if (cached) {
+    const dataKey = slug ? "section" : "sections";
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
       "Section fetch successfully",
       {
-        ...(slug ? { section: cached } : { sections: cached }),
+        [dataKey]: cached,
         fromCache: true,
       },
     );
@@ -822,12 +827,13 @@ exports.getEmployeeSection = asynchandeler(async (req, res) => {
   const dataToCache = slug ? dto[0] : dto;
   await setCache(cacheKey, dataToCache, CACHE_TTL);
 
+  const dataKey = slug ? "section" : "sections";
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Section fetch successfully",
     {
-      ...(slug ? { section: dto[0] } : { sections: dto }),
+      [dataKey]: slug ? dto[0] : dto,
       fromCache: false,
     },
   );
