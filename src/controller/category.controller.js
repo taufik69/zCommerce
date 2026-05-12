@@ -78,7 +78,7 @@ class CategoryController {
       );
     }
 
-    const categories = await Category.find({ isActive: true })
+    const categories = await Category.find({})
       .populate({ path: "subcategories", select: "-updatedAt -createdAt" })
       .populate("discount")
       .select("-updatedAt -createdAt")
@@ -114,7 +114,7 @@ class CategoryController {
       );
     }
 
-    const category = await Category.findOne({ slug, isActive: true })
+    const category = await Category.findOne({ slug })
       .populate({ path: "subcategories", select: "-updatedAt -createdAt" })
       .populate("discount")
       .select("-updatedAt -createdAt")
