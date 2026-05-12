@@ -86,7 +86,7 @@ exports.getEmployeeList = asynchandeler(async (req, res) => {
         res,
         statusCodes.OK,
         "Employee fetch successfully",
-        { ...cached, fromCache: true },
+        { employee: cached, fromCache: true },
       );
     }
 
@@ -107,7 +107,7 @@ exports.getEmployeeList = asynchandeler(async (req, res) => {
       res,
       statusCodes.OK,
       "Employee fetch successfully",
-      employee,
+      { employee, fromCache: false },
     );
   }
 
@@ -133,6 +133,7 @@ exports.getEmployeeList = asynchandeler(async (req, res) => {
   apiResponse.sendSuccess(res, 200, "Employee list fetch successfully", {
     count: employeeList.length,
     employees: employeeList,
+    fromCache: false,
   });
 });
 
@@ -402,30 +403,55 @@ exports.createEmployeeAdvancePayment = asynchandeler(async (req, res) => {
 // get all employe advance pyament or get single advance payment by employee id
 exports.getEmployeeAdvancePayment = asynchandeler(async (req, res) => {
   const { employeeId } = req.query;
+
+  const cacheKey = await buildCacheKey(
+    NS_ADVANCE,
+    employeeId ? `employee:${employeeId}` : "all",
+  );
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Advance Payment fetch successfully",
+      {
+        employeeAdvancePayments: cached,
+        fromCache: true,
+      },
+    );
+  }
+
   let filterQuery = {};
   if (employeeId) {
-    filterQuery._id = employeeId;
-  } else {
-    filterQuery = {};
+    filterQuery.employeeId = employeeId; // Fixed: filter by employeeId, not _id
   }
 
   const employeeAdvancePaymentDoc = await employeeAdvancePayment
     .find(filterQuery)
     .populate("employeeId");
-  if (employeeAdvancePaymentDoc.length == 0) {
+
+  if (!employeeAdvancePaymentDoc || employeeAdvancePaymentDoc.length === 0) {
     return apiResponse.sendError(
       res,
       statusCodes.NOT_FOUND,
       "Advance Payment not found",
     );
   }
+
+  const dto = employeeAdvancePaymentDoc.map((doc) =>
+    employeeAdvancePaymentDTO(doc),
+  );
+
+  await setCache(cacheKey, dto, CACHE_TTL);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Advance Payment fetch successfully",
-    employeeAdvancePaymentDoc.map((employeeAdvancePayment) =>
-      employeeAdvancePaymentDTO(employeeAdvancePayment),
-    ),
+    {
+      employeeAdvancePayments: dto,
+      fromCache: false,
+    },
   );
 });
 
@@ -509,28 +535,54 @@ exports.createEmployeeDesignation = asynchandeler(async (req, res) => {
 //  get all employee designation or get designnation using slug by req.query
 exports.getEmployeeDesignation = asynchandeler(async (req, res) => {
   const { slug } = req.query;
+
+  const cacheKey = await buildCacheKey(
+    NS_DESIGNATION,
+    slug ? `slug:${slug}` : "all",
+  );
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Designation fetch successfully",
+      {
+        ...(slug ? { designation: cached } : { designations: cached }),
+        fromCache: true,
+      },
+    );
+  }
+
   let filterQuery = {};
   if (slug) {
     filterQuery.slug = slug;
-  } else {
-    filterQuery = {};
   }
 
   const employeeDesignation = await employeeDesignationModel.find(filterQuery);
-  if (employeeDesignation.length == 0) {
+  if (!employeeDesignation || employeeDesignation.length === 0) {
     return apiResponse.sendError(
       res,
       statusCodes.NOT_FOUND,
       "Designation not found",
     );
   }
+
+  const dto = employeeDesignation.map((designation) =>
+    employeeDesignationDTO(designation),
+  );
+
+  // If single, store the object, else store the array
+  const dataToCache = slug ? dto[0] : dto;
+  await setCache(cacheKey, dataToCache, CACHE_TTL);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Designation fetch successfully",
-    employeeDesignation.map((designation) =>
-      employeeDesignationDTO(designation),
-    ),
+    {
+      ...(slug ? { designation: dto[0] } : { designations: dto }),
+      fromCache: false,
+    },
   );
 });
 
@@ -612,26 +664,53 @@ exports.createEmployeeDepartment = asynchandeler(async (req, res) => {
 // get all deapartment or get department using slug by req.query
 exports.getEmployeeDepartment = asynchandeler(async (req, res) => {
   const { slug } = req.query;
+
+  const cacheKey = await buildCacheKey(
+    NS_DEPARTMENT,
+    slug ? `slug:${slug}` : "all",
+  );
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Department fetch successfully",
+      {
+        ...(slug ? { department: cached } : { departments: cached }),
+        fromCache: true,
+      },
+    );
+  }
+
   let filterQuery = {};
   if (slug) {
     filterQuery.slug = slug;
-  } else {
-    filterQuery = {};
   }
 
   const employeeDepartment = await departmentModel.find(filterQuery);
-  if (employeeDepartment.length == 0) {
+  if (!employeeDepartment || employeeDepartment.length === 0) {
     return apiResponse.sendError(
       res,
       statusCodes.NOT_FOUND,
       "Department not found",
     );
   }
+
+  const dto = employeeDepartment.map((department) =>
+    employeeDepartmentDTO(department),
+  );
+
+  const dataToCache = slug ? dto[0] : dto;
+  await setCache(cacheKey, dataToCache, CACHE_TTL);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Department fetch successfully",
-    employeeDepartment.map((department) => employeeDepartmentDTO(department)),
+    {
+      ...(slug ? { department: dto[0] } : { departments: dto }),
+      fromCache: false,
+    },
   );
 });
 // update department using slug
@@ -709,26 +788,48 @@ exports.createEmployeeSection = asynchandeler(async (req, res) => {
 // get all section list or get section using slug by req.query
 exports.getEmployeeSection = asynchandeler(async (req, res) => {
   const { slug } = req.query;
+
+  const cacheKey = await buildCacheKey(NS_SECTION, slug ? `slug:${slug}` : "all");
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Section fetch successfully",
+      {
+        ...(slug ? { section: cached } : { sections: cached }),
+        fromCache: true,
+      },
+    );
+  }
+
   let filterQuery = {};
   if (slug) {
     filterQuery.slug = slug;
-  } else {
-    filterQuery = {};
   }
 
   const employeeSection = await sectionModel.find(filterQuery);
-  if (employeeSection.length == 0) {
+  if (!employeeSection || employeeSection.length === 0) {
     return apiResponse.sendError(
       res,
       statusCodes.NOT_FOUND,
       "Section not found",
     );
   }
+
+  const dto = employeeSection.map((section) => employeeDepartmentDTO(section));
+
+  const dataToCache = slug ? dto[0] : dto;
+  await setCache(cacheKey, dataToCache, CACHE_TTL);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Section fetch successfully",
-    employeeSection.map((section) => employeeDepartmentDTO(section)),
+    {
+      ...(slug ? { section: dto[0] } : { sections: dto }),
+      fromCache: false,
+    },
   );
 });
 

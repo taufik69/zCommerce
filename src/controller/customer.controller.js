@@ -457,7 +457,7 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
       res,
       statusCodes.OK,
       "Customer payment retrieved successfully",
-      { ...cached, fromCache: true },
+      { customerPayment: cached, fromCache: true },
     );
   }
 
