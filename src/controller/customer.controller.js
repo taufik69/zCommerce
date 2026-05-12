@@ -92,9 +92,8 @@ exports.getAllCustomersTypes = asynchandeler(async (req, res) => {
       res,
       statusCodes.OK,
       "Customer fetched successfully",
-      customer,
+      { ...customer, fromCache: false },
     );
-    return;
   }
 
   const cacheKey = await buildCacheKey(NS_CUSTOMER_TYPE, "all");
@@ -226,7 +225,7 @@ exports.getAllCustomers = asynchandeler(async (req, res) => {
       res,
       statusCodes.OK,
       "Customers retrieved successfully",
-      { customers: cached, fromCache: true },
+      { ...cached, fromCache: true },
     );
   }
 
@@ -265,14 +264,13 @@ exports.getAllCustomers = asynchandeler(async (req, res) => {
     );
   }
 
-  const dto = customerListDTO(customers);
   await setCache(cacheKey, dto, CACHE_TTL);
 
   return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Customers retrieved successfully",
-    { customers: dto },
+    { ...customers, fromCache: false },
   );
 });
 
@@ -483,7 +481,7 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
       res,
       statusCodes.OK,
       "Customer payment retrieved successfully",
-      doc,
+      { ...doc, fromCache: false },
     );
   }
 
@@ -511,7 +509,7 @@ exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Customer payments retrieved successfully",
-    docs,
+    { ...docs, fromCache: false },
   );
 });
 
@@ -633,16 +631,16 @@ exports.deleteCustomerPaymentRecived = asynchandeler(async (req, res) => {
       "Customer payment not found",
     );
   }
-    // Invalidate cache
-    await bumpNsVersion(NS_CUSTOMER_PAYMENT);
-    await bumpNsVersion(NS_CUSTOMER);
+  // Invalidate cache
+  await bumpNsVersion(NS_CUSTOMER_PAYMENT);
+  await bumpNsVersion(NS_CUSTOMER);
 
-    apiResponse.sendSuccess(
-      res,
-      statusCodes.OK,
-      "Customer payment deleted successfully",
-      customerPaymentDetailsDTO(paymentRecived),
-    );
+  apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Customer payment deleted successfully",
+    customerPaymentDetailsDTO(paymentRecived),
+  );
 });
 
 // customerAdvancePayment controlle
@@ -762,7 +760,7 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
       res,
       statusCodes.OK,
       "Customer payment retrieved successfully",
-      doc,
+      { ...doc, fromCache: false },
     );
   }
 
@@ -790,7 +788,7 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Customer payments retrieved successfully",
-    docs,
+    { ...docs, fromCache: false },
   );
 });
 
