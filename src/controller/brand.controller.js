@@ -64,9 +64,7 @@ exports.getAllBrands = asynchandeler(async (req, res) => {
     );
   }
 
-  const brands = await Brand.find({ isActive: true })
-    .sort({ createdAt: -1 })
-    .lean();
+  const brands = await Brand.find({}).sort({ createdAt: -1 }).lean();
 
   if (!brands.length) {
     throw new customError("Brands not found", statusCodes.NOT_FOUND);
@@ -97,7 +95,7 @@ exports.getBrandBySlug = asynchandeler(async (req, res) => {
     );
   }
 
-  const brand = await Brand.findOne({ slug, isActive: true }).lean();
+  const brand = await Brand.findOne({ slug }).lean();
   if (!brand) {
     throw new customError("Brand not found", statusCodes.NOT_FOUND);
   }
