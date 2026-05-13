@@ -78,7 +78,7 @@ exports.getAllBrands = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Brands fetched successfully",
-    { brands },
+    { brands: brands, fromCache: false },
   );
 });
 
@@ -108,7 +108,7 @@ exports.getBrandBySlug = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Brand fetched successfully",
-    { brand },
+    { brand: brand, fromCache: false },
   );
 });
 
@@ -190,7 +190,10 @@ exports.activateBrand = asynchandeler(async (req, res) => {
   );
 
   if (!brand) {
-    throw new customError("Brand not found or already active", statusCodes.NOT_FOUND);
+    throw new customError(
+      "Brand not found or already active",
+      statusCodes.NOT_FOUND,
+    );
   }
 
   await bumpNsVersion(NS);
@@ -214,7 +217,10 @@ exports.deactivateBrand = asynchandeler(async (req, res) => {
   );
 
   if (!brand) {
-    throw new customError("Brand not found or already inactive", statusCodes.NOT_FOUND);
+    throw new customError(
+      "Brand not found or already inactive",
+      statusCodes.NOT_FOUND,
+    );
   }
 
   await bumpNsVersion(NS);
@@ -227,3 +233,48 @@ exports.deactivateBrand = asynchandeler(async (req, res) => {
   );
 });
 
+// @desc    Search brands by name or query
+exports.searchBrand = asynchandeler(async (req, res) => {
+  const { q } = req.query;
+
+  if (!q || q.trim() === "") {
+    throw new customError("Search query is required", statusCodes.BAD_REQUEST);
+  }
+
+  const searchQuery = q.trim();
+  const cacheKey = await buildCacheKey(NS, `search:${searchQuery}`);
+
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Brands search results",
+      { brands: cached, fromCache: true },
+    );
+  }
+
+  const brands = await Brand.find(
+    {
+      isActive: true,
+      $or: [
+        { name: { $regex: searchQuery, $options: "i" } },
+        { slug: { $regex: searchQuery, $options: "i" } },
+      ],
+    },
+    { lean: true },
+  )
+    .sort({ name: 1 })
+    .limit(20);
+
+  if (!brands.length) {
+    throw new customError("No brands found", statusCodes.NOT_FOUND);
+  }
+
+  await setCache(cacheKey, brands, CACHE_TTL);
+
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Brands search results", {
+    brands: brands,
+    fromCache: false,
+  });
+});

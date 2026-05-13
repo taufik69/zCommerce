@@ -9,35 +9,35 @@ _.route("/brand")
     // authGuard,
     // authorize("brand", "add"),
     multipleFileUpload("image", 1),
-    Brand.createBrand
+    Brand.createBrand,
   )
   .get(Brand.getAllBrands);
-
+_.route("/brand/search").get(Brand.searchBrand);
 _.route("/brand/:slug")
   .get(
     // authGuard, authorize("brand", "view"),
-    Brand.getBrandBySlug
+    Brand.getBrandBySlug,
   )
   .put(
     // authGuard,
     // authorize("brand", "edit"),
     multipleFileUpload("image", 1),
-    Brand.updateBrand
+    Brand.updateBrand,
   )
   .delete(
     // authGuard,
     // authorize("brand", "delete"),
-    Brand.deleteBrand
+    Brand.deleteBrand,
   );
 _.route("/brand/:slug/activate").put(
   // authGuard,
   // authorize("brand", "edit"),
-  Brand.activateBrand
+  Brand.activateBrand,
 );
 _.route("/brand/:slug/deactivate").put(
   // authGuard,
   // authorize("brand", "edit"),
-  Brand.deactivateBrand
+  Brand.deactivateBrand,
 );
 
 module.exports = _;
