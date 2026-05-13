@@ -254,16 +254,13 @@ exports.searchBrand = asynchandeler(async (req, res) => {
 
   const brands = await Brand.find(
     {
-      isActive: true,
       $or: [
         { name: { $regex: searchQuery, $options: "i" } },
         { slug: { $regex: searchQuery, $options: "i" } },
       ],
     },
     { lean: true },
-  )
-    .sort({ name: 1 })
-    .limit(20);
+  ).sort({ name: 1 });
 
   if (!brands.length) {
     throw new customError("No brands found", statusCodes.NOT_FOUND);
