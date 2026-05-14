@@ -23,6 +23,7 @@ const stockAdjustRoutes = require("./api/stockAdjust.api");
 const purchaseRoutes = require("./api/purchase.api");
 const sizeChartRoutes = require("./api/sizeChart.api");
 
+// All routes
 _.use("/auth", userRoutes);
 _.use(categoryRoutes);
 _.use(subcategoryRoutes);
