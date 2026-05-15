@@ -86,7 +86,12 @@ class CategoryController {
       .lean();
 
     if (!categories.length) {
-      throw new customError("No categories found", statusCodes.NOT_FOUND);
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "No categories found",
+        { categories: [], fromCache: false },
+      );
     }
 
     await setCache(cacheKey, categories, CACHE_TTL);
@@ -121,7 +126,12 @@ class CategoryController {
       .lean();
 
     if (!category) {
-      throw new customError("Category not found", statusCodes.NOT_FOUND);
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Category not found",
+        { category: null, fromCache: false },
+      );
     }
 
     await setCache(cacheKey, category, CACHE_TTL);
@@ -212,9 +222,11 @@ class CategoryController {
       { new: true },
     );
     if (!category) {
-      throw new customError(
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
         "Category not found or already active",
-        statusCodes.NOT_FOUND,
+        { category: null, fromCache: false },
       );
     }
 
@@ -238,9 +250,11 @@ class CategoryController {
       { new: true },
     );
     if (!category) {
-      throw new customError(
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
         "Category not found or already inactive",
-        statusCodes.NOT_FOUND,
+        { category: null, fromCache: false },
       );
     }
 
@@ -272,9 +286,14 @@ class CategoryController {
       .lean();
 
     if (!categories.length) {
-      throw new customError(
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
         "No active categories found",
-        statusCodes.NOT_FOUND,
+        {
+          categories: [],
+          fromCache: false,
+        },
       );
     }
 
@@ -306,9 +325,14 @@ class CategoryController {
       .lean();
 
     if (!categories.length) {
-      throw new customError(
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
         "No inactive categories found",
-        statusCodes.NOT_FOUND,
+        {
+          categories: [],
+          fromCache: false,
+        },
       );
     }
 
@@ -354,7 +378,15 @@ class CategoryController {
       .lean();
 
     if (!categories.length) {
-      throw new customError("No categories found", statusCodes.NOT_FOUND);
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "No categories found",
+        {
+          categories: [],
+          fromCache: false,
+        },
+      );
     }
 
     await setCache(cacheKey, categories, CACHE_TTL_SEARCH);
@@ -387,7 +419,15 @@ class CategoryController {
       .lean();
 
     if (!categories.length) {
-      throw new customError("No categories found", statusCodes.NOT_FOUND);
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "No categories found",
+        {
+          categories: [],
+          fromCache: false,
+        },
+      );
     }
 
     await setCache(cacheKey, categories, CACHE_TTL);
@@ -431,7 +471,12 @@ class CategoryController {
     ]);
 
     if (!categories.length) {
-      throw new customError("No categories found", statusCodes.NOT_FOUND);
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "No categories found",
+        { categories: [], fromCache: false },
+      );
     }
 
     const totalPages = Math.ceil(total / limit);

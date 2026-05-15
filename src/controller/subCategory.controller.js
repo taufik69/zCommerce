@@ -86,18 +86,24 @@ exports.getAllSubCategory = asynchandeler(async (req, res) => {
     .sort({ createdAt: -1 })
     .lean();
 
-  if (!subCategories) {
-    throw new customError("Subcategories not found", statusCodes.NOT_FOUND);
+  if (!subCategories.length) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "No subcategories found",
+      {
+        subCategories: [],
+        fromCache: false,
+      },
+    );
   }
 
   await setCache(cacheKey, subCategories, CACHE_TTL);
 
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Subcategories found",
-    { subCategories, fromCache: false },
-  );
+  apiResponse.sendSuccess(res, statusCodes.OK, "Subcategories found", {
+    subCategories,
+    fromCache: false,
+  });
 });
 
 // @desc    Get a subcategory by slug
@@ -122,17 +128,23 @@ exports.getSubCategoryBySlug = asynchandeler(async (req, res) => {
     .lean();
 
   if (!subCategory) {
-    throw new customError("Subcategory not found", statusCodes.NOT_FOUND);
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Subcategory not found",
+      {
+        subCategories: [],
+        fromCache: false,
+      },
+    );
   }
 
   await setCache(cacheKey, subCategory, CACHE_TTL);
 
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Subcategory found",
-    { subCategories: subCategory, fromCache: false },
-  );
+  apiResponse.sendSuccess(res, statusCodes.OK, "Subcategory found", {
+    subCategories: subCategory,
+    fromCache: false,
+  });
 });
 
 // @desc    Update a subcategory by slug
@@ -173,12 +185,10 @@ exports.updateSubCategory = asynchandeler(async (req, res) => {
   await bumpNsVersion(NS);
 
   // Send success response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Subcategory updated",
-    { subCategories: subCategory, fromCache: false },
-  );
+  apiResponse.sendSuccess(res, statusCodes.OK, "Subcategory updated", {
+    subCategories: subCategory,
+    fromCache: false,
+  });
 });
 
 // @desc    Delete a subcategory by slug
@@ -204,12 +214,10 @@ exports.deleteSubCategory = asynchandeler(async (req, res) => {
   await bumpNsVersion("category");
 
   // Send success response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Subcategory deleted",
-    { subCategories: subCategory, fromCache: false },
-  );
+  apiResponse.sendSuccess(res, statusCodes.OK, "Subcategory deleted", {
+    subCategories: subCategory,
+    fromCache: false,
+  });
 });
 
 // @desc    Activate a subcategory by slug
@@ -288,12 +296,10 @@ exports.getInactiveSubCategories = asynchandeler(async (req, res) => {
 
   await setCache(cacheKey, subCategories, CACHE_TTL);
 
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Inactive subcategories found",
-    { subCategories, fromCache: false },
-  );
+  apiResponse.sendSuccess(res, statusCodes.OK, "Inactive subcategories found", {
+    subCategories,
+    fromCache: false,
+  });
 });
 // @desc    Get all active subcategories
 exports.getActiveSubCategories = asynchandeler(async (req, res) => {
@@ -322,12 +328,10 @@ exports.getActiveSubCategories = asynchandeler(async (req, res) => {
 
   await setCache(cacheKey, subCategories, CACHE_TTL);
 
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Active subcategories found",
-    { subCategories, fromCache: false },
-  );
+  apiResponse.sendSuccess(res, statusCodes.OK, "Active subcategories found", {
+    subCategories,
+    fromCache: false,
+  });
 });
 
 // @desc    Search subcategories by name (case-insensitive regex)
