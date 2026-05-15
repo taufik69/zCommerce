@@ -87,7 +87,7 @@ const productCreateSchema = joi
       .valid("In Stock", "Out of Stock", "Preorder")
       .optional(),
 
-    stock: joi.number().min(0).optional().default(0).allow(null),
+    stock: joi.number().min(0).optional().allow(null),
     purchasePrice: joi.number().min(0).when("variantType", {
       is: "singleVariant",
       then: joi.required(),

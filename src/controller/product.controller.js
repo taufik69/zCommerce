@@ -113,6 +113,20 @@ class ProductController {
     const value = await validateProduct(req);
     const { thumbnail, images, ogImage, ...productData } = value;
 
+    // Set default 0 for null number fields
+    if (productData.stock === null || productData.stock === undefined) productData.stock = 0;
+    if (productData.weight === null || productData.weight === undefined) productData.weight = 0;
+    if (productData.groupUnitQuantity === null || productData.groupUnitQuantity === undefined) productData.groupUnitQuantity = 0;
+    if (productData.purchasePrice === null || productData.purchasePrice === undefined) productData.purchasePrice = 0;
+    if (productData.retailPrice === null || productData.retailPrice === undefined) productData.retailPrice = 0;
+    if (productData.wholesalePrice === null || productData.wholesalePrice === undefined) productData.wholesalePrice = 0;
+    if (productData.retailProfitMarginByPercentage === null || productData.retailProfitMarginByPercentage === undefined) productData.retailProfitMarginByPercentage = 0;
+    if (productData.wholesaleProfitMarginPercentage === null || productData.wholesaleProfitMarginPercentage === undefined) productData.wholesaleProfitMarginPercentage = 0;
+
+    // Set null for tag and seo if not provided
+    if (!productData.tag) productData.tag = null;
+    if (!productData.seo) productData.seo = null;
+
     // Uniqueness checks (parallel)
     const [skuTaken, barCodeTaken] = await Promise.all([
       productData.sku ? Product.exists({ sku: productData.sku }) : null,
