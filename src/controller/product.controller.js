@@ -114,14 +114,40 @@ class ProductController {
     const { thumbnail, images, ogImage, ...productData } = value;
 
     // Set default 0 for null number fields
-    if (productData.stock === null || productData.stock === undefined) productData.stock = 0;
-    if (productData.weight === null || productData.weight === undefined) productData.weight = 0;
-    if (productData.groupUnitQuantity === null || productData.groupUnitQuantity === undefined) productData.groupUnitQuantity = 0;
-    if (productData.purchasePrice === null || productData.purchasePrice === undefined) productData.purchasePrice = 0;
-    if (productData.retailPrice === null || productData.retailPrice === undefined) productData.retailPrice = 0;
-    if (productData.wholesalePrice === null || productData.wholesalePrice === undefined) productData.wholesalePrice = 0;
-    if (productData.retailProfitMarginByPercentage === null || productData.retailProfitMarginByPercentage === undefined) productData.retailProfitMarginByPercentage = 0;
-    if (productData.wholesaleProfitMarginPercentage === null || productData.wholesaleProfitMarginPercentage === undefined) productData.wholesaleProfitMarginPercentage = 0;
+    if (productData.stock === null || productData.stock === undefined)
+      productData.stock = 0;
+    if (productData.weight === null || productData.weight === undefined)
+      productData.weight = 0;
+    if (
+      productData.groupUnitQuantity === null ||
+      productData.groupUnitQuantity === undefined
+    )
+      productData.groupUnitQuantity = 0;
+    if (
+      productData.purchasePrice === null ||
+      productData.purchasePrice === undefined
+    )
+      productData.purchasePrice = 0;
+    if (
+      productData.retailPrice === null ||
+      productData.retailPrice === undefined
+    )
+      productData.retailPrice = 0;
+    if (
+      productData.wholesalePrice === null ||
+      productData.wholesalePrice === undefined
+    )
+      productData.wholesalePrice = 0;
+    if (
+      productData.retailProfitMarginByPercentage === null ||
+      productData.retailProfitMarginByPercentage === undefined
+    )
+      productData.retailProfitMarginByPercentage = 0;
+    if (
+      productData.wholesaleProfitMarginPercentage === null ||
+      productData.wholesaleProfitMarginPercentage === undefined
+    )
+      productData.wholesaleProfitMarginPercentage = 0;
 
     // Set null for tag and seo if not provided
     if (!productData.tag) productData.tag = null;
@@ -158,7 +184,9 @@ class ProductController {
     const product = await Product.create({
       ...productData,
       barCode: productData.barCode || generateBarcode(),
-      thumbnail: thumbnail ? { status: "pending", localPath: thumbnail.path } : undefined,
+      thumbnail: thumbnail
+        ? { status: "pending", localPath: thumbnail.path }
+        : undefined,
       image: images.map((img) => ({
         status: "pending",
         localPath: img.path,
@@ -168,7 +196,7 @@ class ProductController {
 
     // Enqueue all uploads in one Redis round-trip
     const jobs = [];
-    
+
     if (thumbnail) {
       jobs.push({
         name: "create-product-thumbnail",
@@ -191,7 +219,7 @@ class ProductController {
           fieldName: "image",
           index: i,
         },
-      }))
+      })),
     );
 
     if (ogImage) {
@@ -257,7 +285,12 @@ class ProductController {
       .lean();
 
     if (!products.length) {
-      throw new customError("No products found", statusCodes.NOT_FOUND);
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Products fetched successfully",
+        { products: [], fromCache: false },
+      );
     }
 
     await setCache(cacheKey, products, CACHE_TTL_LIST);
@@ -266,7 +299,7 @@ class ProductController {
       res,
       statusCodes.OK,
       "Products fetched successfully",
-      { products },
+      { products, fromCache: false },
     );
   });
 
@@ -295,7 +328,10 @@ class ProductController {
       .lean();
 
     if (!product) {
-      throw new customError("Product not found", statusCodes.NOT_FOUND);
+      return apiResponse.sendSuccess(res, statusCodes.OK, "Product not found", {
+        product: null,
+        fromCache: false,
+      });
     }
 
     await setCache(cacheKey, product, CACHE_TTL);
@@ -304,7 +340,7 @@ class ProductController {
       res,
       statusCodes.OK,
       "Product fetched successfully",
-      { product },
+      { product, fromCache: false },
     );
   });
 
@@ -406,7 +442,9 @@ class ProductController {
 
     const product = await Product.findOne({ slug });
     if (!product) {
-      throw new customError("Product not found", statusCodes.NOT_FOUND);
+      return apiResponse.sendSuccess(res, statusCodes.OK, "Product not found", {
+        product: null,
+      });
     }
 
     const currentCount = product.image.length;
@@ -464,7 +502,9 @@ class ProductController {
 
     const product = await Product.findOne({ slug });
     if (!product) {
-      throw new customError("Product not found", statusCodes.NOT_FOUND);
+      return apiResponse.sendSuccess(res, statusCodes.OK, "Product not found", {
+        product: null,
+      });
     }
 
     const toDelete = [];
@@ -511,7 +551,6 @@ class ProductController {
     );
   });
 
-
   // ─── PAGINATION ────────────────────────────────────────────────────────────
   getProductsWithPagination = asynchandeler(async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -543,7 +582,12 @@ class ProductController {
     ]);
 
     if (!products.length) {
-      throw new customError("No products found", statusCodes.NOT_FOUND);
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Products not found",
+        { products: [], fromCache: false },
+      );
     }
 
     const payload = {
@@ -560,7 +604,7 @@ class ProductController {
       res,
       statusCodes.OK,
       "Products fetched successfully",
-      payload,
+      { products: payload, fromCache: false },
     );
   });
 
@@ -570,7 +614,9 @@ class ProductController {
 
     const product = await Product.findOneAndDelete({ slug });
     if (!product) {
-      throw new customError("Product not found", statusCodes.NOT_FOUND);
+      return apiResponse.sendSuccess(res, statusCodes.OK, "Product not found", {
+        product: null,
+      });
     }
 
     await bumpNsVersion(NS);
@@ -605,9 +651,14 @@ class ProductController {
       .lean();
 
     if (!products.length) {
-      throw new customError(
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
         "Multiple variant products not found",
-        statusCodes.NOT_FOUND,
+        {
+          products: [],
+          fromCache: false,
+        },
       );
     }
 
@@ -617,7 +668,7 @@ class ProductController {
       res,
       statusCodes.OK,
       "Multiple variant products fetched successfully",
-      { products },
+      { products: products, fromCache: false },
     );
   });
 
@@ -643,9 +694,14 @@ class ProductController {
       .lean();
 
     if (!products.length) {
-      throw new customError(
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
         "New arrival products not found",
-        statusCodes.NOT_FOUND,
+        {
+          products: [],
+          fromCache: false,
+        },
       );
     }
 
@@ -655,7 +711,7 @@ class ProductController {
       res,
       statusCodes.OK,
       "New arrival products fetched successfully",
-      { products },
+      { products: products, fromCache: false },
     );
   });
 
@@ -719,7 +775,12 @@ class ProductController {
     ]);
 
     if (!products.length) {
-      throw new customError("No products found", statusCodes.NOT_FOUND);
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "No products found matching price range",
+        { products: [], fromCache: false },
+      );
     }
 
     await setCache(cacheKey, products, CACHE_TTL_LIST);
@@ -795,9 +856,14 @@ class ProductController {
     const merged = [...products, ...variantDiscountedProducts];
 
     if (!merged.length) {
-      throw new customError(
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
         "No discounted products found",
-        statusCodes.NOT_FOUND,
+        {
+          products: [],
+          fromCache: false,
+        },
       );
     }
 
@@ -807,7 +873,7 @@ class ProductController {
       res,
       statusCodes.OK,
       "Discounted products fetched successfully",
-      { products: merged },
+      { products: merged, fromCache: false },
     );
   });
 
@@ -842,9 +908,14 @@ class ProductController {
     const merged = [...products, ...variantBestSelling];
 
     if (!merged.length) {
-      throw new customError(
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
         "No best selling products found",
-        statusCodes.NOT_FOUND,
+        {
+          products: [],
+          fromCache: false,
+        },
       );
     }
 
@@ -854,7 +925,7 @@ class ProductController {
       res,
       statusCodes.OK,
       "Best selling products fetched successfully",
-      { products: merged },
+      { products: merged, fromCache: false },
     );
   });
 
@@ -931,7 +1002,12 @@ class ProductController {
     ]);
 
     if (!products.length) {
-      throw new customError("No products found", statusCodes.NOT_FOUND);
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "No products found matching search criteria",
+        { products: [], fromCache: false },
+      );
     }
 
     await setCache(cacheKey, products, 60 * 5); // 5 min — search results change
@@ -940,7 +1016,7 @@ class ProductController {
       res,
       statusCodes.OK,
       "Products fetched successfully",
-      { products },
+      { products: products, fromCache: false },
     );
   });
 }
