@@ -319,10 +319,15 @@ exports.getActiveSubCategories = asynchandeler(async (req, res) => {
     .populate("category", { name: 1, slug: 1, isActive: 1 })
     .lean();
 
-  if (!subCategories) {
-    throw new customError(
-      "Active subcategories not found",
-      statusCodes.NOT_FOUND,
+  if (!subCategories.length) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "No active subcategories found",
+      {
+        subCategories: [],
+        fromCache: false,
+      },
     );
   }
 
@@ -361,7 +366,15 @@ exports.searchSubCategories = asynchandeler(async (req, res) => {
     .lean();
 
   if (!subCategories.length) {
-    throw new customError("No subcategories found", statusCodes.NOT_FOUND);
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "No subcategories found",
+      {
+        subCategories: [],
+        fromCache: false,
+      },
+    );
   }
 
   await setCache(cacheKey, subCategories, CACHE_TTL_SEARCH);
