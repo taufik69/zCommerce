@@ -87,11 +87,7 @@ const productCreateSchema = joi
       .valid("In Stock", "Out of Stock", "Preorder")
       .optional(),
 
-    stock: joi.number().min(0).when("variantType", {
-      is: "singleVariant",
-      then: joi.required(),
-      otherwise: joi.optional().default(0),
-    }),
+    stock: joi.number().min(0).optional().default(0),
     purchasePrice: joi.number().min(0).when("variantType", {
       is: "singleVariant",
       then: joi.required(),
@@ -130,27 +126,11 @@ const productCreateSchema = joi
       otherwise: joi.optional(),
     }),
 
-    weight: joi.number().min(0).when("variantType", {
-      is: "singleVariant",
-      then: joi.required(),
-      otherwise: joi.optional(),
-    }),
-    dimensions: dimensionsField.when("variantType", {
-      is: "singleVariant",
-      then: joi.required(),
-      otherwise: joi.optional(),
-    }),
+    weight: joi.number().min(0).optional(),
+    dimensions: dimensionsField.optional(),
 
-    groupUnit: joi.string().trim().when("variantType", {
-      is: "singleVariant",
-      then: joi.required(),
-      otherwise: joi.optional(),
-    }),
-    groupUnitQuantity: joi.number().min(0).when("variantType", {
-      is: "singleVariant",
-      then: joi.required(),
-      otherwise: joi.optional(),
-    }),
+    groupUnit: joi.string().trim().optional(),
+    groupUnitQuantity: joi.number().min(0).optional(),
     unit: joi
       .string()
       .valid("Piece", "Kg", "Gram", "Packet", "Custom")
