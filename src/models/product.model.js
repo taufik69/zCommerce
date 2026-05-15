@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { default: slugify } = require("slugify");
+const { customError } = require("../lib/CustomError");
 
 // ─── Reusable subschemas ─────────────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ const seoSchema = new mongoose.Schema(
 const productSchema = new mongoose.Schema(
   {
     slug: { type: String, unique: true, lowercase: true, trim: true },
-    name: { type: String, required: true, trim: true },
+    name: { type: String, required: true, trim: true, unique: true },
     description: { type: String },
     category: {
       type: mongoose.Schema.Types.ObjectId,
@@ -197,6 +198,27 @@ productSchema.pre("findOneAndUpdate", function (next) {
     update.slug = slugify(update.name, { lower: true, strict: true });
   }
   next();
+});
+
+const handleDuplicateKeyError = (error, next) => {
+  if (error && error.code === 11000) {
+    const field =
+      (error.keyPattern && Object.keys(error.keyPattern)[0]) ||
+      (error.keyValue && Object.keys(error.keyValue)[0]) ||
+      "field";
+
+    return next(new customError(`${field} already exists`, 400));
+  }
+
+  return next(error);
+};
+
+productSchema.post("save", function (error, doc, next) {
+  handleDuplicateKeyError(error, next);
+});
+
+productSchema.post("findOneAndUpdate", function (error, doc, next) {
+  handleDuplicateKeyError(error, next);
 });
 
 // ─── Virtuals ─────────────────────────────────────────────────────────────────

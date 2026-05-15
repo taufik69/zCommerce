@@ -154,13 +154,20 @@ class ProductController {
     if (!productData.seo) productData.seo = null;
 
     // Uniqueness checks (parallel)
-    const [skuTaken, barCodeTaken] = await Promise.all([
+    const [nameTaken, skuTaken, barCodeTaken] = await Promise.all([
+      Product.exists({ name: productData.name }),
       productData.sku ? Product.exists({ sku: productData.sku }) : null,
       productData.barCode
         ? Product.exists({ barCode: productData.barCode })
         : null,
     ]);
 
+    if (nameTaken) {
+      throw new customError(
+        `Product name "${productData.name}" already exists`,
+        statusCodes.BAD_REQUEST,
+      );
+    }
     if (skuTaken) {
       throw new customError(
         `SKU "${productData.sku}" already exists`,
@@ -351,7 +358,10 @@ class ProductController {
     const { ogImage, ...updateData } = value;
 
     // Uniqueness checks against OTHER docs (parallel)
-    const [skuTaken, barCodeTaken] = await Promise.all([
+    const [nameTaken, skuTaken, barCodeTaken] = await Promise.all([
+      updateData.name
+        ? Product.exists({ name: updateData.name, slug: { $ne: slug } })
+        : null,
       updateData.sku
         ? Product.exists({ sku: updateData.sku, slug: { $ne: slug } })
         : null,
@@ -360,6 +370,12 @@ class ProductController {
         : null,
     ]);
 
+    if (nameTaken) {
+      throw new customError(
+        `Product name "${updateData.name}" is already taken`,
+        statusCodes.BAD_REQUEST,
+      );
+    }
     if (skuTaken) {
       throw new customError(
         `SKU "${updateData.sku}" is already taken`,
