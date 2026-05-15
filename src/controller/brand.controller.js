@@ -67,7 +67,10 @@ exports.getAllBrands = asynchandeler(async (req, res) => {
   const brands = await Brand.find({}).sort({ createdAt: -1 }).lean();
 
   if (!brands.length) {
-    throw new customError("Brands not found", statusCodes.NOT_FOUND);
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No brands found", {
+      brands: [],
+      fromCache: false,
+    });
   }
 
   await setCache(cacheKey, brands, CACHE_TTL);
@@ -262,7 +265,10 @@ exports.searchBrand = asynchandeler(async (req, res) => {
     .sort({ name: 1 });
 
   if (!brands.length) {
-    throw new customError("No brands found", statusCodes.NOT_FOUND);
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No brands found", {
+      brands: [],
+      fromCache: false,
+    });
   }
 
   await setCache(cacheKey, brands, CACHE_TTL);
