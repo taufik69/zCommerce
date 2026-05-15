@@ -12,23 +12,32 @@ const app = express();
 const server = http.createServer(app);
 
 // ====== Security Middlewares ======
+app.set("trust proxy", 1);
 app.use(helmet());
 app.use(
   cors({
-    origin: [
-      process.env.FRONTEND_URL,
-      "http://localhost:3001",
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "http://localhost:5172",
-      "http://localhost:5174",
-      "https://smartsoftnextjs-ecommerce-git-main-wasim-mahamods-projects.vercel.app",
-      "https://smartsoftnextjs-ecommerce.vercel.app",
-      "https://z-ecommerce-seven.vercel.app",
-      "https://ecommercenext-baig.vercel.app",
-    ],
+    origin: function (origin, callback) {
+      const allowedOrigins = [
+        process.env.FRONTEND_URL,
+        process.env.DASHBOARD_URL,
+        "http://localhost:3001",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:5172",
+        "http://localhost:5174",
+        "https://smartsoftnextjs-ecommerce-git-main-wasim-mahamods-projects.vercel.app",
+        "https://smartsoftnextjs-ecommerce.vercel.app",
+        "https://z-ecommerce-seven.vercel.app",
+        "https://ecommercenext-baig.vercel.app",
+      ];
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin not allowed — ${origin}`));
+      }
+    },
     credentials: true,
-  })
+  }),
 );
 
 app.use(cookieparser());
