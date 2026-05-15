@@ -1015,49 +1015,102 @@ class ProductController {
       );
     }
 
-    const matchConditions = [];
+    const productMatchConditions = [];
+    const variantMatchConditions = [];
     if (name) {
       const safe = escapeRegex(name);
-      matchConditions.push(
+      productMatchConditions.push(
         { name: { $regex: safe, $options: "i" } },
         { slug: { $regex: safe, $options: "i" } },
         { sku: { $regex: safe, $options: "i" } },
         { barCode: { $regex: safe, $options: "i" } },
         { "variant.variantName": { $regex: safe, $options: "i" } },
       );
+      variantMatchConditions.push(
+        { variantName: { $regex: safe, $options: "i" } },
+        { slug: { $regex: safe, $options: "i" } },
+        { sku: { $regex: safe, $options: "i" } },
+        { barCode: { $regex: safe, $options: "i" } },
+        { "product.name": { $regex: safe, $options: "i" } },
+      );
     }
     if (barCode) {
       const safe = escapeRegex(barCode);
-      matchConditions.push({ barCode: { $regex: safe, $options: "i" } });
+      productMatchConditions.push({
+        barCode: { $regex: safe, $options: "i" },
+      });
+      variantMatchConditions.push(
+        { barCode: { $regex: safe, $options: "i" } },
+        { "product.barCode": { $regex: safe, $options: "i" } },
+      );
     }
     if (sku) {
       const safe = escapeRegex(sku);
-      matchConditions.push({ sku: { $regex: safe, $options: "i" } });
+      productMatchConditions.push({ sku: { $regex: safe, $options: "i" } });
+      variantMatchConditions.push(
+        { sku: { $regex: safe, $options: "i" } },
+        { "product.sku": { $regex: safe, $options: "i" } },
+      );
     }
     if (slug) {
       const safe = escapeRegex(slug);
-      matchConditions.push({ slug: { $regex: safe, $options: "i" } });
+      productMatchConditions.push({ slug: { $regex: safe, $options: "i" } });
+      variantMatchConditions.push(
+        { slug: { $regex: safe, $options: "i" } },
+        { "product.slug": { $regex: safe, $options: "i" } },
+      );
     }
 
-    const products = await Product.aggregate([
-      {
-        $lookup: {
-          from: "variants",
-          localField: "variant",
-          foreignField: "_id",
-          as: "variant",
+    const [productMatches, variantMatches] = await Promise.all([
+      Product.aggregate([
+        {
+          $lookup: {
+            from: "variants",
+            localField: "variant",
+            foreignField: "_id",
+            as: "variant",
+          },
         },
-      },
-      {
-        $lookup: {
-          from: "discounts",
-          localField: "discount",
-          foreignField: "_id",
-          as: "discount",
+        {
+          $lookup: {
+            from: "discounts",
+            localField: "discount",
+            foreignField: "_id",
+            as: "discount",
+          },
         },
-      },
-      { $match: { $or: matchConditions } },
+        { $match: { $or: productMatchConditions } },
+        { $addFields: { resultType: "product" } },
+      ]),
+      Variant.aggregate([
+        {
+          $lookup: {
+            from: "products",
+            localField: "product",
+            foreignField: "_id",
+            as: "product",
+          },
+        },
+        {
+          $unwind: {
+            path: "$product",
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $lookup: {
+            from: "discounts",
+            localField: "discount",
+            foreignField: "_id",
+            as: "discount",
+          },
+        },
+        { $match: { $or: variantMatchConditions } },
+        { $addFields: { resultType: "variant" } },
+      ]),
     ]);
+
+    const products = [...productMatches, ...variantMatches];
 
     if (!products.length) {
       return apiResponse.sendSuccess(
