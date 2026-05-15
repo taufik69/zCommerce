@@ -79,15 +79,15 @@ const productCreateSchema = joi
     }),
     qrCode: joi.string().trim().optional(),
 
-    warrantyInformation: joi.string().trim().default("No warranty info"),
-    shippingInformation: joi.string().trim().optional(),
-    manufactureCountry: joi.string().trim().optional(),
+    warrantyInformation: joi.string().trim().default("No warranty info").allow(""),
+    shippingInformation: joi.string().trim().allow("").optional(),
+    manufactureCountry: joi.string().trim().allow("").optional(),
     availabilityStatus: joi
       .string()
       .valid("In Stock", "Out of Stock", "Preorder")
       .optional(),
 
-    stock: joi.number().min(0).optional().default(0),
+    stock: joi.number().min(0).optional().default(0).allow(null),
     purchasePrice: joi.number().min(0).when("variantType", {
       is: "singleVariant",
       then: joi.required(),
@@ -103,8 +103,8 @@ const productCreateSchema = joi
       then: joi.required(),
       otherwise: joi.optional(),
     }),
-    retailProfitMarginByPercentage: joi.number().min(0).max(100).optional(),
-    wholesaleProfitMarginPercentage: joi.number().min(0).max(100).optional(),
+    retailProfitMarginByPercentage: joi.number().min(0).max(100).optional().allow(null),
+    wholesaleProfitMarginPercentage: joi.number().min(0).max(100).optional().allow(null),
     alertQuantity: joi.number().min(0).when("variantType", {
       is: "singleVariant",
       then: joi.required(),
@@ -126,11 +126,11 @@ const productCreateSchema = joi
       otherwise: joi.optional(),
     }),
 
-    weight: joi.number().min(0).optional(),
-    dimensions: dimensionsField.optional(),
+    weight: joi.number().min(0).optional().allow(null),
+    dimensions: dimensionsField.optional().allow(null),
 
-    groupUnit: joi.string().trim().optional(),
-    groupUnitQuantity: joi.number().min(0).optional(),
+    groupUnit: joi.string().trim().allow("").optional(),
+    groupUnitQuantity: joi.number().min(0).optional().allow(null),
     unit: joi
       .string()
       .valid("Piece", "Kg", "Gram", "Packet", "Custom")
@@ -140,11 +140,11 @@ const productCreateSchema = joi
         otherwise: joi.optional(),
       }),
 
-    warehouseLocation: joi.string().trim().optional(),
-    tag: joi.array().items(joi.string().trim()).optional(),
-    specifications: joi.string().trim().optional(),
+    warehouseLocation: joi.string().trim().allow("").optional(),
+    tag: joi.array().items(joi.string().trim()).optional().allow(null),
+    specifications: joi.string().trim().allow("").optional(),
     ...seoFieldsSchema,
-    seo: seoFields.optional(),
+    seo: seoFields.optional().allow(null),
   })
   .options({ abortEarly: false, stripUnknown: { objects: true } });
 
@@ -163,39 +163,39 @@ const productUpdateSchema = joi
     barCode: joi.string().trim(),
     qrCode: joi.string().trim(),
 
-    warrantyInformation: joi.string().trim(),
-    shippingInformation: joi.string().trim(),
-    manufactureCountry: joi.string().trim(),
+    warrantyInformation: joi.string().trim().allow(""),
+    shippingInformation: joi.string().trim().allow(""),
+    manufactureCountry: joi.string().trim().allow(""),
     availabilityStatus: joi
       .string()
       .valid("In Stock", "Out of Stock", "Preorder"),
 
-    stock: joi.number().min(0),
-    purchasePrice: joi.number().min(0),
-    retailPrice: joi.number().min(0),
-    wholesalePrice: joi.number().min(0),
-    retailProfitMarginByPercentage: joi.number().min(0).max(100),
-    wholesaleProfitMarginPercentage: joi.number().min(0).max(100),
+    stock: joi.number().min(0).allow(null),
+    purchasePrice: joi.number().min(0).allow(null),
+    retailPrice: joi.number().min(0).allow(null),
+    wholesalePrice: joi.number().min(0).allow(null),
+    retailProfitMarginByPercentage: joi.number().min(0).max(100).allow(null),
+    wholesaleProfitMarginPercentage: joi.number().min(0).max(100).allow(null),
     alertQuantity: joi.number().min(0),
 
     variantType: joi.string().valid("singleVariant", "multipleVariant"),
     size: joi.string().trim(),
     color: joi.string().trim(),
 
-    weight: joi.number().min(0),
-    dimensions: dimensionsField,
+    weight: joi.number().min(0).allow(null),
+    dimensions: dimensionsField.allow(null),
 
-    groupUnit: joi.string().trim(),
-    groupUnitQuantity: joi.number().min(0),
+    groupUnit: joi.string().trim().allow(""),
+    groupUnitQuantity: joi.number().min(0).allow(null),
     unit: joi.string().valid("Piece", "Kg", "Gram", "Packet", "Custom"),
 
-    warehouseLocation: joi.string().trim(),
-    tag: joi.array().items(joi.string().trim()),
-    specifications: joi.string().trim(),
+    warehouseLocation: joi.string().trim().allow(""),
+    tag: joi.array().items(joi.string().trim()).allow(null),
+    specifications: joi.string().trim().allow(""),
 
     isActive: joi.boolean(),
     ...seoFieldsSchema,
-    seo: seoFields,
+    seo: seoFields.allow(null),
   })
   .min(1) // at least one field must be present
   .options({ abortEarly: false, stripUnknown: { objects: true } });
