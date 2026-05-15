@@ -28,6 +28,13 @@ _.route("/updateproductinfo/:slug").put(
   ]),
   Product.updateProductInfoBySlug
 );
+
+_.route("/product-status/:slug").put(
+  // authGuard,
+  // authorize("product", "edit"),
+  Product.updateProductStatus
+);
+
 _.route("/addproductimage/:slug").post(
   // authGuard,
   // authorize("product", "edit"),

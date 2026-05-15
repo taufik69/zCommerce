@@ -105,6 +105,16 @@ const fireAndForgetCloudinaryDelete = (publicIds = []) => {
   });
 };
 
+const parseBoolean = (value) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+  return null;
+};
+
 // ─── controller class ─────────────────────────────────────────────────────────
 
 class ProductController {
@@ -447,6 +457,38 @@ class ProductController {
       res,
       statusCodes.OK,
       "Product updated successfully",
+      product,
+    );
+  });
+
+  // ─── UPDATE STATUS — active/deactive product from one endpoint ─────────────
+  updateProductStatus = asynchandeler(async (req, res) => {
+    const { slug } = req.params;
+    const isActive = parseBoolean(req.body?.isActive);
+
+    if (isActive === null) {
+      throw new customError(
+        "isActive must be true or false",
+        statusCodes.BAD_REQUEST,
+      );
+    }
+
+    const product = await Product.findOneAndUpdate(
+      { slug },
+      { $set: { isActive } },
+      { new: true, runValidators: true },
+    );
+
+    if (!product) {
+      throw new customError("Product not found", statusCodes.NOT_FOUND);
+    }
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      `Product ${isActive ? "activated" : "deactivated"} successfully`,
       product,
     );
   });
