@@ -14,7 +14,6 @@ const seoFieldsSchema = {
   metaTitle: joi.string().trim().max(70).allow(""),
   metaDescription: joi.string().trim().max(200).allow(""),
   metaKeywords: joi.array().items(joi.string().trim().lowercase()),
-  canonicalUrl: joi.string().trim().uri().allow(""),
   focusKeyword: joi.string().trim().lowercase().allow(""),
   ogTitle: joi.string().trim().max(70).allow(""),
   ogDescription: joi.string().trim().max(200).allow(""),
@@ -28,22 +27,6 @@ const seoFieldsSchema = {
       lastError: joi.string().allow(""),
     })
     .optional(),
-  twitterCard: joi
-    .string()
-    .valid("summary", "summary_large_image", "app", "player"),
-  structuredData: joi
-    .alternatives()
-    .try(
-      joi.object(),
-      joi.string().custom((value, helpers) => {
-        try {
-          return JSON.parse(value);
-        } catch (e) {
-          return helpers.error("any.invalid");
-        }
-      }),
-    )
-    .allow(null, ""),
   noIndex: joi.boolean(),
   noFollow: joi.boolean(),
 };
