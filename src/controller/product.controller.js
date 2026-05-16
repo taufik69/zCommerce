@@ -361,11 +361,11 @@ class ProductController {
     );
   });
 
-  // ─── UPDATE — text fields + SEO + optional ogImage replacement ─────────────
+  // ─── UPDATE — text fields + SEO + optional image replacement ───────────────
   updateProductInfoBySlug = asynchandeler(async (req, res) => {
     const { slug } = req.params;
     const value = await validateProductUpdate(req);
-    const { ogImage, ...updateData } = value;
+    const { thumbnail, ogImage, ...updateData } = value;
 
     // Uniqueness checks against OTHER docs (parallel)
     const [nameTaken, skuTaken, barCodeTaken] = await Promise.all([
@@ -401,13 +401,15 @@ class ProductController {
 
     // Load doc first if image change is needed (we need oldPublicId)
     let product;
+    let oldThumbnailPublicId = null;
     let oldOgPublicId = null;
 
-    if (ogImage) {
+    if (thumbnail || ogImage) {
       product = await Product.findOne({ slug });
       if (!product) {
         throw new customError("Product not found", statusCodes.NOT_FOUND);
       }
+      oldThumbnailPublicId = product.thumbnail?.publicId || null;
       oldOgPublicId = product.seo?.ogImage?.publicId || null;
     }
 
@@ -419,6 +421,16 @@ class ProductController {
       Object.entries(seoData).forEach(([k, v]) => {
         $set[`seo.${k}`] = v;
       });
+    }
+    if (thumbnail) {
+      $set.thumbnail = {
+        status: "pending",
+        localPath: thumbnail.path,
+        url: product.thumbnail?.url || "",
+        publicId: product.thumbnail?.publicId || "",
+        tries: 0,
+        lastError: "",
+      };
     }
     if (ogImage) {
       $set["seo.ogImage"] = {
@@ -441,14 +453,36 @@ class ProductController {
       throw new customError("Product not found", statusCodes.NOT_FOUND);
     }
 
-    if (ogImage) {
-      await imageQueue.add("update-product-ogimage", {
-        modelName: NS,
-        documentId: product._id,
-        localPath: ogImage.path,
-        fieldName: "seo.ogImage",
-        oldPublicId: oldOgPublicId,
+    const jobs = [];
+
+    if (thumbnail) {
+      jobs.push({
+        name: "update-product-thumbnail",
+        data: {
+          modelName: NS,
+          documentId: product._id,
+          localPath: thumbnail.path,
+          fieldName: "thumbnail",
+          oldPublicId: oldThumbnailPublicId,
+        },
       });
+    }
+
+    if (ogImage) {
+      jobs.push({
+        name: "update-product-ogimage",
+        data: {
+          modelName: NS,
+          documentId: product._id,
+          localPath: ogImage.path,
+          fieldName: "seo.ogImage",
+          oldPublicId: oldOgPublicId,
+        },
+      });
+    }
+
+    if (jobs.length > 0) {
+      await imageQueue.addBulk(jobs);
     }
 
     await bumpNsVersion(NS);

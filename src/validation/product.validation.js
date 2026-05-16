@@ -234,16 +234,18 @@ const validateProduct = async (req) => {
 
 /**
  * Validate product UPDATE — all fields optional, strict.
- * Also accepts an optional ogImage file upload.
+ * Also accepts optional thumbnail and ogImage file uploads.
  */
 const validateProductUpdate = async (req) => {
   const expandedBody = expandBracketKeys(req.body);
   const value = await productUpdateSchema.validateAsync(expandedBody);
 
+  const thumbnail = req.files?.thumbnail?.[0];
   const ogImage = req.files?.ogImage?.[0];
+  if (thumbnail) validateImageFile(thumbnail, "Thumbnail");
   if (ogImage) validateImageFile(ogImage, "OG Image");
 
-  return { ...value, ogImage };
+  return { ...value, thumbnail, ogImage };
 };
 
 /**

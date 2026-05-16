@@ -24,6 +24,7 @@ _.route("/updateproductinfo/:slug").put(
   // authGuard,
   // authorize("product", "edit"),
   multipleFileUploadWithFields([
+    { name: "thumbnail", maxCount: 1 },
     { name: "ogImage", maxCount: 1 },
   ]),
   Product.updateProductInfoBySlug
