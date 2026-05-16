@@ -68,6 +68,8 @@ const VariantSchema = Joi.object({
   purchasePrice: Joi.number().min(0).required(),
   retailPrice: Joi.number().min(0).required(),
   wholesalePrice: Joi.number().min(0).optional(),
+  retailProfitMarginByPercentage: Joi.number().min(0).max(100).optional().allow(null),
+  wholesaleProfitMarginPercentage: Joi.number().min(0).max(100).optional().allow(null),
   alertQuantity: Joi.number().min(0).optional(),
   sku: Joi.string().trim().optional(),
   barCode: Joi.string().trim().optional(),

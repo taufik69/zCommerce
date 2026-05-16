@@ -105,6 +105,18 @@ const variantSchema = new mongoose.Schema(
     purchasePrice: { type: Number, min: 0, default: 0 },
     retailPrice: { type: Number, min: 0, default: 0 },
     wholesalePrice: { type: Number, min: 0, default: 0 },
+    retailProfitMarginByPercentage: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0,
+    },
+    wholesaleProfitMarginPercentage: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0,
+    },
 
     alertQuantity: { type: Number, default: 5 },
     stockAlert: { type: Boolean, default: false },
@@ -189,7 +201,7 @@ variantSchema.virtual("wholesaleProfitMarginAmount").get(function () {
   return (this.wholesalePrice || 0) - (this.purchasePrice || 0);
 });
 
-variantSchema.virtual("wholesaleProfitMarginPercentage").get(function () {
+variantSchema.virtual("calculatedWholesaleProfitMarginPercentage").get(function () {
   if (!this.purchasePrice) return 0;
   return (
     ((this.wholesalePrice - this.purchasePrice) / this.purchasePrice) *

@@ -59,6 +59,19 @@ exports.createVariant = asynchandeler(async (req, res) => {
     const v = variants[i];
     const validatedData = await validateVariant({ ...v, index: i }, allFiles);
 
+    if (
+      validatedData.retailProfitMarginByPercentage === null ||
+      validatedData.retailProfitMarginByPercentage === undefined
+    ) {
+      validatedData.retailProfitMarginByPercentage = 0;
+    }
+    if (
+      validatedData.wholesaleProfitMarginPercentage === null ||
+      validatedData.wholesaleProfitMarginPercentage === undefined
+    ) {
+      validatedData.wholesaleProfitMarginPercentage = 0;
+    }
+
     // 1. Collect Gallery Images
     const currentGalleryFiles = allFiles.filter(
       (f) => f.fieldname === "image" || f.fieldname === `variants[${i}][image]`,
@@ -290,6 +303,12 @@ exports.updateVariant = asynchandeler(async (req, res) => {
 
   // Update other fields
   const validatedData = await validateVariantUpdate(req.body, allFiles, existingVariant._id);
+  if (validatedData.retailProfitMarginByPercentage === null) {
+    validatedData.retailProfitMarginByPercentage = 0;
+  }
+  if (validatedData.wholesaleProfitMarginPercentage === null) {
+    validatedData.wholesaleProfitMarginPercentage = 0;
+  }
   Object.assign(existingVariant, validatedData);
   await existingVariant.save();
 
