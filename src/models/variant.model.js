@@ -148,6 +148,14 @@ variantSchema.index({ barCode: 1 });
 variantSchema.index({ product: 1 });
 variantSchema.index({ product: 1, isActive: 1 });
 
+const UNIQUE_VARIANT_FIELDS = {
+  variantName: "Variant name",
+  size: "Size",
+  color: "Color",
+  sku: "SKU",
+  barCode: "Barcode",
+};
+
 // calculate stock adjustment // adjustment plus
 variantSchema.virtual("adjustmentMultipleVariantPlus").get(function () {
   return this.stockVariantAdjust?.reduce((total, variant) => {
@@ -213,13 +221,26 @@ variantSchema.pre("save", async function (next) {
       this.slug = slugify(this.variantName, { lower: true, strict: true });
     }
 
-    // 2. Duplicate slug check
-    if (this.isModified("slug")) {
-      const existSlug = await this.constructor.findOne({
-        slug: this.slug,
+    // 2. Duplicate checks
+    const duplicateChecks = [];
+
+    if (this.isModified("slug") && this.slug) {
+      duplicateChecks.push({ slug: this.slug });
+    }
+
+    Object.keys(UNIQUE_VARIANT_FIELDS).forEach((field) => {
+      if (this.isModified(field) && this[field]) {
+        duplicateChecks.push({ [field]: this[field] });
+      }
+    });
+
+    if (duplicateChecks.length > 0) {
+      const existingVariant = await this.constructor.findOne({
+        $or: duplicateChecks,
         _id: { $ne: this._id },
       });
-      if (existSlug) {
+
+      if (existingVariant?.slug === this.slug) {
         return next(
           new customError(
             `${this.variantName} already exists Try another`,
@@ -227,22 +248,19 @@ variantSchema.pre("save", async function (next) {
           ),
         );
       }
-    }
 
-    // 3. Duplicate variant check (size/color combination per product)
-    const existVariant = await this.constructor.findOne({
-      product: this.product,
-      size: this.size,
-      color: this.color,
-      _id: { $ne: this._id },
-    });
-    if (existVariant) {
-      return next(
-        new customError(
-          `Variant with size ${this.size} and color ${this.color} already exists.`,
-          400,
-        ),
+      const duplicateField = Object.keys(UNIQUE_VARIANT_FIELDS).find(
+        (field) => this[field] && existingVariant?.[field] === this[field],
       );
+
+      if (duplicateField) {
+        return next(
+          new customError(
+            `${UNIQUE_VARIANT_FIELDS[duplicateField]} "${this[duplicateField]}" already exists`,
+            400,
+          ),
+        );
+      }
     }
 
     next();

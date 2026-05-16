@@ -44,6 +44,41 @@ const getVariantFile = (files = [], index, fieldName) => {
   );
 };
 
+const uniqueFieldLabels = {
+  variantName: "Variant name",
+  size: "Size",
+  color: "Color",
+  sku: "SKU",
+  barCode: "Barcode",
+};
+
+const ensureUniqueVariantFields = async (Variant, value, currentId = null) => {
+  const query = Object.keys(uniqueFieldLabels)
+    .filter((field) => value[field])
+    .map((field) => ({ [field]: value[field] }));
+
+  if (query.length === 0) return;
+
+  const findQuery = { $or: query };
+  if (currentId) {
+    findQuery._id = { $ne: currentId };
+  }
+
+  const existing = await Variant.findOne(findQuery);
+  if (!existing) return;
+
+  const duplicateField = Object.keys(uniqueFieldLabels).find(
+    (field) => value[field] && existing[field] === value[field],
+  );
+
+  if (duplicateField) {
+    throw new customError(
+      `${uniqueFieldLabels[duplicateField]} "${value[duplicateField]}" already exists`,
+      400,
+    );
+  }
+};
+
 // ─── Variant Schema ──────────────────────────────────────────────────────────
 
 const VariantSchema = Joi.object({
@@ -85,20 +120,7 @@ const validateVariant = async (variantObj, files = {}) => {
     const expandedVariantObj = expandBracketKeys(variantObj);
     const value = await VariantSchema.validateAsync(expandedVariantObj);
 
-    // DB Uniqueness check
-    const query = [];
-    if (value.sku) query.push({ sku: value.sku });
-    if (value.barCode) query.push({ barCode: value.barCode });
-
-    if (query.length > 0) {
-      const existing = await Variant.findOne({ $or: query });
-      if (existing) {
-        if (value.sku && existing.sku === value.sku)
-          throw new customError(`SKU ${value.sku} already exists`, 400);
-        if (value.barCode && existing.barCode === value.barCode)
-          throw new customError(`Barcode ${value.barCode} already exists`, 400);
-      }
-    }
+    await ensureUniqueVariantFields(Variant, value);
     
     // File validation
     const thumbnail = getVariantFile(
@@ -143,23 +165,7 @@ const validateVariantUpdate = async (variantObj, files = {}, currentId = null) =
       noDefaults: true, // Don't apply defaults for updates
     });
 
-    // DB Uniqueness check (excluding current variant)
-    const query = [];
-    if (value.sku) query.push({ sku: value.sku });
-    if (value.barCode) query.push({ barCode: value.barCode });
-
-    if (query.length > 0) {
-      const existing = await Variant.findOne({
-        $or: query,
-        _id: { $ne: currentId },
-      });
-      if (existing) {
-        if (value.sku && existing.sku === value.sku)
-          throw new customError(`SKU ${value.sku} already exists`, 400);
-        if (value.barCode && existing.barCode === value.barCode)
-          throw new customError(`Barcode ${value.barCode} already exists`, 400);
-      }
-    }
+    await ensureUniqueVariantFields(Variant, value, currentId);
 
     const thumbnail =
       getVariantFile(files, expandedVariantObj.index, "thumbnail") ||
