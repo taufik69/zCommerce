@@ -107,7 +107,11 @@ const variantSchema = new mongoose.Schema(
       max: 100,
       default: 0,
     },
-
+    unit: {
+      type: String,
+      enum: ["Piece", "Kg", "Gram", "Packet", "pair", "liter", "Custom"],
+    },
+    specifications: { type: String, default: null },
     alertQuantity: { type: Number, default: 5 },
     stockAlert: { type: Boolean, default: false },
     instock: { type: Boolean },
@@ -191,13 +195,15 @@ variantSchema.virtual("wholesaleProfitMarginAmount").get(function () {
   return (this.wholesalePrice || 0) - (this.purchasePrice || 0);
 });
 
-variantSchema.virtual("calculatedWholesaleProfitMarginPercentage").get(function () {
-  if (!this.purchasePrice) return 0;
-  return (
-    ((this.wholesalePrice - this.purchasePrice) / this.purchasePrice) *
-    100
-  ).toFixed(2);
-});
+variantSchema
+  .virtual("calculatedWholesaleProfitMarginPercentage")
+  .get(function () {
+    if (!this.purchasePrice) return 0;
+    return (
+      ((this.wholesalePrice - this.purchasePrice) / this.purchasePrice) *
+      100
+    ).toFixed(2);
+  });
 
 // Consolidated pre-save hook: slugify + duplicate checks
 variantSchema.pre("save", async function (next) {

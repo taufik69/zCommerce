@@ -67,6 +67,10 @@ const VariantSchema = Joi.object({
   sku: Joi.string().trim().optional(),
   barCode: Joi.string().trim().optional(),
   qrCode: Joi.string().trim().optional(),
+  unit: Joi.string()
+    .valid("Piece", "Kg", "Gram", "Packet", "pair", "liter", "Custom")
+    .optional(),
+  specifications: Joi.string().trim().allow("").optional(),
   weight: Joi.number().min(0).optional(),
   dimensions: dimensionsField.optional(),
   ...seoFieldsSchema,

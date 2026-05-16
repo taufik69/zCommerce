@@ -20,7 +20,6 @@ const imageSchema = new mongoose.Schema(
   { _id: false },
 );
 
-
 // SEO subdocument — search-engine + social-share metadata
 const seoSchema = new mongoose.Schema(
   {
@@ -115,7 +114,7 @@ const productSchema = new mongoose.Schema(
     groupUnitQuantity: { type: Number },
     unit: {
       type: String,
-      enum: ["Piece", "Kg", "Gram", "Packet", "Custom"],
+      enum: ["Piece", "Kg", "Gram", "Packet", "pair", "liter", "Custom"],
     },
 
     // Variant type
@@ -147,6 +146,7 @@ const productSchema = new mongoose.Schema(
       max: 100,
       default: 0,
     },
+    specifications: { type: String, default: null },
 
     alertQuantity: { type: Number, default: 5 },
     stockAlert: { type: Boolean, default: false },
