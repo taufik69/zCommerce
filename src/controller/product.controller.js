@@ -198,9 +198,8 @@ class ProductController {
       seoData.ogImage = { status: "pending", localPath: ogImage.path };
     }
 
-    const product = await Product.create({
+    const createPayload = {
       ...productData,
-      barCode: productData.barCode || generateBarcode(),
       thumbnail: thumbnail
         ? { status: "pending", localPath: thumbnail.path }
         : undefined,
@@ -209,7 +208,13 @@ class ProductController {
         localPath: img.path,
       })),
       seo: seoData,
-    });
+    };
+
+    if (productData.variantType === "singleVariant") {
+      createPayload.barCode = productData.barCode || generateBarcode();
+    }
+
+    const product = await Product.create(createPayload);
 
     // Enqueue all uploads in one Redis round-trip
     const jobs = [];

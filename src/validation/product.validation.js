@@ -53,12 +53,12 @@ const productCreateSchema = joi
     sku: joi.string().trim().when("variantType", {
       is: "singleVariant",
       then: joi.required(),
-      otherwise: joi.optional(),
+      otherwise: joi.any().strip(),
     }),
     barCode: joi.string().trim().when("variantType", {
       is: "singleVariant",
       then: joi.required(),
-      otherwise: joi.optional(),
+      otherwise: joi.any().strip(),
     }),
     qrCode: joi.string().trim().optional(),
 
