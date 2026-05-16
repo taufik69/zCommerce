@@ -25,8 +25,14 @@ const CACHE_TTL_LIST = 60 * 30; // 30 mins
  * Collect all Cloudinary publicIds from a variant.
  */
 const collectVariantPublicIds = (v) => {
-  if (!v || !Array.isArray(v.image)) return [];
-  return v.image.map((img) => img?.publicId).filter(Boolean);
+  if (!v) return [];
+  const ids = [];
+  if (v.thumbnail?.publicId) ids.push(v.thumbnail.publicId);
+  if (Array.isArray(v.image)) {
+    v.image.forEach((img) => img?.publicId && ids.push(img.publicId));
+  }
+  if (v.seo?.ogImage?.publicId) ids.push(v.seo.ogImage.publicId);
+  return ids;
 };
 
 const fireAndForgetCloudinaryDelete = (publicIds = []) => {
@@ -72,15 +78,11 @@ exports.createVariant = asynchandeler(async (req, res) => {
       validatedData.wholesaleProfitMarginPercentage = 0;
     }
 
-    // 1. Collect Gallery Images
-    const currentGalleryFiles = allFiles.filter(
-      (f) => f.fieldname === "image" || f.fieldname === `variants[${i}][image]`,
-    );
-    
-    // If they used flat 'image' name, we should only take the one that corresponds to this variant index
-    // UNLESS they only sent one variant, then we take all 'image' files for it.
-    // However, the best practice is nested naming variants[i][image].
-    // If we find nested names, we use those exclusively for this variant.
+    // 1. Collect Thumbnail + Gallery Images
+    const nestedThumbnail = allFiles.find((f) => f.fieldname === `variants[${i}][thumbnail]`);
+    const flatThumbnail = allFiles.filter((f) => f.fieldname === "thumbnail")[i];
+    const finalThumbnail = nestedThumbnail || flatThumbnail;
+
     const nestedGalleryFiles = allFiles.filter((f) => f.fieldname === `variants[${i}][image]`);
     const finalGalleryFiles = nestedGalleryFiles.length > 0 
       ? nestedGalleryFiles 
@@ -107,6 +109,9 @@ exports.createVariant = asynchandeler(async (req, res) => {
 
     const newVariant = new variant({
       ...validatedData,
+      thumbnail: finalThumbnail
+        ? { status: "pending", localPath: finalThumbnail.path }
+        : undefined,
       image: variantImages,
       seo: seoData,
     });
@@ -119,6 +124,18 @@ exports.createVariant = asynchandeler(async (req, res) => {
     });
 
     // Enqueue jobs
+    if (finalThumbnail) {
+      jobs.push({
+        name: "create-variant-thumbnail",
+        data: {
+          modelName: NS,
+          documentId: newVariant._id,
+          localPath: finalThumbnail.path,
+          fieldName: "thumbnail",
+        },
+      });
+    }
+
     finalGalleryFiles.forEach((file, index) => {
       jobs.push({
         name: "add-product-image",
@@ -254,7 +271,33 @@ exports.updateVariant = asynchandeler(async (req, res) => {
   const initialImageCount = existingVariant.image.length;
 
   const galleryFiles = allFiles.filter((f) => f.fieldname === "image");
+  const thumbnailFiles = allFiles.filter((f) => f.fieldname === "thumbnail");
   const ogFiles = allFiles.filter((f) => f.fieldname === "ogImage");
+
+  if (thumbnailFiles.length > 0) {
+    const thumbnailFile = thumbnailFiles[0];
+    const oldPublicId = existingVariant.thumbnail?.publicId || null;
+
+    existingVariant.thumbnail = {
+      status: "pending",
+      localPath: thumbnailFile.path,
+      url: existingVariant.thumbnail?.url || "",
+      publicId: existingVariant.thumbnail?.publicId || "",
+      tries: 0,
+      lastError: "",
+    };
+
+    jobs.push({
+      name: "update-variant-thumbnail",
+      data: {
+        modelName: NS,
+        documentId: existingVariant._id,
+        localPath: thumbnailFile.path,
+        fieldName: "thumbnail",
+        oldPublicId,
+      },
+    });
+  }
 
   if (galleryFiles.length > 0) {
     const newImages = galleryFiles.map((file) => ({

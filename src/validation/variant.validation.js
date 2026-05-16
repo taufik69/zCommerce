@@ -25,21 +25,6 @@ const dimensionsField = Joi.object({
   depth: Joi.number().min(0),
 });
 
-const sizeField = Joi.alternatives()
-  .try(
-    Joi.array().items(Joi.string().trim()).single(),
-    Joi.string().trim(),
-  )
-  .custom((value) => {
-    const sizes = Array.isArray(value) ? value : [value];
-    const cleaned = sizes
-      .map((size) => (typeof size === "string" ? size.trim() : size))
-      .filter(Boolean);
-
-    return cleaned.length > 0 ? cleaned : ["N/A"];
-  })
-  .default(["N/A"]);
-
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 const validateImageFile = (file, label) => {
@@ -49,6 +34,14 @@ const validateImageFile = (file, label) => {
       statusCodes.BAD_REQUEST,
     );
   }
+};
+
+const getVariantFile = (files = [], index, fieldName) => {
+  const fileList = Array.isArray(files) ? files : Object.values(files).flat();
+  return (
+    fileList.find((f) => f.fieldname === `variants[${index}][${fieldName}]`) ||
+    fileList.filter((f) => f.fieldname === fieldName)[index]
+  );
 };
 
 // ─── Variant Schema ──────────────────────────────────────────────────────────
@@ -62,7 +55,7 @@ const VariantSchema = Joi.object({
     "string.empty": "Variant name is required",
     "any.required": "Variant name is required",
   }),
-  size: sizeField,
+  size: Joi.string().trim().default("N/A"),
   color: Joi.string().trim().default("N/A"),
   stockVariant: Joi.number().min(0).default(0),
   purchasePrice: Joi.number().min(0).required(),
@@ -104,6 +97,11 @@ const validateVariant = async (variantObj, files = {}) => {
     }
     
     // File validation
+    const thumbnail = getVariantFile(
+      files,
+      expandedVariantObj.index,
+      "thumbnail",
+    );
     const nestedGalleryFiles = files.filter(f => f.fieldname === `variants[${expandedVariantObj.index}][image]`);
     const flatGalleryFiles = files.filter(f => f.fieldname === 'image');
     
@@ -112,13 +110,14 @@ const validateVariant = async (variantObj, files = {}) => {
       ? nestedGalleryFiles 
       : (flatGalleryFiles[expandedVariantObj.index] ? [flatGalleryFiles[expandedVariantObj.index]] : []);
 
-    const ogImage = files.find(f => f.fieldname === `variants[${expandedVariantObj.index}][ogImage]`) || files.filter(f => f.fieldname === 'ogImage')[expandedVariantObj.index];
+    const ogImage = getVariantFile(files, expandedVariantObj.index, "ogImage");
 
     if (variantImages.length > 10) {
       throw new customError("Maximum 10 images allowed per variant", 400);
     }
 
     variantImages.forEach((img, idx) => validateImageFile(img, `Variant Image ${idx + 1}`));
+    if (thumbnail) validateImageFile(thumbnail, "Variant Thumbnail");
     if (ogImage) validateImageFile(ogImage, "Variant OG Image");
 
     return value;
@@ -158,8 +157,13 @@ const validateVariantUpdate = async (variantObj, files = {}, currentId = null) =
       }
     }
 
+    const thumbnail =
+      getVariantFile(files, expandedVariantObj.index, "thumbnail") ||
+      getVariantFile(files, 0, "thumbnail");
     const ogImage =
-      files.ogImage?.[0] || files[`variants[${expandedVariantObj.index}][ogImage]`];
+      getVariantFile(files, expandedVariantObj.index, "ogImage") ||
+      getVariantFile(files, 0, "ogImage");
+    if (thumbnail) validateImageFile(thumbnail, "Variant Thumbnail");
     if (ogImage) validateImageFile(ogImage, "Variant OG Image");
 
     return value;

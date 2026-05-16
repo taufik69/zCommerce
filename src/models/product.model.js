@@ -268,10 +268,9 @@ productSchema.virtual("sizeWiseStock").get(function () {
 
   if (this.variant?.length > 0) {
     this.variant.forEach((v) => {
-      const sizes = Array.isArray(v?.size) ? v.size : [v?.size];
-      sizes.filter(Boolean).forEach((size) => {
-        result[size] = (result[size] || 0) + (v.stockVariant || 0);
-      });
+      if (v?.size) {
+        result[v.size] = (result[v.size] || 0) + (v.stockVariant || 0);
+      }
     });
     return result;
   }
