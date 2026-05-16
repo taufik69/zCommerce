@@ -67,7 +67,18 @@ const variantSchema = new mongoose.Schema(
     qrCode: { type: String },
     barCode: { type: String, index: true },
 
-    size: { type: String, trim: true, default: "N/A" },
+    size: {
+      type: [String],
+      default: ["N/A"],
+      set: (value) => {
+        const sizes = Array.isArray(value) ? value : [value];
+        const cleaned = sizes
+          .map((size) => (typeof size === "string" ? size.trim() : size))
+          .filter(Boolean);
+
+        return cleaned.length > 0 ? cleaned : ["N/A"];
+      },
+    },
     color: { type: String, trim: true, default: "N/A" },
 
     image: [imageSchema], // gallery
@@ -211,16 +222,17 @@ variantSchema.pre("save", async function (next) {
     }
 
     // 3. Duplicate variant check (size/color combination per product)
+    const sizeList = Array.isArray(this.size) ? this.size : [this.size];
     const existVariant = await this.constructor.findOne({
       product: this.product,
-      size: this.size,
+      size: { $in: sizeList },
       color: this.color,
       _id: { $ne: this._id },
     });
     if (existVariant) {
       return next(
         new customError(
-          `Variant with size ${this.size} and color ${this.color} already exists.`,
+          `Variant with size ${sizeList.join(", ")} and color ${this.color} already exists.`,
           400,
         ),
       );

@@ -2,6 +2,7 @@ const Joi = require("joi");
 const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
 const mongoose = require("mongoose");
+const { expandBracketKeys } = require("../utils/parseFormData.util");
 
 // ─── Reusable schemas ─────────────────────────────────────────────────────────
 
@@ -23,6 +24,21 @@ const dimensionsField = Joi.object({
   height: Joi.number().min(0),
   depth: Joi.number().min(0),
 });
+
+const sizeField = Joi.alternatives()
+  .try(
+    Joi.array().items(Joi.string().trim()).single(),
+    Joi.string().trim(),
+  )
+  .custom((value) => {
+    const sizes = Array.isArray(value) ? value : [value];
+    const cleaned = sizes
+      .map((size) => (typeof size === "string" ? size.trim() : size))
+      .filter(Boolean);
+
+    return cleaned.length > 0 ? cleaned : ["N/A"];
+  })
+  .default(["N/A"]);
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
@@ -46,7 +62,7 @@ const VariantSchema = Joi.object({
     "string.empty": "Variant name is required",
     "any.required": "Variant name is required",
   }),
-  size: Joi.string().trim().default("N/A"),
+  size: sizeField,
   color: Joi.string().trim().default("N/A"),
   stockVariant: Joi.number().min(0).default(0),
   purchasePrice: Joi.number().min(0).required(),
@@ -67,7 +83,8 @@ const VariantSchema = Joi.object({
 const validateVariant = async (variantObj, files = {}) => {
   const Variant = mongoose.models.Variant || require("../models/variant.model");
   try {
-    const value = await VariantSchema.validateAsync(variantObj);
+    const expandedVariantObj = expandBracketKeys(variantObj);
+    const value = await VariantSchema.validateAsync(expandedVariantObj);
 
     // DB Uniqueness check
     const query = [];
@@ -85,15 +102,15 @@ const validateVariant = async (variantObj, files = {}) => {
     }
     
     // File validation
-    const nestedGalleryFiles = files.filter(f => f.fieldname === `variants[${variantObj.index}][image]`);
+    const nestedGalleryFiles = files.filter(f => f.fieldname === `variants[${expandedVariantObj.index}][image]`);
     const flatGalleryFiles = files.filter(f => f.fieldname === 'image');
     
     // Choose which set of files to validate for this variant
     const variantImages = nestedGalleryFiles.length > 0 
       ? nestedGalleryFiles 
-      : (flatGalleryFiles[variantObj.index] ? [flatGalleryFiles[variantObj.index]] : []);
+      : (flatGalleryFiles[expandedVariantObj.index] ? [flatGalleryFiles[expandedVariantObj.index]] : []);
 
-    const ogImage = files.find(f => f.fieldname === `variants[${variantObj.index}][ogImage]`) || files.filter(f => f.fieldname === 'ogImage')[variantObj.index];
+    const ogImage = files.find(f => f.fieldname === `variants[${expandedVariantObj.index}][ogImage]`) || files.filter(f => f.fieldname === 'ogImage')[expandedVariantObj.index];
 
     if (variantImages.length > 10) {
       throw new customError("Maximum 10 images allowed per variant", 400);
@@ -116,7 +133,8 @@ const validateVariant = async (variantObj, files = {}) => {
 const validateVariantUpdate = async (variantObj, files = {}, currentId = null) => {
   const Variant = mongoose.models.Variant || require("../models/variant.model");
   try {
-    const value = await VariantSchema.validateAsync(variantObj, {
+    const expandedVariantObj = expandBracketKeys(variantObj);
+    const value = await VariantSchema.validateAsync(expandedVariantObj, {
       noDefaults: true, // Don't apply defaults for updates
     });
 
@@ -139,7 +157,7 @@ const validateVariantUpdate = async (variantObj, files = {}, currentId = null) =
     }
 
     const ogImage =
-      files.ogImage?.[0] || files[`variants[${variantObj.index}][ogImage]`];
+      files.ogImage?.[0] || files[`variants[${expandedVariantObj.index}][ogImage]`];
     if (ogImage) validateImageFile(ogImage, "Variant OG Image");
 
     return value;

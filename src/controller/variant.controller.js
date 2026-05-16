@@ -5,6 +5,7 @@ const product = require("../models/product.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { validateVariant, validateVariantUpdate } = require("../validation/variant.validation");
+const { expandBracketKeys } = require("../utils/parseFormData.util");
 
 const { statusCodes } = require("../constant/constant");
 const {
@@ -41,7 +42,7 @@ const fireAndForgetCloudinaryDelete = (publicIds = []) => {
 
 // @desc create variant controller (batch)
 exports.createVariant = asynchandeler(async (req, res) => {
-  const { variants } = req.body;
+  const { variants } = expandBracketKeys(req.body);
   const allFiles = req.files || [];
 
   if (!variants || !Array.isArray(variants) || variants.length === 0) {
