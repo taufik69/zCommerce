@@ -4,7 +4,10 @@ const variant = require("../models/variant.model");
 const product = require("../models/product.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
-const { validateVariant, validateVariantUpdate } = require("../validation/variant.validation");
+const {
+  validateVariant,
+  validateVariantUpdate,
+} = require("../validation/variant.validation");
 const { expandBracketKeys } = require("../utils/parseFormData.util");
 
 const { statusCodes } = require("../constant/constant");
@@ -20,6 +23,16 @@ const { deleteCloudinaryFile } = require("../helpers/cloudinary");
 const NS = "variant";
 const CACHE_TTL = 60 * 60; // 1 hour
 const CACHE_TTL_LIST = 60 * 30; // 30 mins
+
+const escapeRegex = (value = "") =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const parseBoolean = (value) => {
+  if (typeof value === "boolean") return value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+};
 
 /**
  * Collect all Cloudinary publicIds from a variant.
@@ -79,21 +92,32 @@ exports.createVariant = asynchandeler(async (req, res) => {
     }
 
     // 1. Collect Thumbnail + Gallery Images
-    const nestedThumbnail = allFiles.find((f) => f.fieldname === `variants[${i}][thumbnail]`);
-    const flatThumbnail = allFiles.filter((f) => f.fieldname === "thumbnail")[i];
+    const nestedThumbnail = allFiles.find(
+      (f) => f.fieldname === `variants[${i}][thumbnail]`,
+    );
+    const flatThumbnail = allFiles.filter((f) => f.fieldname === "thumbnail")[
+      i
+    ];
     const finalThumbnail = nestedThumbnail || flatThumbnail;
 
-    const nestedGalleryFiles = allFiles.filter((f) => f.fieldname === `variants[${i}][image]`);
-    const finalGalleryFiles = nestedGalleryFiles.length > 0 
-      ? nestedGalleryFiles 
-      : (allFiles.filter(f => f.fieldname === "image")[i] ? [allFiles.filter(f => f.fieldname === "image")[i]] : []);
+    const nestedGalleryFiles = allFiles.filter(
+      (f) => f.fieldname === `variants[${i}][image]`,
+    );
+    const finalGalleryFiles =
+      nestedGalleryFiles.length > 0
+        ? nestedGalleryFiles
+        : allFiles.filter((f) => f.fieldname === "image")[i]
+          ? [allFiles.filter((f) => f.fieldname === "image")[i]]
+          : [];
 
     // 2. Collect OG Image
-    const nestedOgImage = allFiles.find((f) => f.fieldname === `variants[${i}][ogImage]`);
-    const flatOgImage = allFiles.filter(f => f.fieldname === "ogImage")[i];
+    const nestedOgImage = allFiles.find(
+      (f) => f.fieldname === `variants[${i}][ogImage]`,
+    );
+    const flatOgImage = allFiles.filter((f) => f.fieldname === "ogImage")[i];
     const finalOgImage = nestedOgImage || flatOgImage;
 
-    const variantImages = finalGalleryFiles.map(file => ({
+    const variantImages = finalGalleryFiles.map((file) => ({
       status: "pending",
       localPath: file.path,
       tries: 0,
@@ -196,8 +220,6 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
     .find()
     .populate({
       path: "product",
-      select:
-        "name category brand subcategory discount  barCode sku stock retailPrice wholesalePrice purchasePrice slug",
     })
     .populate("stockVariantAdjust byReturn salesReturn")
     .select("-updatedAt")
@@ -205,7 +227,10 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
     .lean();
 
   if (!variants || variants.length === 0) {
-    throw new customError("Variants not found", statusCodes.NOT_FOUND);
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No variants found", {
+      variants: [],
+      fromCache: false,
+    });
   }
 
   await setCache(cacheKey, variants, CACHE_TTL_LIST);
@@ -214,7 +239,73 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
     res,
     statusCodes.OK,
     "Variants fetched successfully",
-    variants ,
+    { variants, fromCache: false },
+  );
+});
+
+// @desc search variants by name or barcode
+exports.searchVariants = asynchandeler(async (req, res) => {
+  const search = String(req.query.q || req.query.search || "").trim();
+  const isActive =
+    req.query.isActive === undefined ? null : parseBoolean(req.query.isActive);
+
+  if (!search) {
+    throw new customError("Search query is required", statusCodes.BAD_REQUEST);
+  }
+
+  if (req.query.isActive !== undefined && isActive === null) {
+    throw new customError(
+      "isActive must be true or false",
+      statusCodes.BAD_REQUEST,
+    );
+  }
+
+  const cacheKey = await buildCacheKey(
+    NS,
+    `search:${search.toLowerCase()}:isActive:${isActive}`,
+  );
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Variants search results",
+      { variants: cached, fromCache: true },
+    );
+  }
+
+  const safeSearch = escapeRegex(search);
+  const searchRegex = new RegExp(safeSearch, "i");
+  const filter = {
+    $or: [
+      { variantName: searchRegex },
+      { barCode: searchRegex },
+    ],
+  };
+
+  if (isActive !== null) {
+    filter.isActive = isActive;
+  }
+
+  const variants = await variant
+    .find(filter)
+    .populate({
+      path: "product",
+      select:
+        "name category brand subcategory discount barCode sku stock retailPrice wholesalePrice purchasePrice slug",
+    })
+    .populate("stockVariantAdjust byReturn salesReturn")
+    .select("-updatedAt")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  await setCache(cacheKey, variants, 60 * 5);
+
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    variants.length ? "Variants search results" : "No variants found",
+    { variants, fromCache: false },
   );
 });
 
@@ -243,7 +334,10 @@ exports.getSingleVariant = asynchandeler(async (req, res, next) => {
     .lean();
 
   if (!singleVariant) {
-    throw new customError("Variant not found", statusCodes.NOT_FOUND);
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Variant not found", {
+      variant: null,
+      fromCache: false,
+    });
   }
 
   await setCache(cacheKey, singleVariant, CACHE_TTL);
@@ -252,7 +346,7 @@ exports.getSingleVariant = asynchandeler(async (req, res, next) => {
     res,
     statusCodes.OK,
     "Variant fetched successfully",
-    singleVariant,
+    { variant: singleVariant, fromCache: false },
   );
 });
 
@@ -345,7 +439,11 @@ exports.updateVariant = asynchandeler(async (req, res) => {
   }
 
   // Update other fields
-  const validatedData = await validateVariantUpdate(req.body, allFiles, existingVariant._id);
+  const validatedData = await validateVariantUpdate(
+    req.body,
+    allFiles,
+    existingVariant._id,
+  );
   if (validatedData.retailProfitMarginByPercentage === null) {
     validatedData.retailProfitMarginByPercentage = 0;
   }
@@ -366,7 +464,7 @@ exports.updateVariant = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Variant updated successfully",
-    existingVariant,
+    { variant: existingVariant, fromCache: false },
   );
 });
 
@@ -375,7 +473,10 @@ exports.deactivateVariant = asynchandeler(async (req, res) => {
   const { slug } = req.query;
   const variantToDeactivate = await variant.findOne({ slug });
   if (!variantToDeactivate) {
-    throw new customError("Variant not found", statusCodes.NOT_FOUND);
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Variant not found", {
+      variant: null,
+      fromCache: false,
+    });
   }
   variantToDeactivate.isActive = false;
   await variantToDeactivate.save();
@@ -387,7 +488,7 @@ exports.deactivateVariant = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Variant deactivated successfully",
-    variantToDeactivate,
+    { variant: variantToDeactivate, fromCache: false },
   );
 });
 
@@ -408,7 +509,7 @@ exports.activateVariant = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Variant activated successfully",
-    variantToActivate,
+    { variant: variantToActivate, fromCache: false },
   );
 });
 
@@ -417,7 +518,10 @@ exports.deleteVariant = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const deletedVariant = await variant.findOneAndDelete({ slug });
   if (!deletedVariant) {
-    throw new customError("Variant not found", statusCodes.NOT_FOUND);
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Variant not found", {
+      variant: null,
+      fromCache: false,
+    });
   }
 
   // Remove the variant from the product's variants array
@@ -431,10 +535,8 @@ exports.deleteVariant = asynchandeler(async (req, res) => {
   await bumpNsVersion(NS);
   await bumpNsVersion("product");
 
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Variant deleted successfully",
-    deletedVariant,
-  );
+  apiResponse.sendSuccess(res, statusCodes.OK, "Variant deleted successfully", {
+    variant: deletedVariant,
+    fromCache: false,
+  });
 });
