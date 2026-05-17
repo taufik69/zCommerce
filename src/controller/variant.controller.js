@@ -34,6 +34,13 @@ const parseBoolean = (value) => {
   return null;
 };
 
+const getVariantUpdateBody = (body = {}) => expandBracketKeys(body);
+
+const getVariantUpdateFiles = (files = [], fieldName) => {
+  const fileList = Array.isArray(files) ? files : Object.values(files).flat();
+  return fileList.filter((file) => file.fieldname === fieldName);
+};
+
 /**
  * Collect all Cloudinary publicIds from a variant.
  */
@@ -354,6 +361,7 @@ exports.getSingleVariant = asynchandeler(async (req, res, next) => {
 exports.updateVariant = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const allFiles = req.files || [];
+  const updateBody = getVariantUpdateBody(req.body);
 
   const existingVariant = await variant.findOne({ slug });
   if (!existingVariant) {
@@ -363,10 +371,11 @@ exports.updateVariant = asynchandeler(async (req, res) => {
   // Handle new images
   const jobs = [];
   const initialImageCount = existingVariant.image.length;
+  const previousProductId = existingVariant.product?.toString();
 
-  const galleryFiles = allFiles.filter((f) => f.fieldname === "image");
-  const thumbnailFiles = allFiles.filter((f) => f.fieldname === "thumbnail");
-  const ogFiles = allFiles.filter((f) => f.fieldname === "ogImage");
+  const galleryFiles = getVariantUpdateFiles(allFiles, "image");
+  const thumbnailFiles = getVariantUpdateFiles(allFiles, "thumbnail");
+  const ogFiles = getVariantUpdateFiles(allFiles, "ogImage");
 
   if (thumbnailFiles.length > 0) {
     const thumbnailFile = thumbnailFiles[0];
@@ -440,7 +449,7 @@ exports.updateVariant = asynchandeler(async (req, res) => {
 
   // Update other fields
   const validatedData = await validateVariantUpdate(
-    req.body,
+    updateBody,
     allFiles,
     existingVariant._id,
   );
@@ -452,6 +461,19 @@ exports.updateVariant = asynchandeler(async (req, res) => {
   }
   Object.assign(existingVariant, validatedData);
   await existingVariant.save();
+
+  const nextProductId = existingVariant.product?.toString();
+  if (validatedData.product && previousProductId !== nextProductId) {
+    if (previousProductId) {
+      await product.findByIdAndUpdate(previousProductId, {
+        $pull: { variant: existingVariant._id },
+      });
+    }
+
+    await product.findByIdAndUpdate(nextProductId, {
+      $addToSet: { variant: existingVariant._id },
+    });
+  }
 
   if (jobs.length > 0) {
     await imageQueue.addBulk(jobs);

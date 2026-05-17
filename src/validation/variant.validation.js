@@ -120,6 +120,11 @@ const VariantSchema = Joi.object({
   seo: Joi.object(seoFieldsSchema).optional(),
 }).options({ abortEarly: false, allowUnknown: true });
 
+const VariantUpdateSchema = VariantSchema.fork(
+  ["product", "variantName", "purchasePrice", "retailPrice"],
+  (schema) => schema.optional(),
+);
+
 // ─── Validators ───────────────────────────────────────────────────────────────
 
 const validateVariant = async (variantObj, files = {}) => {
@@ -169,7 +174,7 @@ const validateVariantUpdate = async (variantObj, files = {}, currentId = null) =
   const Variant = mongoose.models.Variant || require("../models/variant.model");
   try {
     const expandedVariantObj = expandBracketKeys(variantObj);
-    const value = await VariantSchema.validateAsync(expandedVariantObj, {
+    const value = await VariantUpdateSchema.validateAsync(expandedVariantObj, {
       noDefaults: true, // Don't apply defaults for updates
     });
 
