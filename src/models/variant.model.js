@@ -63,9 +63,19 @@ const variantSchema = new mongoose.Schema(
       trim: true,
     },
 
-    sku: { type: String, trim: true, index: true },
+    sku: {
+      type: String,
+      trim: true,
+      index: true,
+      match: [/^\d+$/, "SKU must contain only numbers"],
+    },
     qrCode: { type: String },
-    barCode: { type: String, index: true },
+    barCode: {
+      type: String,
+      trim: true,
+      index: true,
+      match: [/^\d+$/, "Barcode must contain only numbers"],
+    },
 
     size: { type: String, trim: true, default: "N/A" },
     color: { type: String, trim: true, default: "N/A" },

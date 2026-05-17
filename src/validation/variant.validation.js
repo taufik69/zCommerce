@@ -25,6 +25,14 @@ const dimensionsField = Joi.object({
   depth: Joi.number().min(0),
 });
 
+const numericString = (label) =>
+  Joi.string()
+    .trim()
+    .pattern(/^\d+$/)
+    .messages({
+      "string.pattern.base": `${label} must contain only numbers`,
+    });
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 const validateImageFile = (file, label) => {
@@ -99,8 +107,8 @@ const VariantSchema = Joi.object({
   retailProfitMarginByPercentage: Joi.number().min(0).max(100).optional().allow(null),
   wholesaleProfitMarginPercentage: Joi.number().min(0).max(100).optional().allow(null),
   alertQuantity: Joi.number().min(0).optional(),
-  sku: Joi.string().trim().optional(),
-  barCode: Joi.string().trim().optional(),
+  sku: numericString("SKU").optional(),
+  barCode: numericString("Barcode").optional(),
   qrCode: Joi.string().trim().optional(),
   unit: Joi.string()
     .valid("Piece", "Kg", "Gram", "Packet", "pair", "liter", "Custom")
