@@ -7,6 +7,8 @@ const { asynchandeler } = require("../lib/asyncHandeler");
 const {
   validateVariant,
   validateVariantUpdate,
+  validateVariantGalleryUpload,
+  MAX_GALLERY_IMAGES,
 } = require("../validation/variant.validation");
 const { expandBracketKeys } = require("../utils/parseFormData.util");
 
@@ -487,6 +489,118 @@ exports.updateVariant = asynchandeler(async (req, res) => {
     statusCodes.OK,
     "Variant updated successfully",
     { variant: existingVariant, fromCache: false },
+  );
+});
+
+// @desc add gallery image(s) to a variant
+exports.addVariantImage = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const images = validateVariantGalleryUpload(req);
+
+  const variantToUpdate = await variant.findOne({ slug });
+  if (!variantToUpdate) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Variant not found", {
+      variant: null,
+    });
+  }
+
+  const currentCount = variantToUpdate.image.length;
+  if (currentCount + images.length > MAX_GALLERY_IMAGES) {
+    throw new customError(
+      `Adding ${images.length} images would exceed gallery limit (${MAX_GALLERY_IMAGES}). Current: ${currentCount}`,
+      statusCodes.BAD_REQUEST,
+    );
+  }
+
+  const newImages = images.map((file) => ({
+    status: "pending",
+    localPath: file.path,
+    tries: 0,
+  }));
+  variantToUpdate.image.push(...newImages);
+  await variantToUpdate.save();
+
+  const jobs = images.map((file, i) => ({
+    name: "add-product-image",
+    data: {
+      modelName: NS,
+      documentId: variantToUpdate._id,
+      localPath: file.path,
+      fieldName: "image",
+      index: currentCount + i,
+    },
+  }));
+
+  await imageQueue.addBulk(jobs);
+  await bumpNsVersion(NS);
+  await bumpNsVersion("product");
+
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    `${images.length} image(s) upload started in background`,
+    { slug, count: images.length },
+  );
+});
+
+// @desc delete variant gallery image(s) or thumbnail by publicId
+exports.deleteVariantImage = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  let { publicId } = req.body;
+
+  if (!publicId) {
+    throw new customError("publicId is required", statusCodes.BAD_REQUEST);
+  }
+
+  if (!Array.isArray(publicId)) {
+    publicId = [publicId];
+  }
+
+  const variantToUpdate = await variant.findOne({ slug });
+  if (!variantToUpdate) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Variant not found", {
+      variant: null,
+    });
+  }
+
+  const toDelete = [];
+
+  if (publicId.includes(variantToUpdate.thumbnail?.publicId)) {
+    toDelete.push(variantToUpdate.thumbnail.publicId);
+    variantToUpdate.thumbnail = { status: "pending" };
+  }
+
+  variantToUpdate.image = variantToUpdate.image.filter((img) => {
+    if (publicId.includes(img.publicId)) {
+      toDelete.push(img.publicId);
+      return false;
+    }
+    return true;
+  });
+
+  if (toDelete.length === 0) {
+    throw new customError(
+      "No matching images found with provided publicIds",
+      statusCodes.NOT_FOUND,
+    );
+  }
+
+  await variantToUpdate.save();
+  await bumpNsVersion(NS);
+  await bumpNsVersion("product");
+
+  const jobs = toDelete.map((pid) => ({
+    name: "delete-cloudinary-image",
+    data: { publicId: pid },
+  }));
+
+  await imageQueue.addBulk(jobs);
+
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    `${toDelete.length} image(s) removal started in background`,
+    { slug, deletedCount: toDelete.length },
   );
 });
 

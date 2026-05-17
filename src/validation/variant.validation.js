@@ -34,6 +34,7 @@ const numericString = (label) =>
     });
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_GALLERY_IMAGES = 10;
 
 const validateImageFile = (file, label) => {
   if (file && file.size > MAX_FILE_SIZE) {
@@ -202,7 +203,30 @@ const validateVariantUpdate = async (variantObj, files = {}, currentId = null) =
   }
 };
 
+const validateVariantGalleryUpload = (req) => {
+  const images = req.files?.image || [];
+  if (images.length === 0) {
+    throw new customError(
+      "At least one image file is required",
+      statusCodes.BAD_REQUEST,
+    );
+  }
+
+  images.forEach((img, idx) => validateImageFile(img, `Image ${idx + 1}`));
+
+  if (images.length > MAX_GALLERY_IMAGES) {
+    throw new customError(
+      `You can upload a maximum of ${MAX_GALLERY_IMAGES} gallery images at once`,
+      statusCodes.BAD_REQUEST,
+    );
+  }
+
+  return images;
+};
+
 module.exports = {
   validateVariant,
   validateVariantUpdate,
+  validateVariantGalleryUpload,
+  MAX_GALLERY_IMAGES,
 };
