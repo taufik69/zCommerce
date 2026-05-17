@@ -229,6 +229,7 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
     .find()
     .populate({
       path: "product",
+      populate: ["category", "brand", "subcategory", "discount"],
     })
     .populate("stockVariantAdjust byReturn salesReturn")
     .select("-updatedAt")
@@ -286,10 +287,7 @@ exports.searchVariants = asynchandeler(async (req, res) => {
   const safeSearch = escapeRegex(search);
   const searchRegex = new RegExp(safeSearch, "i");
   const filter = {
-    $or: [
-      { variantName: searchRegex },
-      { barCode: searchRegex },
-    ],
+    $or: [{ variantName: searchRegex }, { barCode: searchRegex }],
   };
 
   if (isActive !== null) {
@@ -336,6 +334,7 @@ exports.getSingleVariant = asynchandeler(async (req, res, next) => {
     .findOne({ slug })
     .populate({
       path: "product",
+      populate: ["category", "brand", "subcategory", "discount"],
       select:
         "name category brand subcategory discount  barCode sku stock retailPrice wholesalePrice purchasePrice slug",
     })
