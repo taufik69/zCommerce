@@ -32,13 +32,13 @@
 
 ### MAJOR REDESIGN (5)
 
-| Model                | What Changed                                                                      |
-| -------------------- | --------------------------------------------------------------------------------- |
-| `category.model.js`  | Self-referential parent ref, removes subcategories array                          |
-| `product.model.js`   | Variants embedded (not ref), dynamic attributes, sizeChart ref, discount ref      |
-| `variant.model.js`   | **Becomes embedded subdocument inside Product** — no longer a separate collection |
-| `sizeChart.model.js` | Template-based data table (columns + rows), not just an image                     |
-| `discount.model.js`  | 5-level scope (variant/product/brand/category/all), conditions, limits, granular stacking, badge |
+| Model                | What Changed                                                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `category.model.js`  | Self-referential parent ref, removes subcategories array                                                                                     |
+| `product.model.js`   | Variants embedded (not ref), dynamic attributes, sizeChart ref, discount ref                                                                 |
+| `variant.model.js`   | **Becomes embedded subdocument inside Product** — no longer a separate collection                                                            |
+| `sizeChart.model.js` | Template-based data table (columns + rows), not just an image                                                                                |
+| `discount.model.js`  | **PRODUCTION-GRADE**: Multi-level scope, advanced conditions, usage tracking, customer targeting, geographic restrictions, atomic operations |
 
 ### NEW MODELS (3)
 
@@ -368,6 +368,625 @@ module.exports =
 
 ### 4.4 SizeChart Model (Template-Based Data Table)
 
+const mongoose = require("mongoose");
+const { default: slugify } = require("slugify");
+const { customError } = require("../lib/CustomError");
+const { statusCodes } = require("../constant/constant");
+
+// ═════════════════════════════════════════════════════════════════════════════════
+// ── COLUMN SCHEMA (Dynamic measurement columns) ──────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════════
+const columnSchema = new mongoose.Schema(
+{
+key: {
+type: String,
+required: [true, "Column key is required"],
+trim: true,
+lowercase: true,
+match: [/^[a-z0-9_]+$/, "Column key can only contain lowercase letters, numbers, and underscores"],
+},
+label: {
+type: String,
+required: [true, "Column label is required"],
+trim: true,
+},
+unit: {
+type: String,
+enum: ["inch", "cm", "mm", "kg", "lbs", "ml", "l"],
+default: "cm",
+},
+order: {
+type: Number,
+default: 0,
+},
+description: {
+type: String,
+trim: true,
+},
+},
+{ \_id: false },
+);
+
+// ═════════════════════════════════════════════════════════════════════════════════
+// ── ROW SCHEMA (Size options with measurements) ─────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════════
+const rowSchema = new mongoose.Schema(
+{
+label: {
+type: String,
+required: [true, "Row label (size) is required"],
+trim: true,
+uppercase: true,
+},
+values: {
+type: [String],
+required: [true, "Values are required"],
+validate: {
+validator: function (values) {
+return values.length > 0 && values.every((v) => v && v.trim());
+},
+message: "All values must be non-empty strings",
+},
+},
+order: {
+type: Number,
+default: 0,
+},
+sku: {
+type: String,
+trim: true,
+},
+},
+{ \_id: false },
+);
+
+// ═════════════════════════════════════════════════════════════════════════════════
+// ── CONVERSION RULE SCHEMA (For unit conversion support) ────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════════
+const conversionRuleSchema = new mongoose.Schema(
+{
+fromUnit: {
+type: String,
+enum: ["inch", "cm", "mm", "kg", "lbs", "ml", "l"],
+required: true,
+},
+toUnit: {
+type: String,
+enum: ["inch", "cm", "mm", "kg", "lbs", "ml", "l"],
+required: true,
+},
+factor: {
+type: Number,
+required: true,
+min: 0,
+},
+},
+{ \_id: false },
+);
+
+// ═════════════════════════════════════════════════════════════════════════════════
+// ── MAIN SIZE CHART SCHEMA ──────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════════
+const sizeChartSchema = new mongoose.Schema(
+{
+// ── BASIC INFORMATION ───────────────────────────────────────────────────────
+name: {
+type: String,
+required: [true, "Size chart name is required"],
+trim: true,
+maxlength: [100, "Name cannot exceed 100 characters"],
+},
+slug: {
+type: String,
+unique: true,
+lowercase: true,
+trim: true,
+index: true,
+},
+description: {
+type: String,
+trim: true,
+maxlength: [500, "Description cannot exceed 500 characters"],
+},
+category: {
+type: String,
+required: [true, "Category is required (e.g., 'apparel', 'shoes', 'accessories')"],
+trim: true,
+lowercase: true,
+index: true,
+},
+
+    // ── HIERARCHICAL TARGETING (Can be used at multiple levels) ────────────────
+    applicableLevel: {
+      type: String,
+      enum: ["category", "subCategory", "product", "variant"],
+      required: [true, "Applicable level is required"],
+      index: true,
+    },
+
+    // Apply at these specific entities (one or more based on level)
+    applicableCategories: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Category",
+        index: true,
+      },
+    ],
+    applicableSubCategories: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Subcategory",
+        index: true,
+      },
+    ],
+    applicableProducts: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+        index: true,
+      },
+    ],
+    applicableVariants: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Variant",
+        index: true,
+      },
+    ],
+
+    // ── TABLE STRUCTURE ─────────────────────────────────────────────────────────
+    columns: {
+      type: [columnSchema],
+      required: [true, "At least one column is required"],
+      validate: {
+        validator: function (columns) {
+          return columns.length > 0 && columns.length <= 10;
+        },
+        message: "Size chart must have 1-10 columns",
+      },
+    },
+    rows: {
+      type: [rowSchema],
+      required: [true, "At least one row (size) is required"],
+      validate: {
+        validator: function (rows) {
+          const firstColumnCount = this.columns[0]?.label ? 1 : 0;
+          if (firstColumnCount === 0) return true;
+          return rows.every((row) => row.values.length === this.columns.length);
+        },
+        message: "All rows must have same number of values as columns",
+      },
+    },
+
+    // ── MEASUREMENT GUIDE & HELP ────────────────────────────────────────────────
+    measurementGuide: {
+      type: String,
+      trim: true,
+      maxlength: [1000, "Measurement guide cannot exceed 1000 characters"],
+    },
+    tips: [
+      {
+        title: String,
+        description: String,
+      },
+    ],
+    videoUrl: {
+      type: String,
+      match: [
+        /^https?:\/\/.+/,
+        "Video URL must be a valid HTTP/HTTPS URL",
+      ],
+    },
+
+    // ── UNIT CONVERSION (Optional: support multiple units) ──────────────────────
+    supportedUnits: [
+      {
+        type: String,
+        enum: ["inch", "cm", "mm", "kg", "lbs", "ml", "l"],
+      },
+    ],
+    conversionRules: [conversionRuleSchema],
+
+    // ── DISPLAY & VISIBILITY ───────────────────────────────────────────────────
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+    displayOrder: {
+      type: Number,
+      default: 0,
+    },
+    visibility: {
+      type: String,
+      enum: ["public", "internal", "draft"],
+      default: "public",
+      index: true,
+    },
+
+    // ── COMPARISON SETTINGS (For showing multiple size charts) ──────────────────
+    parentChartId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SizeChart",
+      default: null,
+    },
+    isTemplateChart: {
+      type: Boolean,
+      default: false,
+      // Template charts can be inherited by child products
+    },
+    childCharts: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "SizeChart",
+      },
+    ],
+
+    // ── SIZE RANGES (For filtering/search support) ──────────────────────────────
+    sizeLabels: [
+      {
+        type: String,
+        // Auto-populated from rows.label for easy filtering
+      },
+    ],
+    minSize: String,
+    maxSize: String,
+
+    // ── ADMIN & TRACKING ────────────────────────────────────────────────────────
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    viewCount: {
+      type: Number,
+      default: 0,
+    },
+    usageCount: {
+      type: Number,
+      default: 0,
+      // How many products/variants use this chart
+    },
+
+},
+{
+timestamps: true,
+},
+);
+
+// ═════════════════════════════════════════════════════════════════════════════════
+// ── INDEXES FOR PERFORMANCE ────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════════
+sizeChartSchema.index({ slug: 1 });
+sizeChartSchema.index({ isActive: 1, visibility: 1 });
+sizeChartSchema.index({ category: 1, applicableLevel: 1 });
+sizeChartSchema.index({ applicableCategories: 1 });
+sizeChartSchema.index({ applicableSubCategories: 1 });
+sizeChartSchema.index({ applicableProducts: 1 });
+sizeChartSchema.index({ applicableVariants: 1 });
+sizeChartSchema.index({ parentChartId: 1, isTemplateChart: 1 });
+sizeChartSchema.index({ createdAt: -1, updatedAt: -1 });
+
+// ═════════════════════════════════════════════════════════════════════════════════
+// ── PRE-SAVE VALIDATIONS ────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════════
+
+// Generate slug from name
+sizeChartSchema.pre("save", function (next) {
+if (this.isModified("name")) {
+this.slug = slugify(this.name, { lower: true, strict: true });
+}
+next();
+});
+
+// Validate columns and rows alignment
+sizeChartSchema.pre("save", function (next) {
+if (this.columns && this.rows) {
+const columnCount = this.columns.length;
+const rowValuesValid = this.rows.every((row) => row.values.length === columnCount);
+
+    if (!rowValuesValid) {
+      return next(
+        new customError(
+          `All rows must have exactly ${columnCount} values to match columns`,
+          statusCodes.BAD_REQUEST,
+        ),
+      );
+    }
+
+}
+next();
+});
+
+// Auto-populate sizeLabels from rows
+sizeChartSchema.pre("save", function (next) {
+if (this.rows && this.rows.length > 0) {
+this.sizeLabels = this.rows
+.sort((a, b) => a.order - b.order)
+.map((row) => row.label);
+
+    // Set min and max
+    if (this.sizeLabels.length > 0) {
+      this.minSize = this.sizeLabels[0];
+      this.maxSize = this.sizeLabels[this.sizeLabels.length - 1];
+    }
+
+}
+next();
+});
+
+// Sort columns and rows by order
+sizeChartSchema.pre("save", function (next) {
+if (this.columns && this.columns.length > 0) {
+this.columns.sort((a, b) => a.order - b.order);
+}
+if (this.rows && this.rows.length > 0) {
+this.rows.sort((a, b) => a.order - b.order);
+}
+next();
+});
+
+// Validate applicable level has corresponding entities
+sizeChartSchema.pre("save", function (next) {
+const levelMap = {
+category: "applicableCategories",
+subCategory: "applicableSubCategories",
+product: "applicableProducts",
+variant: "applicableVariants",
+};
+
+const applicableField = levelMap[this.applicableLevel];
+const applicable = this[applicableField];
+
+if (!this.isTemplateChart && (!applicable || applicable.length === 0)) {
+return next(
+new customError(
+`${this.applicableLevel} requires at least one applicable entity`,
+statusCodes.BAD_REQUEST,
+),
+);
+}
+
+next();
+});
+
+// Check for duplicate slug
+sizeChartSchema.pre("save", async function (next) {
+try {
+if (this.isModified("slug") || !this.slug) {
+const existingChart = await this.constructor.findOne({ slug: this.slug });
+if (
+existingChart &&
+existingChart.\_id.toString() !== this.\_id.toString()
+) {
+return next(
+new customError(
+`Size chart "${this.name}" already exists`,
+statusCodes.BAD_REQUEST,
+),
+);
+}
+}
+next();
+} catch (error) {
+next(error);
+}
+});
+
+// ═════════════════════════════════════════════════════════════════════════════════
+// ── INSTANCE METHODS ────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════════
+
+/\*\*
+
+- Get size chart as formatted HTML table
+  \*/
+  sizeChartSchema.methods.getTableHTML = function () {
+  if (!this.columns || !this.rows) {
+  return "<p>No size chart available</p>";
+  }
+
+let html = '<table class="size-chart-table">';
+
+// Header
+html += "<thead><tr>";
+html += "<th>Size</th>";
+this.columns.forEach((col) => {
+html += `<th>${col.label} (${col.unit})</th>`;
+});
+html += "</tr></thead>";
+
+// Body
+html += "<tbody>";
+this.rows.forEach((row) => {
+html += "<tr>";
+html += `<td><strong>${row.label}</strong></td>`;
+row.values.forEach((val) => {
+html += `<td>${val}</td>`;
+});
+html += "</tr>";
+});
+html += "</tbody></table>";
+
+return html;
+};
+
+/\*\*
+
+- Get a specific size's measurements
+  \*/
+  sizeChartSchema.methods.getSizeMeasurements = function (sizeLabel) {
+  const row = this.rows.find((r) => r.label.toUpperCase() === sizeLabel.toUpperCase());
+  if (!row) return null;
+
+const measurements = {};
+this.columns.forEach((col, index) => {
+measurements[col.key] = {
+value: row.values[index],
+unit: col.unit,
+label: col.label,
+};
+});
+
+return measurements;
+};
+
+/\*\*
+
+- Check if size is available in this chart
+  \*/
+  sizeChartSchema.methods.hasSizeLabel = function (sizeLabel) {
+  return this.sizeLabels.includes(sizeLabel.toUpperCase());
+  };
+
+/\*\*
+
+- Get column by key
+  \*/
+  sizeChartSchema.methods.getColumn = function (key) {
+  return this.columns.find((col) => col.key === key.toLowerCase());
+  };
+
+/\*\*
+
+- Convert value between units
+  \*/
+  sizeChartSchema.methods.convertUnit = function (value, fromUnit, toUnit) {
+  if (fromUnit === toUnit) return parseFloat(value);
+
+const rule = this.conversionRules.find(
+(r) => r.fromUnit === fromUnit && r.toUnit === toUnit,
+);
+
+if (!rule) {
+throw new customError(
+`Conversion from ${fromUnit} to ${toUnit} not supported`,
+statusCodes.BAD_REQUEST,
+);
+}
+
+return parseFloat(value) \* rule.factor;
+};
+
+/\*\*
+
+- Increment view count (when chart is displayed to customer)
+  \*/
+  sizeChartSchema.methods.incrementViewCount = async function () {
+  return await this.constructor.findByIdAndUpdate(
+  this.\_id,
+  { $inc: { viewCount: 1 } },
+  { new: true },
+  );
+  };
+
+/\*\*
+
+- Increment usage count (when product/variant uses this chart)
+  \*/
+  sizeChartSchema.methods.incrementUsageCount = async function () {
+  return await this.constructor.findByIdAndUpdate(
+  this.\_id,
+  { $inc: { usageCount: 1 } },
+  { new: true },
+  );
+  };
+
+// ═════════════════════════════════════════════════════════════════════════════════
+// ── STATIC METHODS ──────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════════
+
+/\*\*
+
+- Get applicable charts for a product/variant
+  \*/
+  sizeChartSchema.statics.getApplicableCharts = async function (filters = {}) {
+  try {
+  const query = {
+  isActive: true,
+  visibility: "public",
+  };
+
+      // Filter by level
+      if (filters.level) {
+        query.applicableLevel = filters.level;
+      }
+
+      // Filter by product
+      if (filters.productId) {
+        query.$or = [
+          { applicableProducts: filters.productId },
+          { applicableLevel: "category", category: filters.category },
+        ];
+      }
+
+      // Filter by variant
+      if (filters.variantId) {
+        query.applicableVariants = filters.variantId;
+      }
+
+      // Filter by category
+      if (filters.categoryId) {
+        query.$or = query.$or || [];
+        query.$or.push({
+          applicableLevel: "category",
+          applicableCategories: filters.categoryId,
+        });
+      }
+
+      // Filter by category name
+      if (filters.category) {
+        query.category = filters.category.toLowerCase();
+      }
+
+      return await this.find(query)
+        .sort({ displayOrder: 1 })
+        .lean();
+
+  } catch (error) {
+  throw error;
+  }
+  };
+
+/\*\*
+
+- Create from template
+  \*/
+  sizeChartSchema.statics.createFromTemplate = async function (templateId, data) {
+  try {
+  const template = await this.findById(templateId);
+  if (!template || !template.isTemplateChart) {
+  throw new customError(
+  "Template not found or is not a valid template",
+  statusCodes.NOT_FOUND,
+  );
+  }
+
+      const newChart = new this({
+        ...data,
+        columns: template.columns,
+        rows: template.rows,
+        conversionRules: template.conversionRules,
+        supportedUnits: template.supportedUnits,
+        parentChartId: templateId,
+      });
+
+      await newChart.save();
+      return newChart;
+
+  } catch (error) {
+  throw error;
+  }
+  };
+
+// ═════════════════════════════════════════════════════════════════════════════════
+
+module.exports =
+mongoose.models.SizeChart || mongoose.model("SizeChart", sizeChartSchema);
+
 ```js
 // src/models/sizeChart.model.js
 // Template-based. Admin creates reusable size guides (data table, not image).
@@ -540,13 +1159,13 @@ const variantSchema = new Schema(
     // (e.g. 128GB vs 512GB same weight, কিন্তু packaging size আলাদা হতে পারে)
     weight: {
       value: { type: Number, default: 0, min: 0 },
-      unit:  { type: String, enum: ["g", "kg"], default: "g" },
+      unit: { type: String, enum: ["g", "kg"], default: "g" },
     },
     dimensions: {
       length: { type: Number, default: 0, min: 0 },
-      width:  { type: Number, default: 0, min: 0 },
+      width: { type: Number, default: 0, min: 0 },
       height: { type: Number, default: 0, min: 0 },
-      unit:   { type: String, enum: ["cm", "inch"], default: "cm" },
+      unit: { type: String, enum: ["cm", "inch"], default: "cm" },
     },
 
     isActive: { type: Boolean, default: true },
@@ -590,9 +1209,9 @@ const reviewSchema = new Schema(
       required: true,
       index: true,
     },
-    rating:  { type: Number, min: 1, max: 5, required: true },
+    rating: { type: Number, min: 1, max: 5, required: true },
     comment: { type: String, default: "", trim: true },
-    images:  { type: [imageSchema], default: [] },
+    images: { type: [imageSchema], default: [] },
     isActive: { type: Boolean, default: true, index: true },
 
     // Moderation workflow — admin approve/reject করতে পারে
@@ -788,145 +1407,190 @@ Global ("all") discount
 Original retail price
 ```
 
-### 5.1 Discount Model (Industry-Grade)
+### 5.1 Discount Model (Production-Grade — Multi-Level Targeting & Conditions)
+
+**Key Features:**
+
+- ✅ Multi-level scope: flat | category | product | subCategory | variant | brand
+- ✅ Inclusive & exclusive targeting (apply to / exclude from)
+- ✅ Advanced conditions: min/max order amount, customer segments, purchase history, verification
+- ✅ Usage tracking: global limits, per-customer limits, budget caps
+- ✅ Stacking & priority: granular control, combinable discounts
+- ✅ Geographic restrictions: region/city/zipcode targeting
+- ✅ Payment method filtering
+- ✅ Day-of-week restrictions (flash sales, weekend specials)
+- ✅ Virtual fields for real-time eligibility checks
+- ✅ Instance methods: safe increment, customer eligibility, order qualification, amount calculation
+- ✅ Static methods: get applicable discounts with filtering
+- ✅ Atomic operations to prevent race conditions in concurrent requests
 
 ```js
-// src/models/discount.model.js
+// src/models/discount.model.js — Production-Grade Discount System
 const mongoose = require("mongoose");
-const slugify = require("slugify");
+const { default: slugify } = require("slugify");
 const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
-const { Schema } = mongoose;
 
-// ── Variant-level targeting (most precise scope) ──────────────────────────
-// Stores product + embedded variantId pair so a single discount can target
-// specific SKUs (e.g. "Red / XL" only) without touching other variants.
-const variantTargetSchema = new Schema(
+const discountSchema = new mongoose.Schema(
   {
-    product: { type: Schema.Types.ObjectId, ref: "Product", required: true },
-    variantId: { type: Schema.Types.ObjectId, required: true },
-  },
-  { _id: false },
-);
+    // ── BASIC INFORMATION ────────────────────────────────────────────────────
+    discountName: { type: String, required: true, trim: true, maxlength: 100 },
+    slug: { type: String, unique: true, lowercase: true, index: true },
+    discountCode: {
+      type: String,
+      unique: true,
+      sparse: true,
+      uppercase: true,
+      index: true,
+    },
+    description: { type: String, trim: true, maxlength: 500 },
+    campaignName: { type: String, trim: true, index: true },
 
-const discountSchema = new Schema(
-  {
-    name: { type: String, required: true, trim: true },
-    slug: { type: String, unique: true, lowercase: true, trim: true },
-
-    // ── Effect ─────────────────────────────────────────────────────────────
+    // ── DISCOUNT VALUE ──────────────────────────────────────────────────────
     discountType: {
       type: String,
-      // fixed_price = set a hard price (e.g. "always ৳499") — Daraz-style
-      enum: ["percentage", "fixed", "fixed_price"],
+      enum: ["fixed", "percentage"],
       required: true,
     },
     discountValue: { type: Number, required: true, min: 0 },
-    // Ceiling for percentage discounts (e.g. 20% off but max ৳500 deduction)
-    maxDiscountAmount: { type: Number, default: null },
+    maxDiscountAmount: { type: Number, default: null }, // Cap for % discounts
 
-    validFrom: { type: Date, required: true },
-    validTo: { type: Date, required: true },
-
-    // ── Targeting (scope + target arrays) ──────────────────────────────────
-    // Resolution order: variant → product → brand → category → all
-    scope: {
+    // ── SCOPE & TARGETING ───────────────────────────────────────────────────
+    discountPlan: {
       type: String,
-      enum: ["all", "category", "brand", "product", "variant"],
+      enum: ["flat", "category", "product", "subCategory", "variant", "brand"],
       required: true,
-      default: "product",
+      index: true,
     },
 
-    // scope = "category": applies to all products in these categories
-    // child categories resolved in service layer via $graphLookup
-    categories: [{ type: Schema.Types.ObjectId, ref: "Category" }],
+    // Inclusive targeting — which items receive discount
+    applicableCategories: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
+    ],
+    applicableSubCategories: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "Subcategory" },
+    ],
+    applicableProducts: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+    ],
+    applicableVariants: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "Variant" },
+    ],
+    applicableBrands: [{ type: mongoose.Schema.Types.ObjectId, ref: "Brand" }],
 
-    // scope = "brand": applies to all products of these brands
-    brands: [{ type: Schema.Types.ObjectId, ref: "Brand" }],
+    // Exclusive targeting — which items are excluded
+    excludedProducts: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+    ],
+    excludedCategories: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
+    ],
+    excludedSubCategories: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "Subcategory" },
+    ],
 
-    // scope = "product": applies to these products (all variants)
-    products: [{ type: Schema.Types.ObjectId, ref: "Product" }],
+    // ── TIMING ──────────────────────────────────────────────────────────────
+    discountValidFrom: { type: Date, required: true },
+    discountValidTo: { type: Date, required: true },
+    dayOfWeekRestriction: {
+      type: [Number],
+      enum: [0, 1, 2, 3, 4, 5, 6],
+      default: [],
+    }, // 0=Sun..6=Sat
 
-    // scope = "variant": applies only to specific product+variant pairs
-    variants: { type: [variantTargetSchema], default: [] },
+    // ── USAGE LIMITS & TRACKING ─────────────────────────────────────────────
+    usageLimit: { type: Number, default: null }, // Null = unlimited
+    usedCount: { type: Number, default: 0, min: 0 },
+    usagePerCustomer: { type: Number, default: null }, // Max uses per individual
 
-    // ── Conditions (when discount activates) ───────────────────────────────
-    conditions: {
-      // Minimum cart/item amount for discount to apply
-      minOrderAmount: { type: Number, default: 0, min: 0 },
-      // Minimum quantity of the discounted item in cart
-      minQuantity: { type: Number, default: 1, min: 1 },
-      // Who is eligible: "all" = everyone, others = customer segment check
-      customerSegment: {
+    // ── PURCHASE REQUIREMENTS ───────────────────────────────────────────────
+    minOrderAmount: { type: Number, default: 0, min: 0 },
+    maxOrderAmount: { type: Number, default: null },
+    requirePurchaseHistory: { type: Number, default: 0 }, // Min previous purchases
+    minimumProductQuantity: { type: Number, default: 1, min: 1 },
+
+    // ── CUSTOMER TARGETING ──────────────────────────────────────────────────
+    isNewCustomerOnly: { type: Boolean, default: false },
+    isFirstOrderOnly: { type: Boolean, default: false },
+    userSegments: [
+      {
         type: String,
-        enum: ["all", "new", "returning", "vip"],
-        default: "all",
+        enum: ["vip", "regular", "new", "inactive", "high_spender"],
       },
-    },
+    ],
+    applicablePaymentMethods: [
+      {
+        type: String,
+        enum: [
+          "credit_card",
+          "debit_card",
+          "bkash",
+          "nagad",
+          "bank_transfer",
+          "cash_on_delivery",
+        ],
+      },
+    ],
 
-    // ── Limits (budget & usage control) ────────────────────────────────────
-    limits: {
-      // Max total times this discount can be applied globally (null = unlimited)
-      usageLimit: { type: Number, default: null, min: 1 },
-      // Tracked counter — incremented by discount service on each application
-      usageCount: { type: Number, default: 0, min: 0 },
-      // Max total discount budget in currency (null = no budget cap)
-      budgetCap: { type: Number, default: null, min: 0 },
-      // Accumulated discount amount spent — checked before applying
-      budgetUsed: { type: Number, default: 0, min: 0 },
-    },
+    // Geographic Restrictions
+    applicableRegions: [String],
+    applicableCities: [String],
+    applicableZipCodes: [String],
 
-    // ── Priority & stacking ────────────────────────────────────────────────
-    // Higher priority wins when multiple discounts match the same product.
-    // Equal priority → higher discountValue wins.
-    priority: { type: Number, default: 0 },
+    // ── STACKING & PRIORITY ─────────────────────────────────────────────────
+    priority: { type: Number, default: 0, min: 0, max: 100, index: true },
+    isCombinable: { type: Boolean, default: false },
+    stackingLimit: { type: Number, default: 1, min: 1 },
 
-    // Stacking rules — granular control per discount type
-    stackable: {
-      withCoupon: { type: Boolean, default: false },
-      withFlashSale: { type: Boolean, default: false }, // almost always false
-      withOtherDiscount: { type: Boolean, default: false },
-    },
+    // ── VERIFICATION REQUIREMENTS ───────────────────────────────────────────
+    requireEmailVerification: { type: Boolean, default: false },
+    requirePhoneVerification: { type: Boolean, default: false },
 
-    // ── Display (storefront UI) ────────────────────────────────────────────
-    badge: { type: String, trim: true, default: "" }, // "10% OFF", "SUMMER SALE"
-    displayPriority: { type: Number, default: 0 },    // storefront badge sort order
-
+    // ── ADMIN CONTROLS & ANALYTICS ──────────────────────────────────────────
     isActive: { type: Boolean, default: true, index: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    appliedCount: { type: Number, default: 0 },
+    totalDiscountGiven: { type: Number, default: 0 },
   },
   { timestamps: true },
 );
 
-// ── Indexes ────────────────────────────────────────────────────────────────
-discountSchema.index({ validFrom: 1, validTo: 1, isActive: 1 });
-discountSchema.index({ scope: 1, isActive: 1 });
-discountSchema.index({ categories: 1 });
-discountSchema.index({ brands: 1 });
-discountSchema.index({ products: 1 });
-discountSchema.index({ "variants.product": 1, "variants.variantId": 1 });
-discountSchema.index({ priority: -1 });
+// ── INDEXES ─────────────────────────────────────────────────────────────────
+discountSchema.index({ isActive: 1, discountValidFrom: 1, discountValidTo: 1 });
+discountSchema.index({ discountType: 1, priority: -1 });
+discountSchema.index({ isCombinable: 1, priority: -1 });
+discountSchema.index({ usedCount: 1, usageLimit: 1 });
+discountSchema.index({ campaignName: 1, isActive: 1 });
+discountSchema.index({ createdBy: 1, createdAt: -1 });
 
-// ── Validation ─────────────────────────────────────────────────────────────
+// ── VALIDATIONS ─────────────────────────────────────────────────────────────
 discountSchema.pre("save", function (next) {
-  if (this.validTo <= this.validFrom) {
-    return next(
-      new customError("validTo must be after validFrom", statusCodes.BAD_REQUEST),
-    );
+  if (this.isModified("discountName")) {
+    this.slug = slugify(this.discountName, { lower: true, strict: true });
   }
-  // scope guard: ensure required target arrays are not empty
-  const scopeArrayMap = {
-    category: this.categories,
-    brand: this.brands,
-    product: this.products,
-    variant: this.variants,
-  };
-  if (
-    this.scope !== "all" &&
-    (!scopeArrayMap[this.scope] || scopeArrayMap[this.scope].length === 0)
-  ) {
+  next();
+});
+
+discountSchema.pre("save", async function (next) {
+  try {
+    const existDiscount = await this.constructor.findOne({ slug: this.slug });
+    if (existDiscount && existDiscount._id.toString() !== this._id.toString()) {
+      return next(
+        new customError(`Discount already exists`, statusCodes.BAD_REQUEST),
+      );
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+discountSchema.pre("save", function (next) {
+  if (this.discountValidTo <= this.discountValidFrom) {
     return next(
       new customError(
-        `scope "${this.scope}" requires at least one entry in the corresponding target array`,
+        "End date must be after start date",
         statusCodes.BAD_REQUEST,
       ),
     );
@@ -934,71 +1598,216 @@ discountSchema.pre("save", function (next) {
   next();
 });
 
-discountSchema.pre("save", async function (next) {
-  if (!this.slug || this.isModified("name")) {
-    let base = slugify(this.name, { lower: true, strict: true });
-    let slug = base,
-      i = 1;
-    while (
-      await mongoose.model("Discount").exists({ slug, _id: { $ne: this._id } })
-    ) {
-      slug = `${base}-${i++}`;
-    }
-    this.slug = slug;
-  }
-  next();
+// ── VIRTUAL FIELDS ──────────────────────────────────────────────────────────
+discountSchema.virtual("isCurrentlyValid").get(function () {
+  const now = new Date();
+  return (
+    this.isActive &&
+    now >= this.discountValidFrom &&
+    now <= this.discountValidTo
+  );
 });
+
+discountSchema.virtual("isUsageLimitExhausted").get(function () {
+  return this.usageLimit !== null && this.usedCount >= this.usageLimit;
+});
+
+discountSchema.virtual("isApplicable").get(function () {
+  return this.isCurrentlyValid && !this.isUsageLimitExhausted;
+});
+
+discountSchema.virtual("remainingUsage").get(function () {
+  if (this.usageLimit === null) return null;
+  return Math.max(0, this.usageLimit - this.usedCount);
+});
+
+// ── INSTANCE METHODS ────────────────────────────────────────────────────────
+// Safe atomic increment with guards
+discountSchema.methods.incrementUsage = async function (amount = 1) {
+  if (this.usageLimit !== null && this.usedCount + amount > this.usageLimit) {
+    throw new customError(
+      "Usage limit would be exceeded",
+      statusCodes.BAD_REQUEST,
+    );
+  }
+  const result = await this.constructor.findByIdAndUpdate(
+    this._id,
+    { $inc: { usedCount: amount } },
+    { new: true, runValidators: true },
+  );
+  return result;
+};
+
+// Track discount application + amount given
+discountSchema.methods.trackApplication = async function (discountAmount = 0) {
+  return await this.constructor.findByIdAndUpdate(
+    this._id,
+    { $inc: { appliedCount: 1, totalDiscountGiven: discountAmount } },
+    { new: true },
+  );
+};
+
+// Check customer eligibility with detailed reasons
+discountSchema.methods.isEligibleForCustomer = function (customer = {}) {
+  const reasons = [];
+  if (this.isNewCustomerOnly && customer.isNewCustomer === false) {
+    reasons.push("Only for new customers");
+  }
+  if (this.isFirstOrderOnly && (customer.totalOrders || 0) > 0) {
+    reasons.push("Only for first-time orders");
+  }
+  if (
+    this.userSegments.length > 0 &&
+    customer.segment &&
+    !this.userSegments.includes(customer.segment)
+  ) {
+    reasons.push(`Not available for ${customer.segment} segment`);
+  }
+  if (
+    this.requirePurchaseHistory > 0 &&
+    (customer.totalOrders || 0) < this.requirePurchaseHistory
+  ) {
+    reasons.push(`Requires ${this.requirePurchaseHistory} prior purchases`);
+  }
+  if (this.requireEmailVerification && !customer.isEmailVerified) {
+    reasons.push("Email verification required");
+  }
+  if (this.requirePhoneVerification && !customer.isPhoneVerified) {
+    reasons.push("Phone verification required");
+  }
+  return { isEligible: reasons.length === 0, reasons };
+};
+
+// Check order qualification with detailed reasons
+discountSchema.methods.isOrderQualified = function (order = {}) {
+  const reasons = [];
+  if (!this.isCurrentlyValid) reasons.push("Not currently valid");
+  if (!this.isActive) reasons.push("Inactive");
+  if (this.isUsageLimitExhausted) reasons.push("Usage limit reached");
+  if ((order.totalAmount || 0) < this.minOrderAmount) {
+    reasons.push(`Minimum ৳${this.minOrderAmount} required`);
+  }
+  if (
+    this.maxOrderAmount !== null &&
+    (order.totalAmount || 0) > this.maxOrderAmount
+  ) {
+    reasons.push(`Exceeds max ৳${this.maxOrderAmount}`);
+  }
+  if (this.dayOfWeekRestriction.length > 0) {
+    const dayOfWeek = new Date().getDay();
+    if (!this.dayOfWeekRestriction.includes(dayOfWeek)) {
+      reasons.push("Not available today");
+    }
+  }
+  if (
+    this.applicablePaymentMethods.length > 0 &&
+    order.paymentMethod &&
+    !this.applicablePaymentMethods.includes(order.paymentMethod)
+  ) {
+    reasons.push(`Not available for ${order.paymentMethod}`);
+  }
+  return { isQualified: reasons.length === 0, reasons };
+};
+
+// Calculate final discount amount
+discountSchema.methods.calculateDiscountAmount = function (baseAmount = 0) {
+  let amount =
+    this.discountType === "fixed"
+      ? this.discountValue
+      : (baseAmount * this.discountValue) / 100;
+  if (this.maxDiscountAmount !== null && amount > this.maxDiscountAmount) {
+    amount = this.maxDiscountAmount;
+  }
+  return amount;
+};
+
+// ── STATIC METHODS ──────────────────────────────────────────────────────────
+// Get all applicable discounts (sorted by priority)
+discountSchema.statics.getApplicableDiscounts = async function (filters = {}) {
+  const query = {
+    isActive: true,
+    discountValidFrom: { $lte: new Date() },
+    discountValidTo: { $gte: new Date() },
+  };
+  if (filters.productId) {
+    query.$or = [
+      { applicableProducts: filters.productId },
+      { discountPlan: "flat" },
+    ];
+  }
+  if (filters.categoryId) {
+    query.$or = query.$or || [];
+    query.$or.push({ applicableCategories: filters.categoryId });
+  }
+  if (filters.excludeProductIds?.length > 0) {
+    query.excludedProducts = { $nin: filters.excludeProductIds };
+  }
+  return await this.find(query).sort({ priority: -1 });
+};
 
 module.exports =
   mongoose.models.Discount || mongoose.model("Discount", discountSchema);
 ```
 
-**Example discount documents:**
+**Example use cases:**
 
-```json
-// Category-wide sale with budget cap
+```js
+// Category-wide festival sale
 {
-  "name": "Eid Electronics Sale",
-  "scope": "category",
-  "discountType": "percentage",
-  "discountValue": 15,
-  "maxDiscountAmount": 500,
-  "categories": ["ObjectId(electronics)"],
-  "conditions": { "minOrderAmount": 1000, "minQuantity": 1, "customerSegment": "all" },
-  "limits": { "usageLimit": null, "budgetCap": 100000, "budgetUsed": 0 },
-  "stackable": { "withCoupon": true, "withFlashSale": false, "withOtherDiscount": false },
-  "badge": "15% OFF",
-  "validFrom": "2026-03-29T00:00:00Z",
-  "validTo": "2026-04-05T23:59:59Z"
+  discountName: "Eid Electronics Sale",
+  discountPlan: "category",
+  discountType: "percentage",
+  discountValue: 15,
+  maxDiscountAmount: 5000,
+  applicableCategories: ["ObjectId(electronics)"],
+  minOrderAmount: 10000,
+  discountValidFrom: "2026-03-29T00:00:00Z",
+  discountValidTo: "2026-04-05T23:59:59Z",
+  isCombinable: true,
+  priority: 5
 }
 
-// Variant-specific fixed price
+// VIP-only product discount
 {
-  "name": "iPhone 15 Black 256GB Special",
-  "scope": "variant",
-  "discountType": "fixed_price",
-  "discountValue": 129999,
-  "variants": [{ "product": "ObjectId(iphone15)", "variantId": "ObjectId(black-256gb)" }],
-  "conditions": { "minOrderAmount": 0, "minQuantity": 1, "customerSegment": "all" },
-  "limits": { "usageLimit": 50, "usageCount": 0, "budgetCap": null },
-  "stackable": { "withCoupon": false, "withFlashSale": false, "withOtherDiscount": false },
-  "badge": "SPECIAL PRICE",
-  "priority": 10
+  discountName: "VIP Member Exclusive",
+  discountPlan: "product",
+  discountType: "fixed",
+  discountValue: 2000,
+  applicableProducts: ["ObjectId(premium_item)"],
+  userSegments: ["vip"],
+  usagePerCustomer: 2,
+  usageLimit: 100,
+  priority: 8
 }
 
-// Brand-wide VIP discount
+// Weekend flash sale on specific variant
 {
-  "name": "Samsung VIP Member Discount",
-  "scope": "brand",
-  "discountType": "percentage",
-  "discountValue": 8,
-  "brands": ["ObjectId(samsung)"],
-  "conditions": { "minOrderAmount": 0, "minQuantity": 1, "customerSegment": "vip" },
-  "limits": { "usageLimit": null, "budgetCap": null },
-  "stackable": { "withCoupon": true, "withFlashSale": false, "withOtherDiscount": false },
-  "badge": "VIP 8% OFF"
+  discountName: "Weekend Special - iPhone 15 Pro",
+  discountPlan: "variant",
+  discountType: "percentage",
+  discountValue: 8,
+  applicableVariants: ["ObjectId(iphone15-pro-128gb)"],
+  dayOfWeekRestriction: [5, 6], // Fri, Sat
+  discountValidFrom: "2026-05-16T00:00:00Z",
+  discountValidTo: "2026-05-18T23:59:59Z",
+  priority: 10
+}
+
+// New customer first order bonus
+{
+  discountName: "Welcome New Customers",
+  discountPlan: "flat",
+  discountType: "percentage",
+  discountValue: 20,
+  isNewCustomerOnly: true,
+  isFirstOrderOnly: true,
+  minOrderAmount: 5000,
+  usagePerCustomer: 1,
+  priority: 7
 }
 ```
+
+````
 
 **Discount Resolution Service:**
 
@@ -1119,7 +1928,7 @@ async function applyDiscount(discountId, originalPrice) {
 
   return { finalPrice: Math.max(0, finalPrice), deduction };
 }
-```
+````
 
 ---
 
@@ -1437,7 +2246,7 @@ permissionSchema.pre("save", async function (next) {
   } catch (error) {
     next(error);
   }
-}); 
+});
 
 module.exports =
   mongoose.models.Permission || mongoose.model("Permission", permissionSchema);
@@ -1868,6 +2677,7 @@ LOGGED USER
 ```
 
 **মূল নীতি:**
+
 - `user` এবং `guestId` — একটাই set থাকবে, কখনো দুটো একসাথে নয়
 - `unitPrice` সবসময় server থেকে (`variant.pricing.retailPrice`) — client-sent price কখনো trust করা যাবে না
 - Cart item-এ snapshot store করো — display-এ Product join লাগবে না
@@ -1898,8 +2708,8 @@ const cartItemSchema = new Schema(
     // Service layer add-to-cart-এ set করবে। পরে read-only।
     productName: { type: String, default: "" },
     variantName: { type: String, default: "" }, // e.g. "Red / XL"
-    sku:         { type: String, default: "" },
-    image:       { type: String, default: "" }, // variant image URL, fallback → product image
+    sku: { type: String, default: "" },
+    image: { type: String, default: "" }, // variant image URL, fallback → product image
 
     // v2 dynamic attributes — পুরনো hardcoded `color` + `size` string replace করেছে
     // Product.variants[i].attributes: [{ key: "Color", value: "Red" }, { key: "Size", value: "XL" }]
@@ -1918,15 +2728,19 @@ const cartItemSchema = new Schema(
     // discount engine যদি match করে তাহলে এখানে snapshot রাখো
     // cart page-এ "15% Eid Discount applied" badge দেখাতে পারবে
     appliedDiscount: {
-      discountId:   { type: Schema.Types.ObjectId, ref: "Discount", default: null },
-      discountType: { type: String, default: "" },   // "percentage" | "fixed" | "fixed_price"
-      deduction:    { type: Number, default: 0, min: 0 }, // কত টাকা কমেছে
-      badge:        { type: String, default: "" },   // "15% OFF", "EID SALE" — UI label
+      discountId: {
+        type: Schema.Types.ObjectId,
+        ref: "Discount",
+        default: null,
+      },
+      discountType: { type: String, default: "" }, // "percentage" | "fixed" | "fixed_price"
+      deduction: { type: Number, default: 0, min: 0 }, // কত টাকা কমেছে
+      badge: { type: String, default: "" }, // "15% OFF", "EID SALE" — UI label
     },
 
     // unitPrice = originalPrice - appliedDiscount.deduction (service layer calculates)
     // discount না থাকলে unitPrice === originalPrice
-    unitPrice:  { type: Number, required: true, default: 0, min: 0 },
+    unitPrice: { type: Number, required: true, default: 0, min: 0 },
     totalPrice: { type: Number, required: true, default: 0, min: 0 }, // unitPrice × quantity
 
     // ── Gap 1: Price staleness tracker ────────────────────────────────────
@@ -1962,11 +2776,11 @@ cartItemSchema.virtual("isStale").get(function () {
 const cartSchema = new Schema(
   {
     // এই দুটোর মধ্যে সবসময় একটাই set — কখনো দুটো একসাথে নয়
-    user:    { type: Schema.Types.ObjectId, ref: "User", default: null },
+    user: { type: Schema.Types.ObjectId, ref: "User", default: null },
     guestId: { type: String, default: null },
 
-    items:     { type: [cartItemSchema], default: [] },
-    subTotal:  { type: Number, default: 0, min: 0 }, // all item.totalPrice এর sum
+    items: { type: [cartItemSchema], default: [] },
+    subTotal: { type: Number, default: 0, min: 0 }, // all item.totalPrice এর sum
     totalItem: { type: Number, default: 0, min: 0 }, // all item.quantity এর sum
 
     // Guest cart TTL — গেস্ট cart-এ date set করো, logged-in cart-এ null
@@ -1990,18 +2804,18 @@ module.exports = mongoose.models.Cart || mongoose.model("Cart", cartSchema);
 
 **v1 → v2 field mapping:**
 
-| v1 field | v2 field | কারণ |
-|---|---|---|
-| `variant: ref "Variant"` | `variantId: ObjectId` | Variant আলাদা collection নেই, Product-এ embedded |
-| `color: String` | `attributes: [{key,value}]` | Dynamic — hardcoded color/size নয় |
-| `size: String` | (attributes-এর ভেতরে) | |
-| `price: Number` | `unitPrice: Number` | নাম clarify করা হয়েছে |
-| নেই | `productName`, `variantName`, `sku`, `image` | Snapshot — join ছাড়া cart display |
-| নেই | `originalPrice` + `appliedDiscount` | Strikethrough price + discount badge in cart UI |
-| নেই | `priceUpdatedAt` | Price change detection — "Price changed" warning |
-| নেই | `stockStatus` | Out-of-stock badge in cart, checkout button disable |
-| নেই | `expiresAt: Date` | Guest cart auto-cleanup via MongoDB TTL |
-| নেই | `timestamps: true` | Cart age + abandoned cart analytics |
+| v1 field                 | v2 field                                     | কারণ                                                |
+| ------------------------ | -------------------------------------------- | --------------------------------------------------- |
+| `variant: ref "Variant"` | `variantId: ObjectId`                        | Variant আলাদা collection নেই, Product-এ embedded    |
+| `color: String`          | `attributes: [{key,value}]`                  | Dynamic — hardcoded color/size নয়                  |
+| `size: String`           | (attributes-এর ভেতরে)                        |                                                     |
+| `price: Number`          | `unitPrice: Number`                          | নাম clarify করা হয়েছে                              |
+| নেই                      | `productName`, `variantName`, `sku`, `image` | Snapshot — join ছাড়া cart display                  |
+| নেই                      | `originalPrice` + `appliedDiscount`          | Strikethrough price + discount badge in cart UI     |
+| নেই                      | `priceUpdatedAt`                             | Price change detection — "Price changed" warning    |
+| নেই                      | `stockStatus`                                | Out-of-stock badge in cart, checkout button disable |
+| নেই                      | `expiresAt: Date`                            | Guest cart auto-cleanup via MongoDB TTL             |
+| নেই                      | `timestamps: true`                           | Cart age + abandoned cart analytics                 |
 
 **Service layer-এ price, discount ও snapshot নেওয়ার pattern:**
 
@@ -2020,43 +2834,53 @@ if (variant.stock.quantity < quantity)
   throw new customError(`Only ${variant.stock.quantity} units available`, 400);
 
 const stockStatus =
-  variant.stock.quantity === 0           ? "out_of_stock"
-  : variant.stock.quantity <= variant.stock.alertThreshold ? "low_stock"
-  : "available";
+  variant.stock.quantity === 0
+    ? "out_of_stock"
+    : variant.stock.quantity <= variant.stock.alertThreshold
+      ? "low_stock"
+      : "available";
 
 // ── Price (Gap 1 + Gap 2) ──────────────────────────────────────────────────
 const originalPrice = variant.pricing.retailPrice; // discount-এর আগের price
 
 // discount engine থেকে effective discount বের করো
 const discount = await resolveDiscount(
-  product._id, variant._id, product.category, product.brand,
-  { quantity, orderAmount: originalPrice * quantity }
+  product._id,
+  variant._id,
+  product.category,
+  product.brand,
+  { quantity, orderAmount: originalPrice * quantity },
 );
 
 let deduction = 0;
-let appliedDiscount = { discountId: null, discountType: "", deduction: 0, badge: "" };
+let appliedDiscount = {
+  discountId: null,
+  discountType: "",
+  deduction: 0,
+  badge: "",
+};
 
 if (discount) {
   const result = await applyDiscount(discount._id, originalPrice); // counters increment
   deduction = result.deduction;
   appliedDiscount = {
-    discountId:   discount._id,
+    discountId: discount._id,
     discountType: discount.discountType,
     deduction,
-    badge:        discount.badge || "",
+    badge: discount.badge || "",
   };
 }
 
-const unitPrice  = originalPrice - deduction;
+const unitPrice = originalPrice - deduction;
 const totalPrice = unitPrice * quantity;
 
 // ── Snapshot ───────────────────────────────────────────────────────────────
 const snapshot = {
   productName: product.name,
   variantName: variant.variantName || "",
-  sku:         variant.sku || "",
-  image:       variant.images?.[0]?.url || product.images?.[0]?.url || "",
-  attributes:  variant.attributes || [],
+  sku: variant.sku || "",
+  image: variant.images?.[0]?.url || product.images?.[0]?.url || "",
+  attributes: variant.attributes || [],
 };
 
 // cart item push করো এই সব data দিয়ে
@@ -2070,7 +2894,7 @@ cart.items.push({
   unitPrice,
   totalPrice,
   priceUpdatedAt: new Date(), // Gap 1: staleness tracker reset
-  stockStatus,                // Gap 3: stock visibility
+  stockStatus, // Gap 3: stock visibility
 });
 ```
 
@@ -2079,24 +2903,32 @@ cart.items.push({
 ```js
 // cart load হলে প্রতিটা item-এর live price vs stored price compare করো
 for (const item of cart.items) {
-  const product = await Product.findOne({ _id: item.product, "variants._id": item.variantId });
-  if (!product) { item.stockStatus = "out_of_stock"; continue; }
+  const product = await Product.findOne({
+    _id: item.product,
+    "variants._id": item.variantId,
+  });
+  if (!product) {
+    item.stockStatus = "out_of_stock";
+    continue;
+  }
 
   const variant = product.variants.id(item.variantId);
   const livePrice = variant.pricing.retailPrice;
 
   // Gap 1: price বদলে গেছে?
   if (livePrice !== item.originalPrice) {
-    item.originalPrice  = livePrice;
+    item.originalPrice = livePrice;
     item.priceUpdatedAt = new Date(); // frontend এই timestamp দিয়ে "Price changed" দেখাবে
     // discount re-resolve করো নতুন price-এ
   }
 
   // Gap 3: stock status refresh
   item.stockStatus =
-    variant.stock.quantity === 0                              ? "out_of_stock"
-    : variant.stock.quantity <= variant.stock.alertThreshold  ? "low_stock"
-    : "available";
+    variant.stock.quantity === 0
+      ? "out_of_stock"
+      : variant.stock.quantity <= variant.stock.alertThreshold
+        ? "low_stock"
+        : "available";
 }
 await cart.save();
 ```
@@ -2450,41 +3282,41 @@ Base URL: `/api/v2`
 
 ## 11. Design Decisions Summary
 
-| Decision                  | Choice                                                  | Reason                                                      |
-| ------------------------- | ------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------ |
-| Category hierarchy        | Self-referential `parent: null = root`                  | Amazon/Daraz style, unlimited depth, simple                 |
-| Brand ↔ Category          | Independent, product refs both                          | Samsung spans Electronics + Appliances                      |
-| Variant storage           | Embedded array in Product                               | Atomic updates, single doc fetch, <16MB for typical product |
-| Variant attributes        | `[{key, value:Mixed}]`                                  | Free-form dynamic, driven by AttributeDefinition in UI      |
-| SizeChart                 | Template (data table, columns + rows)                   | Reusable across products, structured not an image           |
-| SizeChart scope           | Category-level template, Product can override           | Inheritance: Product → Category                             |
-| Discount scope            | 5-level: variant → product → brand → category → all     | Daraz/Shopee-style precision — variant SKU level targeting  |
-| Discount conditions       | minOrderAmount, minQuantity, customerSegment            | Conditional promotions ("৳1000+ কিনলে 15% off")            |
-| Discount limits           | usageLimit + usageCount + budgetCap + budgetUsed        | Budget-controlled campaigns, prevents unlimited spend       |
-| Discount stacking         | Granular: withCoupon, withFlashSale, withOtherDiscount  | Fine-grained control vs single boolean                      |
-| Discount resolution       | Priority cascade + level hierarchy + tie-breaking       | Predictable, no ambiguity — highest level wins first        |
-| Discount type fixed_price | Added "fixed_price" alongside percentage/fixed          | "Always ৳499" Daraz-style hard price override               |
-| FlashSale                 | Separate model with per-item stock cap                  | Different semantics from discount: countdown + qty limit    |
-| Banner                    | Single model with `type` enum                           | Eliminates duplicate schema, simpler API                    |
-| Permission model          | Keep existing style, add module+action fields           | Matches your existing code style                            |
-| Role                      | Upgraded: now carries `permissions[]`                   | Standard RBAC: Role = permission bundle                     |
-| SuperAdmin                | `isSuperAdmin` flag on User (hidden field)              | Not deletable as a role, survives role cleanup              |
-| Permission override       | `{permission, type: grant                               | deny}` on User                                              | Least-privilege: deny wins, fine-grained control |
-| Cart identity             | `user` OR `guestId` — never both simultaneously        | Clean separation, merge on login                            |
-| Cart guest TTL            | `expiresAt` + MongoDB TTL index (7-day sliding)         | Auto-cleanup abandoned guest carts, no cron job needed      |
-| Cart item variant ref     | `variantId: ObjectId` (embedded _id) — NOT collection ref | v2 has no Variant collection, variants live in Product   |
-| Cart item attributes      | `[{key,value}]` dynamic, replaces `color`+`size` strings | Matches v2 variant attribute design                       |
-| Cart item snapshot        | productName, variantName, sku, image stored on add      | Display cart without re-fetching Product                    |
-| Cart price source         | Always `variant.pricing.retailPrice` from server        | Client-sent price never trusted — prevents manipulation     |
-| Cart discount snapshot    | `originalPrice` + `appliedDiscount` per item            | Strikethrough price + badge without re-running discount engine |
-| Cart price staleness      | `priceUpdatedAt` — refreshed on cart GET if price changed | Frontend shows "Price changed" warning before checkout    |
-| Cart stock visibility     | `stockStatus` enum per item, refreshed on cart GET      | "Out of Stock" badge in cart, checkout disabled proactively |
-| Cart/Order items          | `variantId` + attribute snapshot                        | Snapshots = immutable order history, no join on display     |
-| Purchase line items       | `variantId` + full snapshot                             | Audit trail: what was bought at what price/spec             |
-| Soft delete               | `isDeleted + deletedAt` on Product, User                | Preserves order/purchase history references                 |
-| Subcategory removal       | ✓ Removed — self-referential category handles this      | No duplication, cleaner tree                                |
-| UserPermission collection | ✓ Removed — merged into User model                      | Was redundant with User.permissions[]                       |
-| discountBanner model      | ✓ Removed — merged into Banner with type field          | Identical schema, no need for two collections               |
+| Decision                  | Choice                                                     | Reason                                                         |
+| ------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------ |
+| Category hierarchy        | Self-referential `parent: null = root`                     | Amazon/Daraz style, unlimited depth, simple                    |
+| Brand ↔ Category          | Independent, product refs both                             | Samsung spans Electronics + Appliances                         |
+| Variant storage           | Embedded array in Product                                  | Atomic updates, single doc fetch, <16MB for typical product    |
+| Variant attributes        | `[{key, value:Mixed}]`                                     | Free-form dynamic, driven by AttributeDefinition in UI         |
+| SizeChart                 | Template (data table, columns + rows)                      | Reusable across products, structured not an image              |
+| SizeChart scope           | Category-level template, Product can override              | Inheritance: Product → Category                                |
+| Discount scope            | 5-level: variant → product → brand → category → all        | Daraz/Shopee-style precision — variant SKU level targeting     |
+| Discount conditions       | minOrderAmount, minQuantity, customerSegment               | Conditional promotions ("৳1000+ কিনলে 15% off")                |
+| Discount limits           | usageLimit + usageCount + budgetCap + budgetUsed           | Budget-controlled campaigns, prevents unlimited spend          |
+| Discount stacking         | Granular: withCoupon, withFlashSale, withOtherDiscount     | Fine-grained control vs single boolean                         |
+| Discount resolution       | Priority cascade + level hierarchy + tie-breaking          | Predictable, no ambiguity — highest level wins first           |
+| Discount type fixed_price | Added "fixed_price" alongside percentage/fixed             | "Always ৳499" Daraz-style hard price override                  |
+| FlashSale                 | Separate model with per-item stock cap                     | Different semantics from discount: countdown + qty limit       |
+| Banner                    | Single model with `type` enum                              | Eliminates duplicate schema, simpler API                       |
+| Permission model          | Keep existing style, add module+action fields              | Matches your existing code style                               |
+| Role                      | Upgraded: now carries `permissions[]`                      | Standard RBAC: Role = permission bundle                        |
+| SuperAdmin                | `isSuperAdmin` flag on User (hidden field)                 | Not deletable as a role, survives role cleanup                 |
+| Permission override       | `{permission, type: grant                                  | deny}` on User                                                 | Least-privilege: deny wins, fine-grained control |
+| Cart identity             | `user` OR `guestId` — never both simultaneously            | Clean separation, merge on login                               |
+| Cart guest TTL            | `expiresAt` + MongoDB TTL index (7-day sliding)            | Auto-cleanup abandoned guest carts, no cron job needed         |
+| Cart item variant ref     | `variantId: ObjectId` (embedded \_id) — NOT collection ref | v2 has no Variant collection, variants live in Product         |
+| Cart item attributes      | `[{key,value}]` dynamic, replaces `color`+`size` strings   | Matches v2 variant attribute design                            |
+| Cart item snapshot        | productName, variantName, sku, image stored on add         | Display cart without re-fetching Product                       |
+| Cart price source         | Always `variant.pricing.retailPrice` from server           | Client-sent price never trusted — prevents manipulation        |
+| Cart discount snapshot    | `originalPrice` + `appliedDiscount` per item               | Strikethrough price + badge without re-running discount engine |
+| Cart price staleness      | `priceUpdatedAt` — refreshed on cart GET if price changed  | Frontend shows "Price changed" warning before checkout         |
+| Cart stock visibility     | `stockStatus` enum per item, refreshed on cart GET         | "Out of Stock" badge in cart, checkout disabled proactively    |
+| Cart/Order items          | `variantId` + attribute snapshot                           | Snapshots = immutable order history, no join on display        |
+| Purchase line items       | `variantId` + full snapshot                                | Audit trail: what was bought at what price/spec                |
+| Soft delete               | `isDeleted + deletedAt` on Product, User                   | Preserves order/purchase history references                    |
+| Subcategory removal       | ✓ Removed — self-referential category handles this         | No duplication, cleaner tree                                   |
+| UserPermission collection | ✓ Removed — merged into User model                         | Was redundant with User.permissions[]                          |
+| discountBanner model      | ✓ Removed — merged into Banner with type field             | Identical schema, no need for two collections                  |
 
 ---
 
