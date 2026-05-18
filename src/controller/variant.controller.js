@@ -20,7 +20,6 @@ const {
   buildCacheKey,
 } = require("@/utils/cache.util");
 const { imageQueue } = require("@/queues/image.queue");
-const { deleteCloudinaryFile } = require("../helpers/cloudinary");
 
 const NS = "variant";
 const CACHE_TTL = 60 * 60; // 1 hour
@@ -43,29 +42,14 @@ const getVariantUpdateFiles = (files = [], fieldName) => {
   return fileList.filter((file) => file.fieldname === fieldName);
 };
 
-/**
- * Collect all Cloudinary publicIds from a variant.
- */
 const collectVariantPublicIds = (v) => {
   if (!v) return [];
   const ids = [];
   if (v.thumbnail?.publicId) ids.push(v.thumbnail.publicId);
-  if (Array.isArray(v.image)) {
+  if (Array.isArray(v.image))
     v.image.forEach((img) => img?.publicId && ids.push(img.publicId));
-  }
   if (v.seo?.ogImage?.publicId) ids.push(v.seo.ogImage.publicId);
   return ids;
-};
-
-const fireAndForgetCloudinaryDelete = (publicIds = []) => {
-  if (!publicIds.length) return;
-  setImmediate(() => {
-    publicIds.forEach((id) =>
-      deleteCloudinaryFile(id).catch((err) =>
-        console.error(`[Cleanup] Failed to delete ${id}:`, err.message),
-      ),
-    );
-  });
 };
 
 // @desc create variant controller (batch)
@@ -664,8 +648,15 @@ exports.deleteVariant = asynchandeler(async (req, res) => {
     $pull: { variant: deletedVariant._id },
   });
 
-  // Background cleanup for Cloudinary
-  fireAndForgetCloudinaryDelete(collectVariantPublicIds(deletedVariant));
+  const publicIds = collectVariantPublicIds(deletedVariant);
+  if (publicIds.length > 0) {
+    await imageQueue.addBulk(
+      publicIds.map((publicId) => ({
+        name: "delete-cloudinary-image",
+        data: { publicId },
+      })),
+    );
+  }
 
   await bumpNsVersion(NS);
   await bumpNsVersion("product");

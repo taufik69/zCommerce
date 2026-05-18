@@ -4,7 +4,6 @@ const Variant = require("../models/variant.model");
 const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { apiResponse } = require("../utils/apiResponse");
-const { deleteCloudinaryFile } = require("../helpers/cloudinary");
 const {
   validateProduct,
   validateProductUpdate,
@@ -92,17 +91,6 @@ const collectProductPublicIds = (product) => {
   }
   if (product.seo?.ogImage?.publicId) ids.push(product.seo.ogImage.publicId);
   return ids;
-};
-
-const fireAndForgetCloudinaryDelete = (publicIds = []) => {
-  if (!publicIds.length) return;
-  setImmediate(() => {
-    publicIds.forEach((id) =>
-      deleteCloudinaryFile(id).catch((e) =>
-        console.error(`[Cloudinary] delete ${id} failed:`, e.message),
-      ),
-    );
-  });
 };
 
 const parseBoolean = (value) => {
@@ -716,10 +704,17 @@ class ProductController {
       });
     }
 
-    await bumpNsVersion(NS);
+    const publicIds = collectProductPublicIds(product);
+    if (publicIds.length > 0) {
+      await imageQueue.addBulk(
+        publicIds.map((publicId) => ({
+          name: "delete-cloudinary-image",
+          data: { publicId },
+        })),
+      );
+    }
 
-    // Cleanup ALL images (thumbnail + gallery + SEO og image)
-    fireAndForgetCloudinaryDelete(collectProductPublicIds(product));
+    await bumpNsVersion(NS);
 
     return apiResponse.sendSuccess(
       res,
