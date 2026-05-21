@@ -1,185 +1,360 @@
+const { asynchandeler } = require("../lib/asyncHandeler");
 const { apiResponse } = require("../utils/apiResponse");
 const { customError } = require("../lib/CustomError");
-const SizeChart = require("../models/sizeChart.model");
-const { asynchandeler } = require("../lib/asyncHandeler");
-const {
-  cloudinaryFileUpload,
-  deleteCloudinaryFile,
-} = require("../helpers/cloudinary");
 const { statusCodes } = require("../constant/constant");
-// create size chart
-exports.createSizeChart = asynchandeler(async (req, res, next) => {
-  const { subCategory } = req.body;
+const SizeChart = require("../models/sizeChart.model");
+const {
+  getCache,
+  setCache,
+  bumpNsVersion,
+  buildCacheKey,
+} = require("@/utils/cache.util");
 
-  if (!subCategory) {
+// ─── constants ────────────────────────────────────────────────────────────────
+
+const NS = "sizechart";
+const CACHE_TTL = 60 * 60;       // 1 hour — single doc
+const CACHE_TTL_LIST = 60 * 30;  // 30 min — list / search
+
+// Fields the API never accepts as input — derived by model hooks or system
+const READ_ONLY_FIELDS = [
+  "slug",
+  "sizeLabels",
+  "minSize",
+  "maxSize",
+  "viewCount",
+  "usageCount",
+  "childCharts",
+  "parentChartId",
+  "createdAt",
+  "updatedAt",
+  "_id",
+  "__v",
+];
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+const stripReadOnly = (body = {}) => {
+  const clean = { ...body };
+  READ_ONLY_FIELDS.forEach((f) => delete clean[f]);
+  return clean;
+};
+
+const escapeRegex = (str) => String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// ─── controllers ──────────────────────────────────────────────────────────────
+
+// @desc    Create a new size chart
+// @route   POST /sizechart/create-sizechart
+exports.createSizeChart = asynchandeler(async (req, res) => {
+  const body = stripReadOnly(req.body);
+
+  // createdBy set when auth is active
+  if (req.user?._id) body.createdBy = req.user._id;
+
+  const sizeChart = await new SizeChart(body).save();
+
+  await bumpNsVersion(NS);
+
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    "Size chart created successfully",
+    { sizeChart },
+  );
+});
+
+// @desc    Get all size charts with optional filters
+// @route   GET /sizechart/get-sizechart
+// @query   applicableLevel | visibility | isActive | isTemplateChart
+exports.getAllSizeChart = asynchandeler(async (req, res) => {
+  const { applicableLevel, visibility, isActive, isTemplateChart } = req.query;
+
+  // Build a stable cache key from the active filters
+  const filterKey = JSON.stringify({ applicableLevel, visibility, isActive, isTemplateChart });
+  const cacheKey = await buildCacheKey(NS, `list:${filterKey}`);
+  const cached = await getCache(cacheKey);
+
+  if (cached) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Size charts fetched successfully", {
+      sizeCharts: cached.sizeCharts,
+      total: cached.total,
+      fromCache: true,
+    });
+  }
+
+  const query = {};
+
+  if (applicableLevel) query.applicableLevel = applicableLevel;
+  if (visibility) query.visibility = visibility;
+  if (isActive !== undefined) query.isActive = isActive === "true";
+  if (isTemplateChart !== undefined) query.isTemplateChart = isTemplateChart === "true";
+
+  const sizeCharts = await SizeChart.find(query).sort({ displayOrder: 1, createdAt: -1 }).lean();
+
+  if (!sizeCharts.length) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No size charts found", {
+      sizeCharts: [],
+      total: 0,
+      fromCache: false,
+    });
+  }
+
+  await setCache(cacheKey, { sizeCharts, total: sizeCharts.length }, CACHE_TTL_LIST);
+
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Size charts fetched successfully", {
+    sizeCharts,
+    total: sizeCharts.length,
+    fromCache: false,
+  });
+});
+
+// @desc    Get a single size chart by slug
+// @route   GET /sizechart/get-sizechart/:slug
+exports.getSizeChartBySlug = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+
+  const cacheKey = await buildCacheKey(NS, `single:${slug}`);
+  const cached = await getCache(cacheKey);
+
+  if (cached) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Size chart fetched successfully", {
+      sizeChart: cached,
+      fromCache: true,
+    });
+  }
+
+  const sizeChart = await SizeChart.findOne({ slug });
+
+  if (!sizeChart) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Size chart not found", {
+      sizeChart: null,
+      fromCache: false,
+    });
+  }
+
+  // Increment viewCount atomically — non-blocking, does not affect response
+  sizeChart.incrementViewCount().catch(() => {});
+
+  await setCache(cacheKey, sizeChart.toObject(), CACHE_TTL);
+
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Size chart fetched successfully", {
+    sizeChart,
+    fromCache: false,
+  });
+});
+
+// @desc    Update a size chart by slug
+// @route   PUT /sizechart/update-sizechart/:slug
+exports.updateSizeChart = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const body = stripReadOnly(req.body);
+
+  const sizeChart = await SizeChart.findOne({ slug });
+
+  if (!sizeChart) {
+    throw new customError("Size chart not found", statusCodes.NOT_FOUND);
+  }
+
+  // Merge incoming fields onto the document so pre-save hooks re-run
+  Object.assign(sizeChart, body);
+
+  if (req.user?._id) sizeChart.updatedBy = req.user._id;
+
+  // .save() triggers all pre-save hooks:
+  //   slug regen, row/column alignment, sizeLabels, sort, applicable validation
+  const updated = await sizeChart.save();
+
+  await bumpNsVersion(NS);
+
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Size chart updated successfully", {
+    sizeChart: updated,
+  });
+});
+
+// @desc    Delete a size chart by slug
+// @route   DELETE /sizechart/delete-sizechart/:slug
+exports.deleteSizeChart = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+
+  const sizeChart = await SizeChart.findOneAndDelete({ slug });
+
+  if (!sizeChart) {
+    throw new customError("Size chart not found", statusCodes.NOT_FOUND);
+  }
+
+  await bumpNsVersion(NS);
+
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Size chart deleted successfully", null);
+});
+
+// @desc    Activate a size chart
+// @route   PUT /sizechart/update-sizechart/:slug/activate
+exports.activateSizeChart = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+
+  const sizeChart = await SizeChart.findOneAndUpdate(
+    { slug },
+    { isActive: true },
+    { new: true },
+  );
+
+  if (!sizeChart) {
+    throw new customError("Size chart not found", statusCodes.NOT_FOUND);
+  }
+
+  await bumpNsVersion(NS);
+
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Size chart activated successfully", {
+    sizeChart,
+  });
+});
+
+// @desc    Deactivate a size chart
+// @route   PUT /sizechart/update-sizechart/:slug/deactivate
+exports.deactivateSizeChart = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+
+  const sizeChart = await SizeChart.findOneAndUpdate(
+    { slug },
+    { isActive: false },
+    { new: true },
+  );
+
+  if (!sizeChart) {
+    throw new customError("Size chart not found", statusCodes.NOT_FOUND);
+  }
+
+  await bumpNsVersion(NS);
+
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Size chart deactivated successfully", {
+    sizeChart,
+  });
+});
+
+// @desc    Create a new size chart from an existing template
+// @route   POST /sizechart/from-template
+exports.createFromTemplate = asynchandeler(async (req, res) => {
+  const { templateId, name, applicableLevel, visibility, description, createdBy, ...rest } = req.body;
+
+  if (!templateId) {
+    throw new customError("templateId is required", statusCodes.BAD_REQUEST);
+  }
+  if (!name) {
+    throw new customError("name is required", statusCodes.BAD_REQUEST);
+  }
+
+  const sizeChart = await SizeChart.createFromTemplate(templateId, {
+    name,
+    applicableLevel,
+    visibility,
+    description,
+    createdBy: req.user?._id || createdBy,
+    ...rest,
+  });
+
+  await bumpNsVersion(NS);
+
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    "Size chart created from template successfully",
+    { sizeChart },
+  );
+});
+
+// @desc    Get applicable size charts for a storefront entity
+// @route   GET /sizechart/applicable
+// @query   categoryId | subCategoryId | productId | variantId | brandId
+exports.getApplicableCharts = asynchandeler(async (req, res) => {
+  const { categoryId, subCategoryId, productId, variantId, brandId } = req.query;
+
+  const hasFilter = categoryId || subCategoryId || productId || variantId || brandId;
+  if (!hasFilter) {
     throw new customError(
-      "subCategory id is required",
+      "At least one filter param is required (categoryId, subCategoryId, productId, variantId, brandId)",
       statusCodes.BAD_REQUEST,
     );
   }
 
-  // Save SizeChart first without image
-  const newSizeChart = await SizeChart.create({
-    subCategory,
-    image: null,
+  const filterKey = JSON.stringify(req.query);
+  const cacheKey = await buildCacheKey(NS, `applicable:${filterKey}`);
+  const cached = await getCache(cacheKey);
+
+  if (cached) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Applicable size charts fetched successfully", {
+      sizeCharts: cached,
+      total: cached.length,
+      fromCache: true,
+    });
+  }
+
+  const sizeCharts = await SizeChart.getApplicableCharts({
+    categoryId,
+    subCategoryId,
+    productId,
+    variantId,
+    brandId,
   });
 
-  // Send immediate response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.CREATED,
-    "Size chart creation started",
-    {
-      newSizeChart,
-    },
-  );
+  await setCache(cacheKey, sizeCharts, CACHE_TTL_LIST);
 
-  // Background image upload
-  const image = req.files?.image;
-  if (image && image.length > 0) {
-    (async () => {
-      try {
-        const sizeChartUpload = await cloudinaryFileUpload(image[0].path);
-
-        newSizeChart.image = {
-          public_id: sizeChartUpload.result.public_id,
-          url: sizeChartUpload.result.url,
-        };
-        await newSizeChart.save();
-        console.log(
-          " Size chart image uploaded successfully:",
-          newSizeChart._id,
-        );
-      } catch (error) {
-        console.error(
-          "❌ Background size chart image upload failed:",
-          error.message,
-        );
-      }
-    })();
-  }
-});
-
-// get all size chart
-exports.getAllSizeChart = asynchandeler(async (req, res) => {
-  const sizeChart = await SizeChart.find().sort({ createdAt: -1 });
-  if (!sizeChart || sizeChart.length === 0) {
-    throw new customError("Size chart not found", statusCodes.NOT_FOUND);
-  }
-  return apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Size chart fetched successfully",
-    {
-      sizeChart,
-    },
-  );
-});
-
-// get single size chart
-exports.getSizeChartBySlug = asynchandeler(async (req, res) => {
-  const { subCategory } = req.params;
-  const sizeChart = await SizeChart.findOne({
-    subCategory: subCategory,
-  }).populate("subCategory");
-  if (!sizeChart) {
-    throw new customError("Size chart not found", statusCodes.NOT_FOUND);
-  }
-  return apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Size chart fetched successfully",
-    {
-      sizeChart,
-    },
-  );
-});
-
-// update size chart
-exports.updateSizeChart = asynchandeler(async (req, res, next) => {
-  const { subCategoryId } = req.body;
-  const { subcid } = req.params;
-
-  const sizeChart = await SizeChart.findOne({ subCategory: subcid });
-  if (!sizeChart) {
-    throw new customError("Size chart not found", statusCodes.NOT_FOUND);
-  }
-
-  // Update name immediately
-  sizeChart.subCategory = subCategoryId || sizeChart.subCategoryId;
-  await sizeChart.save();
-
-  // Send immediate response
-  apiResponse.sendSuccess(res, statusCodes.OK, "Size chart update started", {
-    sizeChart,
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Applicable size charts fetched successfully", {
+    sizeCharts,
+    total: sizeCharts.length,
+    fromCache: false,
   });
-
-  // Background image delete/upload
-  if (req.files?.image && req.files.image.length > 0) {
-    (async () => {
-      try {
-        // Delete old image
-        if (sizeChart.image?.public_id) {
-          await deleteCloudinaryFile(sizeChart.image.public_id);
-          console.log(
-            "✅ Old size chart image deleted:",
-            sizeChart.image.public_id,
-          );
-        }
-
-        // Upload new image
-        const image = req.files.image[0];
-        const sizeChartImage = await cloudinaryFileUpload(image.path);
-        sizeChart.image = {
-          public_id: sizeChartImage.result.public_id,
-          url: sizeChartImage.result.url,
-        };
-        await sizeChart.save();
-        console.log(
-          "✅ Size chart image uploaded successfully:",
-          sizeChart._id,
-        );
-      } catch (error) {
-        console.error(
-          "❌ Background size chart image update failed:",
-          error.message,
-        );
-      }
-    })();
-  }
 });
 
-//@desc delete size chart by slug
-exports.deleteSizeChartBySlug = asynchandeler(async (req, res) => {
-  const { subCategory } = req.params;
+// @desc    Search size charts by name or applicableLevel keyword
+// @route   GET /sizechart/search-sizechart?query=<term>
+exports.searchSizeChart = asynchandeler(async (req, res) => {
+  const { query } = req.query;
 
-  const sizeChart = await SizeChart.findOne({ subCategory });
-  if (!sizeChart) {
-    throw new customError("Size chart not found", statusCodes.NOT_FOUND);
+  if (!query || !query.trim()) {
+    throw new customError("query param is required", statusCodes.BAD_REQUEST);
   }
 
-  // ✅ Send immediate response
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Size chart deletion started",
-    sizeChart,
-  );
+  const LEVEL_VALUES = ["category", "subCategory", "product", "variant", "brand"];
+  const term = query.trim().toLowerCase();
 
-  // ✅ Background delete
-  (async () => {
-    try {
-      // Delete image from Cloudinary if exists
-      if (sizeChart.image?.public_id) {
-        await deleteCloudinaryFile(sizeChart.image.public_id);
-        console.log("✅ Size chart image deleted:", sizeChart.image.public_id);
-      }
+  const cacheKey = await buildCacheKey(NS, `search:${term}`);
+  const cached = await getCache(cacheKey);
 
-      // Delete the document from DB
-      await SizeChart.deleteOne({ subCategory: sizeChart.subCategory });
-      console.log("✅ Size chart document deleted:", slug);
-    } catch (error) {
-      console.error("❌ Background size chart deletion failed:", error.message);
-    }
-  })();
+  if (cached) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Search results fetched successfully", {
+      sizeCharts: cached,
+      total: cached.length,
+      fromCache: true,
+    });
+  }
+
+  const orConditions = [
+    { name: { $regex: escapeRegex(query.trim()), $options: "i" } },
+  ];
+
+  // If the term exactly matches a level value, also search by applicableLevel
+  if (LEVEL_VALUES.includes(term)) {
+    orConditions.push({ applicableLevel: term });
+  }
+
+  const sizeCharts = await SizeChart.find({ $or: orConditions })
+    .sort({ displayOrder: 1, createdAt: -1 })
+    .lean();
+
+  if (!sizeCharts.length) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No results found", {
+      sizeCharts: [],
+      total: 0,
+      fromCache: false,
+    });
+  }
+
+  await setCache(cacheKey, sizeCharts, CACHE_TTL_LIST);
+
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Search results fetched successfully", {
+    sizeCharts,
+    total: sizeCharts.length,
+    fromCache: false,
+  });
 });
