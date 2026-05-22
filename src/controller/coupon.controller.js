@@ -12,7 +12,10 @@ const {
 } = require("@/utils/cache.util");
 
 const NS = "coupon";
-const CACHE_TTL = 60 * 60; // 1 hour
+const CACHE_TTL = 60 * 60;        // 1 hour
+const CACHE_TTL_SEARCH = 60 * 5;  // 5 min — search results change faster
+
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // Create coupon
 exports.createCoupon = asynchandeler(async (req, res, next) => {
@@ -36,26 +39,46 @@ exports.createCoupon = asynchandeler(async (req, res, next) => {
   );
 });
 
-// Search coupon using slug
+// Search coupons by name (code) — GET /coupon/search?name=SAVE
 exports.searchCoupon = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-  if (!slug) throw new customError("Slug not provided", statusCodes.BAD_REQUEST);
+  const name = String(req.query.name || "").trim();
 
-  const cacheKey = await buildCacheKey(NS, `slug:${slug}`);
+  if (!name) {
+    throw new customError(
+      "Search query (name) is required",
+      statusCodes.BAD_REQUEST,
+    );
+  }
+
+  const cacheKey = await buildCacheKey(NS, `search:${name.toLowerCase()}`);
   const cached = await getCache(cacheKey);
   if (cached) {
-    return apiResponse.sendSuccess(res, statusCodes.OK, "Coupon found", {
-      coupon: cached,
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Coupons fetched successfully", {
+      coupons: cached,
       fromCache: true,
     });
   }
 
-  const coupon = await Coupon.findOne({ slug }).lean();
-  if (!coupon) throw new customError("Coupon not found", statusCodes.NOT_FOUND);
+  const safeSearch = escapeRegex(name);
 
-  await setCache(cacheKey, coupon, CACHE_TTL);
+  const coupons = await Coupon.find({
+    code: { $regex: safeSearch, $options: "i" },
+  })
+    .sort({ createdAt: -1 })
+    .lean();
 
-  apiResponse.sendSuccess(res, statusCodes.OK, "Coupon found", { coupon });
+  if (!coupons.length) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No coupons found", {
+      coupons: [],
+      fromCache: false,
+    });
+  }
+
+  await setCache(cacheKey, coupons, CACHE_TTL_SEARCH);
+
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Coupons fetched successfully", {
+    coupons,
+  });
 });
 
 // Update coupon
@@ -225,4 +248,66 @@ exports.checkCouponValidity = asynchandeler(async (req, res) => {
       finalAmount: Math.max(0, Number(amount) - discount),
     },
   });
+});
+
+// ── Activate coupon ───────────────────────────────────────────────────────────
+// PUT /coupon/:slug/activate
+exports.activateCoupon = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  if (!slug) throw new customError("Slug not provided", statusCodes.BAD_REQUEST);
+
+  const coupon = await Coupon.findOneAndUpdate(
+    { slug, isActive: false },
+    { isActive: true },
+    { new: true },
+  );
+
+  if (!coupon) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Coupon not found or already active",
+      { coupon: null },
+    );
+  }
+
+  await bumpNsVersion(NS);
+
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Coupon activated successfully",
+    { coupon },
+  );
+});
+
+// ── Deactivate coupon ─────────────────────────────────────────────────────────
+// PUT /coupon/:slug/deactivate
+exports.deactivateCoupon = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  if (!slug) throw new customError("Slug not provided", statusCodes.BAD_REQUEST);
+
+  const coupon = await Coupon.findOneAndUpdate(
+    { slug, isActive: true },
+    { isActive: false },
+    { new: true },
+  );
+
+  if (!coupon) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Coupon not found or already inactive",
+      { coupon: null },
+    );
+  }
+
+  await bumpNsVersion(NS);
+
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Coupon deactivated successfully",
+    { coupon },
+  );
 });
