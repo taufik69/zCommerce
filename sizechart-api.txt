@@ -31,16 +31,7 @@ Request Body (JSON):
     { "label": "M", "values": ["M", "38-40", "97-102"], "order": 1 },
     { "label": "L", "values": ["L", "40-42", "102-107"],"order": 2 }
   ],
-  "measurementGuide": "Measure around the fullest part of your chest",
-  "tips": [
-    { "title": "How to measure", "description": "Keep the tape snug but not tight" }
-  ],
   "videoUrl": "https://www.youtube.com/watch?v=example",
-  "supportedUnits": ["inch", "cm"],
-  "conversionRules": [
-    { "fromUnit": "inch", "toUnit": "cm", "factor": 2.54 }
-  ],
-  "isTemplateChart": false,
   "visibility": "public",
   "displayOrder": 0
 }
@@ -88,13 +79,11 @@ Query Params (all optional):
   applicableLevel   = category | subCategory | product | variant | brand
   visibility        = public | internal | draft
   isActive          = true | false
-  isTemplateChart   = true | false
 
 Examples:
   GET /api/v1/sizechart/get-sizechart
   GET /api/v1/sizechart/get-sizechart?applicableLevel=category
   GET /api/v1/sizechart/get-sizechart?visibility=public&isActive=true
-  GET /api/v1/sizechart/get-sizechart?isTemplateChart=true
 
 Success Response 200:
 {
@@ -187,8 +176,7 @@ Request Body (JSON) — all fields optional on update:
 }
 
 Read-only fields (stripped automatically, ignored if sent):
-  slug, sizeLabels, minSize, maxSize, viewCount,
-  childCharts, parentChartId, createdAt, updatedAt, _id, __v
+  slug, sizeLabels, minSize, maxSize, viewCount, createdAt, updatedAt, _id, __v
 
 Note: Uses .save() internally — all pre-save hooks re-run (slug regen,
       row/column alignment check, sizeLabels recalculation, applicable validation).
@@ -273,52 +261,7 @@ Error 404: Size chart not found
 
 
 ────────────────────────────────────────────────────────────────────────────────
-8. CREATE FROM TEMPLATE
-────────────────────────────────────────────────────────────────────────────────
-Method : POST
-URL    : /api/v1/sizechart/from-template
-Auth   : Not required
-
-Request Body (JSON):
-{
-  "templateId": "664f1a2b3c4d5e6f7a8b9c0d",
-  "name": "Women's Tops Chart",
-  "applicableLevel": "category",
-  "applicableCategories": ["664f1a2b3c4d5e6f7a8b9c0e"],
-  "applicableSubCategories": [],
-  "applicableProducts": [],
-  "applicableVariants": [],
-  "applicableBrands": [],
-  "description": "Derived from the standard tops template",
-  "visibility": "public"
-}
-
-Required fields: templateId (24-char hex ObjectId), name
-Optional: applicableLevel, applicable* arrays, description, visibility
-
-Note: templateId must point to a chart where isTemplateChart = true.
-      New chart inherits columns and rows from the template.
-      parentChartId is set automatically; template's childCharts array is updated.
-
-Success Response 201:
-{
-  "statusCode": 201,
-  "message": "Size chart created from template successfully",
-  "data": {
-    "sizeChart": {
-      ...inheritedColumnsAndRows,
-      "parentChartId": "664f1a2b3c4d5e6f7a8b9c0d",
-      "isTemplateChart": false,
-      ...
-    }
-  }
-}
-
-Error 400: templateId not found, or referenced chart is not a template
-
-
-────────────────────────────────────────────────────────────────────────────────
-9. GET APPLICABLE CHARTS (Storefront)
+8. GET APPLICABLE CHARTS (Storefront)
 ────────────────────────────────────────────────────────────────────────────────
 Method : GET
 URL    : /api/v1/sizechart/applicable
@@ -353,7 +296,7 @@ Error 400: "At least one filter param is required (categoryId, subCategoryId, pr
 
 
 ────────────────────────────────────────────────────────────────────────────────
-10. SEARCH SIZE CHARTS
+9. SEARCH SIZE CHARTS
 ────────────────────────────────────────────────────────────────────────────────
 Method : GET
 URL    : /api/v1/sizechart/search-sizechart
@@ -422,18 +365,9 @@ rows[].label             | string, required
 rows[].values            | array of strings, min 1, must match columns count
 rows[].order             | integer >= 0, default 0
 rows[].sku               | string, optional
-measurementGuide         | string, max 1000 chars, optional
-tips[].title             | string, required if tip provided
-tips[].description       | string, required if tip provided
 videoUrl                 | valid http/https URL, optional
-supportedUnits           | array of unit strings, optional
-conversionRules[].fromUnit | inch | cm | mm | kg | lbs | ml | l
-conversionRules[].toUnit   | inch | cm | mm | kg | lbs | ml | l
-conversionRules[].factor   | number >= 0
-isTemplateChart          | boolean, default false
 visibility               | public | internal | draft, default "draft"
 displayOrder             | integer >= 0, default 0
-templateId               | 24-char hex ObjectId (from-template only)
 
 
 ================================================================================
@@ -471,7 +405,6 @@ Cache is invalidated (bumpNsVersion) after:
   - DELETE /delete-sizechart/:slug
   - PUT /update-sizechart/:slug/activate
   - PUT /update-sizechart/:slug/deactivate
-  - POST /from-template
 
 TTL — single doc : 1 hour
 TTL — lists      : 30 minutes

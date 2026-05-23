@@ -6,7 +6,6 @@ const validate = require("../../middleware/validate");
 const {
   createSizeChartSchema,
   updateSizeChartSchema,
-  fromTemplateSchema,
 } = require("../../validation/sizeChart.validation");
 const sizeChartController = require("../../controller/sizeChart.controller");
 
@@ -33,13 +32,6 @@ _.route("/applicable").get(
   // authGuard,
   // authorize("size-chart", "view"),
   sizeChartController.getApplicableCharts,
-);
-
-_.route("/from-template").post(
-  // authGuard,
-  // authorize("size-chart", "add"),
-  validate(fromTemplateSchema),
-  sizeChartController.createFromTemplate,
 );
 
 _.route("/get-sizechart/:slug").get(

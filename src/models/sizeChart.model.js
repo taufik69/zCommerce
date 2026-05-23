@@ -60,27 +60,6 @@ const rowSchema = new mongoose.Schema(
   { _id: false },
 );
 
-// Unit conversion rule subdocument
-const conversionRuleSchema = new mongoose.Schema(
-  {
-    fromUnit: {
-      type: String,
-      enum: ["inch", "cm", "mm", "kg", "lbs", "ml", "l"],
-      required: true,
-    },
-    toUnit: {
-      type: String,
-      enum: ["inch", "cm", "mm", "kg", "lbs", "ml", "l"],
-      required: true,
-    },
-    factor: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-  },
-  { _id: false },
-);
 
 const sizeChartSchema = new mongoose.Schema(
   {
@@ -170,24 +149,6 @@ const sizeChartSchema = new mongoose.Schema(
     minSize: String,
     maxSize: String,
 
-    // Measurement guidance and tips
-    measurementGuide: {
-      type: String,
-      maxlength: [1000, "Measurement guide cannot exceed 1000 characters"],
-    },
-    tips: [
-      {
-        title: {
-          type: String,
-          required: true,
-        },
-        description: {
-          type: String,
-          required: true,
-        },
-      },
-    ],
-
     // Video support for demonstration
     videoUrl: {
       type: String,
@@ -199,31 +160,6 @@ const sizeChartSchema = new mongoose.Schema(
         message: "Video URL must be a valid HTTP/HTTPS URL",
       },
     },
-
-    // Unit conversion support
-    supportedUnits: [
-      {
-        type: String,
-        enum: ["inch", "cm", "mm", "kg", "lbs", "ml", "l"],
-      },
-    ],
-    conversionRules: [conversionRuleSchema],
-
-    // Template system: create reusable templates
-    isTemplateChart: {
-      type: Boolean,
-      default: false,
-    },
-    parentChartId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "SizeChart",
-    },
-    childCharts: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "SizeChart",
-      },
-    ],
 
     // Display and visibility
     isActive: {
@@ -386,7 +322,6 @@ sizeChartSchema.index({ applicableCategories: 1 });
 sizeChartSchema.index({ applicableSubCategories: 1 });
 sizeChartSchema.index({ applicableProducts: 1 });
 sizeChartSchema.index({ applicableVariants: 1 });
-sizeChartSchema.index({ parentChartId: 1, isTemplateChart: 1 });
 sizeChartSchema.index({ createdAt: -1, updatedAt: -1 });
 
 // Instance methods
@@ -435,16 +370,6 @@ sizeChartSchema.methods.getColumn = function (key) {
   return this.columns?.find((c) => c.key === key) || null;
 };
 
-sizeChartSchema.methods.convertUnit = function (value, fromUnit, toUnit) {
-  if (fromUnit === toUnit) return value;
-
-  const rule = this.conversionRules?.find(
-    (r) => r.fromUnit === fromUnit && r.toUnit === toUnit,
-  );
-  if (!rule) return null;
-
-  return parseFloat(value) * rule.factor;
-};
 
 sizeChartSchema.methods.incrementViewCount = async function () {
   return await this.constructor.findByIdAndUpdate(
@@ -490,48 +415,6 @@ sizeChartSchema.statics.getApplicableCharts = async function (filters) {
   return await this.find(query).sort({ displayOrder: 1 });
 };
 
-sizeChartSchema.statics.createFromTemplate = async function (templateId, data) {
-  const template = await this.findById(templateId);
-  if (!template || !template.isTemplateChart) {
-    throw new customError(
-      "Template not found or is not a template chart",
-      statusCodes.BAD_REQUEST,
-    );
-  }
-
-  const newChart = new this({
-    name: data.name,
-    description: data.description || template.description,
-    applicableLevel: data.applicableLevel || template.applicableLevel,
-    applicableCategories:
-      data.applicableCategories || template.applicableCategories,
-    applicableSubCategories:
-      data.applicableSubCategories || template.applicableSubCategories,
-    applicableProducts: data.applicableProducts || template.applicableProducts,
-    applicableVariants: data.applicableVariants || template.applicableVariants,
-    applicableBrands: data.applicableBrands || template.applicableBrands,
-    columns: template.columns.map((col) => ({ ...col.toObject() })),
-    rows: template.rows.map((row) => ({ ...row.toObject() })),
-    measurementGuide: data.measurementGuide || template.measurementGuide,
-    tips: data.tips || template.tips,
-    videoUrl: data.videoUrl || template.videoUrl,
-    supportedUnits: template.supportedUnits,
-    conversionRules: template.conversionRules.map((rule) => rule.toObject()),
-    parentChartId: templateId,
-    isTemplateChart: false,
-    visibility: data.visibility || "draft",
-    createdBy: data.createdBy,
-  });
-
-  const savedChart = await newChart.save();
-
-  // Add to template's childCharts array
-  await this.findByIdAndUpdate(templateId, {
-    $push: { childCharts: savedChart._id },
-  });
-
-  return savedChart;
-};
 
 module.exports =
   mongoose.models.SizeChart || mongoose.model("SizeChart", sizeChartSchema);

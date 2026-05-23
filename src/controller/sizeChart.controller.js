@@ -23,8 +23,6 @@ const READ_ONLY_FIELDS = [
   "minSize",
   "maxSize",
   "viewCount",
-  "childCharts",
-  "parentChartId",
   "createdAt",
   "updatedAt",
   "_id",
@@ -67,10 +65,10 @@ exports.createSizeChart = asynchandeler(async (req, res) => {
 // @route   GET /sizechart/get-sizechart
 // @query   applicableLevel | visibility | isActive | isTemplateChart
 exports.getAllSizeChart = asynchandeler(async (req, res) => {
-  const { applicableLevel, visibility, isActive, isTemplateChart } = req.query;
+  const { applicableLevel, visibility, isActive } = req.query;
 
   // Build a stable cache key from the active filters
-  const filterKey = JSON.stringify({ applicableLevel, visibility, isActive, isTemplateChart });
+  const filterKey = JSON.stringify({ applicableLevel, visibility, isActive });
   const cacheKey = await buildCacheKey(NS, `list:${filterKey}`);
   const cached = await getCache(cacheKey);
 
@@ -87,7 +85,6 @@ exports.getAllSizeChart = asynchandeler(async (req, res) => {
   if (applicableLevel) query.applicableLevel = applicableLevel;
   if (visibility) query.visibility = visibility;
   if (isActive !== undefined) query.isActive = isActive === "true";
-  if (isTemplateChart !== undefined) query.isTemplateChart = isTemplateChart === "true";
 
   const sizeCharts = await SizeChart.find(query).sort({ displayOrder: 1, createdAt: -1 }).lean();
 
@@ -229,37 +226,6 @@ exports.deactivateSizeChart = asynchandeler(async (req, res) => {
   return apiResponse.sendSuccess(res, statusCodes.OK, "Size chart deactivated successfully", {
     sizeChart,
   });
-});
-
-// @desc    Create a new size chart from an existing template
-// @route   POST /sizechart/from-template
-exports.createFromTemplate = asynchandeler(async (req, res) => {
-  const { templateId, name, applicableLevel, visibility, description, createdBy, ...rest } = req.body;
-
-  if (!templateId) {
-    throw new customError("templateId is required", statusCodes.BAD_REQUEST);
-  }
-  if (!name) {
-    throw new customError("name is required", statusCodes.BAD_REQUEST);
-  }
-
-  const sizeChart = await SizeChart.createFromTemplate(templateId, {
-    name,
-    applicableLevel,
-    visibility,
-    description,
-    createdBy: req.user?._id || createdBy,
-    ...rest,
-  });
-
-  await bumpNsVersion(NS);
-
-  return apiResponse.sendSuccess(
-    res,
-    statusCodes.CREATED,
-    "Size chart created from template successfully",
-    { sizeChart },
-  );
 });
 
 // @desc    Get applicable size charts for a storefront entity

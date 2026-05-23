@@ -10,10 +10,10 @@
 
 | File | Status | Notes |
 |---|---|---|
-| `src/models/sizeChart.model.js` | ✅ Complete | `usageCount` field and `incrementUsageCount` method removed |
-| `src/controller/sizeChart.controller.js` | ✅ Complete | `usageCount` removed from READ_ONLY_FIELDS |
-| `src/routes/api/sizeChart.api.js` | ✅ Complete | Validation wired, permission slug fixed to `"size-chart"` |
-| `src/validation/sizeChart.validation.js` | ✅ Complete | Joi schemas: create, update, fromTemplate |
+| `src/models/sizeChart.model.js` | ✅ Complete | Removed: `measurementGuide`, `tips`, `supportedUnits`, `conversionRules`, `isTemplateChart`, `parentChartId`, `childCharts`, `conversionRuleSchema`, `convertUnit` method, `createFromTemplate` static |
+| `src/controller/sizeChart.controller.js` | ✅ Complete | Removed: `createFromTemplate` handler, `childCharts`/`parentChartId` from READ_ONLY_FIELDS — 9 handlers remain |
+| `src/routes/api/sizeChart.api.js` | ✅ Complete | Removed: `/from-template` route — 9 routes remain |
+| `src/validation/sizeChart.validation.js` | ✅ Complete | Removed: `conversionRuleSchema`, `measurementGuide`, `tips`, `supportedUnits`, `conversionRules`, `isTemplateChart`, `fromTemplateSchema` — 2 schemas remain |
 | Permission slug alignment | ✅ Fixed | All authorize() calls use `"size-chart"` |
 
 ---
