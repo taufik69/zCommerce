@@ -138,6 +138,11 @@ const variantSchema = new mongoose.Schema(
       ref: "Discount",
       default: null,
     },
+    sizeChart: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SizeChart",
+      default: null,
+    },
   },
   {
     timestamps: true,

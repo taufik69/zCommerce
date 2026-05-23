@@ -3,6 +3,12 @@ const { apiResponse } = require("../utils/apiResponse");
 const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
 const SizeChart = require("../models/sizeChart.model");
+const Category = require("../models/category.model");
+const Subcategory = require("../models/subcategory.model");
+const Product = require("../models/product.model");
+const Variant = require("../models/variant.model");
+const Brand = require("../models/brand.model");
+const mongoose = require("mongoose");
 const {
   getCache,
   setCache,
@@ -47,6 +53,33 @@ const stripReadOnly = (body = {}) => {
 
 const escapeRegex = (str) => String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const clearSizeChartFromModels = async (sizeChartId, session) => {
+  const unsetQuery = { $unset: { sizeChart: 1 } };
+  const options = { session };
+  await Category.updateMany({ sizeChart: sizeChartId }, unsetQuery, options);
+  await Subcategory.updateMany({ sizeChart: sizeChartId }, unsetQuery, options);
+  await Product.updateMany({ sizeChart: sizeChartId }, unsetQuery, options);
+  await Variant.updateMany({ sizeChart: sizeChartId }, unsetQuery, options);
+  await Brand.updateMany({ sizeChart: sizeChartId }, unsetQuery, options);
+};
+
+const applySizeChartToModels = async (sizeChart, session) => {
+  const options = { session };
+  const id = sizeChart._id;
+  
+  if (sizeChart.applicableLevel === "category" && sizeChart.applicableCategories?.length) {
+    await Category.updateMany({ _id: { $in: sizeChart.applicableCategories } }, { $set: { sizeChart: id } }, options);
+  } else if (sizeChart.applicableLevel === "subCategory" && sizeChart.applicableSubCategories?.length) {
+    await Subcategory.updateMany({ _id: { $in: sizeChart.applicableSubCategories } }, { $set: { sizeChart: id } }, options);
+  } else if (sizeChart.applicableLevel === "product" && sizeChart.applicableProducts?.length) {
+    await Product.updateMany({ _id: { $in: sizeChart.applicableProducts } }, { $set: { sizeChart: id } }, options);
+  } else if (sizeChart.applicableLevel === "variant" && sizeChart.applicableVariants?.length) {
+    await Variant.updateMany({ _id: { $in: sizeChart.applicableVariants } }, { $set: { sizeChart: id } }, options);
+  } else if (sizeChart.applicableLevel === "brand" && sizeChart.applicableBrands?.length) {
+    await Brand.updateMany({ _id: { $in: sizeChart.applicableBrands } }, { $set: { sizeChart: id } }, options);
+  }
+};
+
 // ─── controllers ──────────────────────────────────────────────────────────────
 
 // @desc    Create a new size chart
@@ -57,16 +90,30 @@ exports.createSizeChart = asynchandeler(async (req, res) => {
   // createdBy set when auth is active
   if (req.user?._id) body.createdBy = req.user._id;
 
-  const sizeChart = await new SizeChart(body).save();
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  await bumpNsVersion(NS);
+  try {
+    const sizeChart = await new SizeChart(body).save({ session });
 
-  return apiResponse.sendSuccess(
-    res,
-    statusCodes.CREATED,
-    "Size chart created successfully",
-    { sizeChart },
-  );
+    await applySizeChartToModels(sizeChart, session);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.CREATED,
+      "Size chart created successfully",
+      { sizeChart },
+    );
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
 });
 
 // @desc    Get all size charts with optional filters
@@ -167,15 +214,30 @@ exports.updateSizeChart = asynchandeler(async (req, res) => {
 
   if (req.user?._id) sizeChart.updatedBy = req.user._id;
 
-  // .save() triggers all pre-save hooks:
-  //   slug regen, row/column alignment, sizeLabels, sort, applicable validation
-  const updated = await sizeChart.save();
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  await bumpNsVersion(NS);
+  try {
+    // .save() triggers all pre-save hooks:
+    //   slug regen, row/column alignment, sizeLabels, sort, applicable validation
+    const updated = await sizeChart.save({ session });
 
-  return apiResponse.sendSuccess(res, statusCodes.OK, "Size chart updated successfully", {
-    sizeChart: updated,
-  });
+    await clearSizeChartFromModels(updated._id, session);
+    await applySizeChartToModels(updated, session);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Size chart updated successfully", {
+      sizeChart: updated,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
 });
 
 // @desc    Delete a size chart by slug
@@ -183,15 +245,29 @@ exports.updateSizeChart = asynchandeler(async (req, res) => {
 exports.deleteSizeChart = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
-  const sizeChart = await SizeChart.findOneAndDelete({ slug });
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  if (!sizeChart) {
-    throw new customError("Size chart not found", statusCodes.NOT_FOUND);
+  try {
+    const sizeChart = await SizeChart.findOneAndDelete({ slug }, { session });
+
+    if (!sizeChart) {
+      throw new customError("Size chart not found", statusCodes.NOT_FOUND);
+    }
+
+    await clearSizeChartFromModels(sizeChart._id, session);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Size chart deleted successfully", null);
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
   }
-
-  await bumpNsVersion(NS);
-
-  return apiResponse.sendSuccess(res, statusCodes.OK, "Size chart deleted successfully", null);
 });
 
 // @desc    Activate a size chart

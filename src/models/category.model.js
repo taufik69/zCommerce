@@ -46,6 +46,11 @@ const categorySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Discount",
     },
+    sizeChart: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SizeChart",
+      default: null,
+    },
     isActive: {
       type: Boolean,
       default: true,

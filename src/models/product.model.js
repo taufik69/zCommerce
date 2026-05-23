@@ -73,6 +73,11 @@ const productSchema = new mongoose.Schema(
       ref: "Discount",
       default: null,
     },
+    sizeChart: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SizeChart",
+      default: null,
+    },
 
     // Media
     image: [imageSchema], // gallery

@@ -36,6 +36,11 @@ const brandSchema = new mongoose.Schema(
       type: imageSchema,
       default: () => ({}),
     },
+    sizeChart: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SizeChart",
+      default: null,
+    },
     isActive: {
       type: Boolean,
       default: true,
