@@ -63,12 +63,12 @@ exports.createSizeChart = asynchandeler(async (req, res) => {
 
 // @desc    Get all size charts with optional filters
 // @route   GET /sizechart/get-sizechart
-// @query   applicableLevel | visibility | isActive | isTemplateChart
+// @query   applicableLevel | isActive
 exports.getAllSizeChart = asynchandeler(async (req, res) => {
-  const { applicableLevel, visibility, isActive } = req.query;
+  const { applicableLevel, isActive } = req.query;
 
   // Build a stable cache key from the active filters
-  const filterKey = JSON.stringify({ applicableLevel, visibility, isActive });
+  const filterKey = JSON.stringify({ applicableLevel, isActive });
   const cacheKey = await buildCacheKey(NS, `list:${filterKey}`);
   const cached = await getCache(cacheKey);
 
@@ -83,10 +83,9 @@ exports.getAllSizeChart = asynchandeler(async (req, res) => {
   const query = {};
 
   if (applicableLevel) query.applicableLevel = applicableLevel;
-  if (visibility) query.visibility = visibility;
   if (isActive !== undefined) query.isActive = isActive === "true";
 
-  const sizeCharts = await SizeChart.find(query).sort({ displayOrder: 1, createdAt: -1 }).lean();
+  const sizeCharts = await SizeChart.find(query).sort({ createdAt: -1 }).lean();
 
   if (!sizeCharts.length) {
     return apiResponse.sendSuccess(res, statusCodes.OK, "No size charts found", {
@@ -304,7 +303,7 @@ exports.searchSizeChart = asynchandeler(async (req, res) => {
   }
 
   const sizeCharts = await SizeChart.find({ $or: orConditions })
-    .sort({ displayOrder: 1, createdAt: -1 })
+    .sort({ createdAt: -1 })
     .lean();
 
   if (!sizeCharts.length) {

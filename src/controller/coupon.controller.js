@@ -90,6 +90,40 @@ exports.deleteCoupon = asynchandeler(async (req, res) => {
   apiResponse.sendSuccess(res, statusCodes.OK, "Coupon deleted successfully", { coupon });
 });
 
+// Activate coupon
+exports.activateCoupon = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+
+  const coupon = await Coupon.findOneAndUpdate(
+    { slug },
+    { isActive: true },
+    { new: true },
+  );
+
+  if (!coupon) throw new customError("Coupon not found", statusCodes.NOT_FOUND);
+
+  await bumpNsVersion(NS);
+
+  apiResponse.sendSuccess(res, statusCodes.OK, "Coupon activated successfully", { coupon });
+});
+
+// Deactivate coupon
+exports.deactivateCoupon = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+
+  const coupon = await Coupon.findOneAndUpdate(
+    { slug },
+    { isActive: false },
+    { new: true },
+  );
+
+  if (!coupon) throw new customError("Coupon not found", statusCodes.NOT_FOUND);
+
+  await bumpNsVersion(NS);
+
+  apiResponse.sendSuccess(res, statusCodes.OK, "Coupon deactivated successfully", { coupon });
+});
+
 // Get all coupons
 exports.getAllCoupons = asynchandeler(async (req, res) => {
   const cacheKey = await buildCacheKey(NS, "all");

@@ -2,11 +2,13 @@ const express = require("express");
 const _ = express.Router();
 const couponController = require("../../controller/coupon.controller");
 
-_.post("/create", couponController.createCoupon);
-_.get("/serach-coupon/:slug", couponController.searchCoupon);
-_.put("/update-coupon/:slug", couponController.updateCoupon);
-_.delete("/delete-coupon/:slug", couponController.deleteCoupon);
-_.get("/getallcoupon", couponController.getAllCoupons);
-_.get("/check-validity", couponController.checkCouponValidity);
+_.route("/create").post(couponController.createCoupon);
+_.route("/getallcoupon").get(couponController.getAllCoupons);
+_.route("/check-validity").get(couponController.checkCouponValidity);
+_.route("/serach-coupon/:slug").get(couponController.searchCoupon);
+_.route("/update-coupon/:slug").put(couponController.updateCoupon);
+_.route("/delete-coupon/:slug").delete(couponController.deleteCoupon);
+_.route("/:slug/activate").put(couponController.activateCoupon);
+_.route("/:slug/deactivate").put(couponController.deactivateCoupon);
 
 module.exports = _;

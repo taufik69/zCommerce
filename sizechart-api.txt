@@ -31,15 +31,12 @@ Request Body (JSON):
     { "label": "M", "values": ["M", "38-40", "97-102"], "order": 1 },
     { "label": "L", "values": ["L", "40-42", "102-107"],"order": 2 }
   ],
-  "videoUrl": "https://www.youtube.com/watch?v=example",
-  "visibility": "public",
-  "displayOrder": 0
+  "videoUrl": "https://www.youtube.com/watch?v=example"
 }
 
 Required fields: name, applicableLevel, columns (min 1, max 10), rows (min 1)
 
 applicableLevel values: "category" | "subCategory" | "product" | "variant" | "brand"
-visibility values     : "public" | "internal" | "draft"  (default: "draft")
 column.unit values    : "inch" | "cm" | "mm" | "kg" | "lbs" | "ml" | "l" | "unitless"
 column.key rule       : lowercase alphanumeric + underscore only  (e.g. chest_inch)
 
@@ -59,7 +56,6 @@ Success Response 201:
       "minSize": "S",
       "maxSize": "L",
       "isActive": true,
-      "visibility": "public",
       "viewCount": 0,
       "createdAt": "...",
       "updatedAt": "..."
@@ -77,13 +73,12 @@ Auth   : Not required
 
 Query Params (all optional):
   applicableLevel   = category | subCategory | product | variant | brand
-  visibility        = public | internal | draft
   isActive          = true | false
 
 Examples:
   GET /api/v1/sizechart/get-sizechart
   GET /api/v1/sizechart/get-sizechart?applicableLevel=category
-  GET /api/v1/sizechart/get-sizechart?visibility=public&isActive=true
+  GET /api/v1/sizechart/get-sizechart?isActive=true
 
 Success Response 200:
 {
@@ -163,8 +158,6 @@ Request Body (JSON) — all fields optional on update:
 {
   "name": "Men's Formal Shirt Size Chart",
   "description": "Updated description",
-  "visibility": "public",
-  "displayOrder": 1,
   "columns": [
     { "key": "size",       "label": "Size",        "unit": "unitless" },
     { "key": "chest_inch", "label": "Chest (inch)", "unit": "inch" }
@@ -279,7 +272,7 @@ Examples:
   GET /api/v1/sizechart/applicable?productId=664f1a2b3c4d5e6f7a8b9c0e
   GET /api/v1/sizechart/applicable?categoryId=664f...&brandId=664f...
 
-Note: Only returns charts with isActive = true AND visibility != "draft"
+Note: Only returns charts with isActive = true
 
 Success Response 200:
 {
@@ -366,8 +359,6 @@ rows[].values            | array of strings, min 1, must match columns count
 rows[].order             | integer >= 0, default 0
 rows[].sku               | string, optional
 videoUrl                 | valid http/https URL, optional
-visibility               | public | internal | draft, default "draft"
-displayOrder             | integer >= 0, default 0
 
 
 ================================================================================

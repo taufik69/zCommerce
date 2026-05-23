@@ -36,8 +36,6 @@ const createSizeChartSchema = Joi.object({
   columns: Joi.array().items(columnSchema).min(1).max(10).required(),
   rows: Joi.array().items(rowSchema).min(1).required(),
   videoUrl: Joi.string().uri({ scheme: ["http", "https"] }).optional().allow(""),
-  visibility: Joi.string().valid("public", "internal", "draft").default("draft"),
-  displayOrder: Joi.number().integer().min(0).default(0),
 }).options({ abortEarly: false });
 
 const updateSizeChartSchema = createSizeChartSchema.fork(

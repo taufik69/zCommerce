@@ -161,19 +161,10 @@ const sizeChartSchema = new mongoose.Schema(
       },
     },
 
-    // Display and visibility
+    // Display
     isActive: {
       type: Boolean,
       default: true,
-    },
-    displayOrder: {
-      type: Number,
-      default: 0,
-    },
-    visibility: {
-      type: String,
-      enum: ["public", "internal", "draft"],
-      default: "draft",
     },
 
     // Tracking
@@ -316,7 +307,7 @@ sizeChartSchema.pre("save", async function (next) {
 
 // Indexes for performance
 sizeChartSchema.index({ slug: 1 });
-sizeChartSchema.index({ isActive: 1, visibility: 1 });
+sizeChartSchema.index({ isActive: 1 });
 sizeChartSchema.index({ applicableLevel: 1, isActive: 1 });
 sizeChartSchema.index({ applicableCategories: 1 });
 sizeChartSchema.index({ applicableSubCategories: 1 });
@@ -384,7 +375,6 @@ sizeChartSchema.methods.incrementViewCount = async function () {
 sizeChartSchema.statics.getApplicableCharts = async function (filters) {
   const query = {
     isActive: true,
-    visibility: { $ne: "draft" },
   };
 
   if (filters.categoryId) {
@@ -412,7 +402,7 @@ sizeChartSchema.statics.getApplicableCharts = async function (filters) {
     query.applicableBrands = filters.brandId;
   }
 
-  return await this.find(query).sort({ displayOrder: 1 });
+  return await this.find(query).sort({ createdAt: -1 });
 };
 
 
