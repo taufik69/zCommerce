@@ -245,11 +245,6 @@ const sizeChartSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    usageCount: {
-      type: Number,
-      default: 0,
-    },
-
     // Metadata
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -459,13 +454,6 @@ sizeChartSchema.methods.incrementViewCount = async function () {
   );
 };
 
-sizeChartSchema.methods.incrementUsageCount = async function () {
-  return await this.constructor.findByIdAndUpdate(
-    this._id,
-    { $inc: { usageCount: 1 } },
-    { new: true },
-  );
-};
 
 // Static methods
 sizeChartSchema.statics.getApplicableCharts = async function (filters) {

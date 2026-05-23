@@ -23,7 +23,6 @@ const READ_ONLY_FIELDS = [
   "minSize",
   "maxSize",
   "viewCount",
-  "usageCount",
   "childCharts",
   "parentChartId",
   "createdAt",

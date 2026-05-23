@@ -10,11 +10,11 @@
 
 | File | Status | Notes |
 |---|---|---|
-| `src/models/sizeChart.model.js` | ✅ Complete | All pre-save hooks, instance & static methods in place |
-| `src/controller/sizeChart.controller.js` | ✅ Complete | Fully rewritten — 10 handlers, Redis cache, no direct Cloudinary |
-| `src/routes/api/sizeChart.api.js` | ✅ Complete | Params fixed (`:slug`), 10 routes registered |
-| `src/validation/sizeChart.validation.js` | ❌ Missing | No Joi schema yet — controller accepts raw `req.body` |
-| Permission slug alignment | ❌ Mismatch | Seeder generates slug `"size-chart"`, controller uses `"sizechart"` |
+| `src/models/sizeChart.model.js` | ✅ Complete | `usageCount` field and `incrementUsageCount` method removed |
+| `src/controller/sizeChart.controller.js` | ✅ Complete | `usageCount` removed from READ_ONLY_FIELDS |
+| `src/routes/api/sizeChart.api.js` | ✅ Complete | Validation wired, permission slug fixed to `"size-chart"` |
+| `src/validation/sizeChart.validation.js` | ✅ Complete | Joi schemas: create, update, fromTemplate |
+| Permission slug alignment | ✅ Fixed | All authorize() calls use `"size-chart"` |
 
 ---
 

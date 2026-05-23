@@ -70,7 +70,6 @@ Success Response 201:
       "isActive": true,
       "visibility": "public",
       "viewCount": 0,
-      "usageCount": 0,
       "createdAt": "...",
       "updatedAt": "..."
     }
@@ -188,7 +187,7 @@ Request Body (JSON) — all fields optional on update:
 }
 
 Read-only fields (stripped automatically, ignored if sent):
-  slug, sizeLabels, minSize, maxSize, viewCount, usageCount,
+  slug, sizeLabels, minSize, maxSize, viewCount,
   childCharts, parentChartId, createdAt, updatedAt, _id, __v
 
 Note: Uses .save() internally — all pre-save hooks re-run (slug regen,
