@@ -16,6 +16,14 @@ const NS = "sizechart";
 const CACHE_TTL = 60 * 60;       // 1 hour — single doc
 const CACHE_TTL_LIST = 60 * 30;  // 30 min — list / search
 
+const POPULATE_REFS = [
+  { path: "applicableCategories",    select: "name slug" },
+  { path: "applicableSubCategories", select: "name slug" },
+  { path: "applicableProducts",      select: "name slug" },
+  { path: "applicableVariants",      select: "name slug" },
+  { path: "applicableBrands",        select: "name slug" },
+];
+
 // Fields the API never accepts as input — derived by model hooks or system
 const READ_ONLY_FIELDS = [
   "slug",
@@ -85,7 +93,10 @@ exports.getAllSizeChart = asynchandeler(async (req, res) => {
   if (applicableLevel) query.applicableLevel = applicableLevel;
   if (isActive !== undefined) query.isActive = isActive === "true";
 
-  const sizeCharts = await SizeChart.find(query).sort({ createdAt: -1 }).lean();
+  const sizeCharts = await SizeChart.find(query)
+    .populate(POPULATE_REFS)
+    .sort({ createdAt: -1 })
+    .lean();
 
   if (!sizeCharts.length) {
     return apiResponse.sendSuccess(res, statusCodes.OK, "No size charts found", {
@@ -119,7 +130,7 @@ exports.getSizeChartBySlug = asynchandeler(async (req, res) => {
     });
   }
 
-  const sizeChart = await SizeChart.findOne({ slug });
+  const sizeChart = await SizeChart.findOne({ slug }).populate(POPULATE_REFS);
 
   if (!sizeChart) {
     return apiResponse.sendSuccess(res, statusCodes.OK, "Size chart not found", {
@@ -303,6 +314,7 @@ exports.searchSizeChart = asynchandeler(async (req, res) => {
   }
 
   const sizeCharts = await SizeChart.find({ $or: orConditions })
+    .populate(POPULATE_REFS)
     .sort({ createdAt: -1 })
     .lean();
 
