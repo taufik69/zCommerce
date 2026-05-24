@@ -111,14 +111,7 @@ exports.createPurchase = asynchandeler(async (req, res) => {
     // const dueamount = payable - paid;
 
     if (supplierId && dueamount !== 0) {
-      // Find supplier by _id first, then by supplierId (mobile number) if not found
-      let supplier = await SupplierModel.findById(supplierId).session(session);
-      if (!supplier) {
-        supplier = await SupplierModel.findOne({ _id: supplierId }).session(
-          session,
-        );
-      }
-
+      const supplier = await SupplierModel.findById(supplierId).session(session);
       if (supplier) {
         supplier.openingDues = (supplier.openingDues || 0) + dueamount;
         await supplier.save({ session });
@@ -141,7 +134,6 @@ exports.createPurchase = asynchandeler(async (req, res) => {
           category,
           subCategory,
           brand,
-          ...req.body,
         },
       ],
       { session },
@@ -374,13 +366,7 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
 
     // Apply New Supplier Dues
     if (supplierId && dueamount !== 0) {
-      let supplier = await SupplierModel.findById(supplierId).session(session);
-      if (!supplier) {
-        supplier = await SupplierModel.findOne({ _id: supplierId }).session(
-          session,
-        );
-      }
-
+      const supplier = await SupplierModel.findById(supplierId).session(session);
       if (supplier) {
         supplier.openingDues = (supplier.openingDues || 0) + dueamount;
         await supplier.save({ session });
@@ -388,20 +374,19 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
     }
 
     // Update Purchase Document
-    existingPurchase.invoiceNumber =
-      invoiceNumber || existingPurchase.invoiceNumber;
-    existingPurchase.supplierId = supplierId || existingPurchase.supplierId;
-    existingPurchase.cashType = cashType || existingPurchase.cashType;
-    existingPurchase.allproduct = updatedProducts;
-    existingPurchase.subTotal = subTotal;
-    existingPurchase.commission = commission;
-    existingPurchase.shipping = shipping;
-    existingPurchase.payable = payable;
-    existingPurchase.paid = paid;
-    existingPurchase.dueamount = dueamount;
-    existingPurchase.category = category || existingPurchase.category;
-    existingPurchase.subCategory = subCategory || existingPurchase.subCategory;
-    existingPurchase.brand = brand || existingPurchase.brand;
+    existingPurchase.invoiceNumber = invoiceNumber || existingPurchase.invoiceNumber;
+    existingPurchase.supplierId    = supplierId    || existingPurchase.supplierId;
+    existingPurchase.cashType      = cashType      || existingPurchase.cashType;
+    existingPurchase.category      = category      || existingPurchase.category;
+    existingPurchase.subCategory   = subCategory   || existingPurchase.subCategory;
+    existingPurchase.brand         = brand         || existingPurchase.brand;
+    existingPurchase.allproduct    = updatedProducts;
+    existingPurchase.subTotal      = subTotal;
+    existingPurchase.commission    = commission;
+    existingPurchase.shipping      = shipping;
+    existingPurchase.payable       = payable       ?? existingPurchase.payable;
+    existingPurchase.paid          = paid;
+    existingPurchase.dueamount     = dueamount     ?? existingPurchase.dueamount;
 
     await existingPurchase.save({ session });
 
@@ -483,4 +468,70 @@ exports.deletePurchase = asynchandeler(async (req, res) => {
     session.endSession();
     throw error;
   }
+});
+
+// search purchases by invoiceNumber | supplierId | cashType
+exports.searchPurchase = asynchandeler(async (req, res) => {
+  const { invoiceNumber, supplierId, cashType } = req.query;
+
+  if (!invoiceNumber && !supplierId && !cashType) {
+    throw new customError(
+      "At least one search param is required (invoiceNumber, supplierId, cashType)",
+      statusCodes.BAD_REQUEST,
+    );
+  }
+
+  const cacheKey = await buildCacheKey(
+    NS,
+    `search:${JSON.stringify({ invoiceNumber, supplierId, cashType })}`,
+  );
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Purchases fetched successfully", {
+      purchases: cached,
+      total: cached.length,
+      fromCache: true,
+    });
+  }
+
+  const query = {};
+
+  if (invoiceNumber) {
+    query.invoiceNumber = { $regex: invoiceNumber.trim(), $options: "i" };
+  }
+  if (supplierId) {
+    if (!mongoose.Types.ObjectId.isValid(supplierId)) {
+      throw new customError("Invalid supplierId", statusCodes.BAD_REQUEST);
+    }
+    query.supplierId = supplierId;
+  }
+  if (cashType) {
+    if (!mongoose.Types.ObjectId.isValid(cashType)) {
+      throw new customError("Invalid cashType id", statusCodes.BAD_REQUEST);
+    }
+    query.cashType = cashType;
+  }
+
+  const purchases = await Purchase.find(query)
+    .populate({ path: "allproduct.product" })
+    .populate({ path: "allproduct.variant" })
+    .populate("category subCategory brand cashType supplierId")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  if (!purchases.length) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No purchases found", {
+      purchases: [],
+      total: 0,
+      fromCache: false,
+    });
+  }
+
+  await setCache(cacheKey, purchases, CACHE_TTL);
+
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Purchases fetched successfully", {
+    purchases,
+    total: purchases.length,
+    fromCache: false,
+  });
 });

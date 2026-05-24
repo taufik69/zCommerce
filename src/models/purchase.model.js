@@ -44,6 +44,9 @@ const purchaseSchema = new mongoose.Schema(
         retailPrice: {
           type: Number,
         },
+        wholesalePrice: {
+          type: Number,
+        },
         subTotal: {
           type: Number,
           default: 0,
