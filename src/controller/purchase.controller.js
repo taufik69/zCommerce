@@ -111,7 +111,8 @@ exports.createPurchase = asynchandeler(async (req, res) => {
     // const dueamount = payable - paid;
 
     if (supplierId && dueamount !== 0) {
-      const supplier = await SupplierModel.findById(supplierId).session(session);
+      const supplier =
+        await SupplierModel.findById(supplierId).session(session);
       if (supplier) {
         supplier.openingDues = (supplier.openingDues || 0) + dueamount;
         await supplier.save({ session });
@@ -241,7 +242,7 @@ exports.getSinglePurchase = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Purchase fetched successfully",
-    purchase,
+    { purchase, fromCache: false },
   );
 });
 
@@ -366,7 +367,8 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
 
     // Apply New Supplier Dues
     if (supplierId && dueamount !== 0) {
-      const supplier = await SupplierModel.findById(supplierId).session(session);
+      const supplier =
+        await SupplierModel.findById(supplierId).session(session);
       if (supplier) {
         supplier.openingDues = (supplier.openingDues || 0) + dueamount;
         await supplier.save({ session });
@@ -374,19 +376,20 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
     }
 
     // Update Purchase Document
-    existingPurchase.invoiceNumber = invoiceNumber || existingPurchase.invoiceNumber;
-    existingPurchase.supplierId    = supplierId    || existingPurchase.supplierId;
-    existingPurchase.cashType      = cashType      || existingPurchase.cashType;
-    existingPurchase.category      = category      || existingPurchase.category;
-    existingPurchase.subCategory   = subCategory   || existingPurchase.subCategory;
-    existingPurchase.brand         = brand         || existingPurchase.brand;
-    existingPurchase.allproduct    = updatedProducts;
-    existingPurchase.subTotal      = subTotal;
-    existingPurchase.commission    = commission;
-    existingPurchase.shipping      = shipping;
-    existingPurchase.payable       = payable       ?? existingPurchase.payable;
-    existingPurchase.paid          = paid;
-    existingPurchase.dueamount     = dueamount     ?? existingPurchase.dueamount;
+    existingPurchase.invoiceNumber =
+      invoiceNumber || existingPurchase.invoiceNumber;
+    existingPurchase.supplierId = supplierId || existingPurchase.supplierId;
+    existingPurchase.cashType = cashType || existingPurchase.cashType;
+    existingPurchase.category = category || existingPurchase.category;
+    existingPurchase.subCategory = subCategory || existingPurchase.subCategory;
+    existingPurchase.brand = brand || existingPurchase.brand;
+    existingPurchase.allproduct = updatedProducts;
+    existingPurchase.subTotal = subTotal;
+    existingPurchase.commission = commission;
+    existingPurchase.shipping = shipping;
+    existingPurchase.payable = payable ?? existingPurchase.payable;
+    existingPurchase.paid = paid;
+    existingPurchase.dueamount = dueamount ?? existingPurchase.dueamount;
 
     await existingPurchase.save({ session });
 
@@ -487,11 +490,16 @@ exports.searchPurchase = asynchandeler(async (req, res) => {
   );
   const cached = await getCache(cacheKey);
   if (cached) {
-    return apiResponse.sendSuccess(res, statusCodes.OK, "Purchases fetched successfully", {
-      purchases: cached,
-      total: cached.length,
-      fromCache: true,
-    });
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Purchases fetched successfully",
+      {
+        purchases: cached,
+        total: cached.length,
+        fromCache: true,
+      },
+    );
   }
 
   const query = {};
@@ -529,9 +537,14 @@ exports.searchPurchase = asynchandeler(async (req, res) => {
 
   await setCache(cacheKey, purchases, CACHE_TTL);
 
-  return apiResponse.sendSuccess(res, statusCodes.OK, "Purchases fetched successfully", {
-    purchases,
-    total: purchases.length,
-    fromCache: false,
-  });
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Purchases fetched successfully",
+    {
+      purchases,
+      total: purchases.length,
+      fromCache: false,
+    },
+  );
 });
