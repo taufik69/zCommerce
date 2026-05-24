@@ -31,8 +31,6 @@ exports.createPurchase = asynchandeler(async (req, res) => {
     brand,
     dueamount,
     payable,
-
-
   } = req.body;
 
   if (!allproduct || !Array.isArray(allproduct) || allproduct.length === 0) {
@@ -82,11 +80,13 @@ exports.createPurchase = asynchandeler(async (req, res) => {
         const productInfo = await Product.findById(product).session(session);
         if (productInfo) {
           productInfo.stock = (productInfo.stock || 0) + quantity;
-          productInfo.wholesalePrice = wholesalePrice;
-          productInfo.purchasePrice = purchasePrice;
-          productInfo.retailPrice = retailPrice;
-          if (size) productInfo.size = size;
-          if (color) productInfo.color = color;
+          productInfo.wholesalePrice =
+            wholesalePrice || productInfo.wholesalePrice;
+          productInfo.purchasePrice =
+            purchasePrice || productInfo.purchasePrice;
+          productInfo.retailPrice = retailPrice || productInfo.retailPrice;
+          if (size) productInfo.size = size || productInfo.size;
+          if (color) productInfo.color = color || productInfo.color;
           await productInfo.save({ session });
         }
       }
@@ -95,11 +95,13 @@ exports.createPurchase = asynchandeler(async (req, res) => {
         const variantInfo = await Variant.findById(variant).session(session);
         if (variantInfo) {
           variantInfo.stockVariant = (variantInfo.stockVariant || 0) + quantity;
-          variantInfo.wholesalePrice = wholesalePrice;
-          variantInfo.purchasePrice = purchasePrice;
-          variantInfo.retailPrice = retailPrice;
-          if (size) variantInfo.size = size;
-          if (color) variantInfo.color = color;
+          variantInfo.wholesalePrice =
+            wholesalePrice || variantInfo.wholesalePrice;
+          variantInfo.purchasePrice =
+            purchasePrice || variantInfo.purchasePrice;
+          variantInfo.retailPrice = retailPrice || variantInfo.retailPrice;
+          if (size) variantInfo.size = size || variantInfo.size;
+          if (color) variantInfo.color = color || variantInfo.color;
           await variantInfo.save({ session });
         }
       }
@@ -110,9 +112,11 @@ exports.createPurchase = asynchandeler(async (req, res) => {
 
     if (supplierId && dueamount !== 0) {
       // Find supplier by _id first, then by supplierId (mobile number) if not found
-      let supplier = await SupplierModel.findById( supplierId).session(session);
+      let supplier = await SupplierModel.findById(supplierId).session(session);
       if (!supplier) {
-        supplier = await SupplierModel.findOne({ _id:  supplierId }).session(session);
+        supplier = await SupplierModel.findOne({ _id: supplierId }).session(
+          session,
+        );
       }
 
       if (supplier) {
@@ -265,8 +269,6 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
     brand,
     dueamount,
     payable,
-  
-
   } = req.body;
 
   const session = await mongoose.startSession();
@@ -282,18 +284,27 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
     for (const item of existingPurchase.allproduct) {
       const { product, variant, quantity } = item;
       if (product) {
-        await Product.findByIdAndUpdate(product, { $inc: { stock: -quantity } }).session(session);
+        await Product.findByIdAndUpdate(product, {
+          $inc: { stock: -quantity },
+        }).session(session);
       }
       if (variant) {
-        await Variant.findByIdAndUpdate(variant, { $inc: { stockVariant: -quantity } }).session(session);
+        await Variant.findByIdAndUpdate(variant, {
+          $inc: { stockVariant: -quantity },
+        }).session(session);
       }
     }
 
     // Revert Old Supplier Dues (Subtract the old due amount from supplier balance)
     if (existingPurchase.supplierId && existingPurchase.dueamount !== 0) {
-      const oldSupplier = await SupplierModel.findById(existingPurchase.supplierId).session(session);
+      const oldSupplier = await SupplierModel.findById(
+        existingPurchase.supplierId,
+      ).session(session);
       if (oldSupplier) {
-        oldSupplier.openingDues = Math.max(0, (oldSupplier.openingDues || 0) - existingPurchase.dueamount);
+        oldSupplier.openingDues = Math.max(
+          0,
+          (oldSupplier.openingDues || 0) - existingPurchase.dueamount,
+        );
         await oldSupplier.save({ session });
       }
     }
@@ -365,9 +376,11 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
     if (supplierId && dueamount !== 0) {
       let supplier = await SupplierModel.findById(supplierId).session(session);
       if (!supplier) {
-        supplier = await SupplierModel.findOne({ _id: supplierId }).session(session);
+        supplier = await SupplierModel.findOne({ _id: supplierId }).session(
+          session,
+        );
       }
-      
+
       if (supplier) {
         supplier.openingDues = (supplier.openingDues || 0) + dueamount;
         await supplier.save({ session });
@@ -375,7 +388,8 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
     }
 
     // Update Purchase Document
-    existingPurchase.invoiceNumber = invoiceNumber || existingPurchase.invoiceNumber;
+    existingPurchase.invoiceNumber =
+      invoiceNumber || existingPurchase.invoiceNumber;
     existingPurchase.supplierId = supplierId || existingPurchase.supplierId;
     existingPurchase.cashType = cashType || existingPurchase.cashType;
     existingPurchase.allproduct = updatedProducts;
@@ -426,18 +440,27 @@ exports.deletePurchase = asynchandeler(async (req, res) => {
     for (const item of purchase.allproduct) {
       const { product, variant, quantity } = item;
       if (product) {
-        await Product.findByIdAndUpdate(product, { $inc: { stock: -quantity } }).session(session);
+        await Product.findByIdAndUpdate(product, {
+          $inc: { stock: -quantity },
+        }).session(session);
       }
       if (variant) {
-        await Variant.findByIdAndUpdate(variant, { $inc: { stockVariant: -quantity } }).session(session);
+        await Variant.findByIdAndUpdate(variant, {
+          $inc: { stockVariant: -quantity },
+        }).session(session);
       }
     }
 
     // Rollback Supplier Dues
     if (purchase.supplierId && purchase.dueamount !== 0) {
-      const supplier = await SupplierModel.findById(purchase.supplierId).session(session);
+      const supplier = await SupplierModel.findById(
+        purchase.supplierId,
+      ).session(session);
       if (supplier) {
-        supplier.openingDues = Math.max(0, (supplier.openingDues || 0) - purchase.dueamount);
+        supplier.openingDues = Math.max(
+          0,
+          (supplier.openingDues || 0) - purchase.dueamount,
+        );
         await supplier.save({ session });
       }
     }
