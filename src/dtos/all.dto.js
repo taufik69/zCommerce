@@ -173,6 +173,7 @@ exports.customerPaymentDetailsDTO = (doc) => {
 // customerAdvancePayment.dto.js;
 exports.customerAdvancePaymentListDTO = (docs = []) => {
   return docs.map((doc) => ({
+    _id: doc._id?.toString(),
     customerName: doc.customerName,
     slug: doc.slug,
     balance: doc.balance ?? 0,
@@ -189,6 +190,7 @@ exports.customerAdvancePaymentDetailsDTO = (doc) => {
   if (!doc) return null;
 
   return {
+    _id: doc._id?.toString(),
     customerName: doc.customerName,
     slug: doc.slug,
     balance: doc.balance ?? 0,
