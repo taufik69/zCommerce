@@ -63,7 +63,7 @@ const CustomerType =
   mongoose.models.CustomerType ||
   mongoose.model("CustomerType", customerTypeSchema);
 
-// customer model 
+// customer model
 
 const customerSchema = new mongoose.Schema(
   {
@@ -203,7 +203,7 @@ customerSchema.pre("save", function (next) {
 });
 
 /**
- * Uniqueness check with customError 
+ * Uniqueness check with customError
  * - customerId unique
  * - mobileNumber unique
  */
@@ -325,7 +325,7 @@ const customerPaymentRecived =
 
 // advance customer payment
 
-const customerAdvancePaymentSchema = new mongoose.Schema(
+const customerAdvancePaymentRecivedSchema = new mongoose.Schema(
   {
     customer: {
       type: mongoose.Schema.Types.ObjectId,
@@ -384,8 +384,11 @@ const customerAdvancePaymentSchema = new mongoose.Schema(
 );
 
 const customerAdvancePaymentModel =
-  mongoose.models.CustomerAdvancePayment ||
-  mongoose.model("CustomerAdvancePayment", customerAdvancePaymentSchema);
+  mongoose.models.CustomerAdvancePaymentRecived ||
+  mongoose.model(
+    "CustomerAdvancePaymentRecived",
+    customerAdvancePaymentRecivedSchema,
+  );
 
 module.exports = {
   CustomerType,

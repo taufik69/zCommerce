@@ -748,7 +748,6 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
     const doc = await customerAdvancePaymentModel
       .findOne({
         customer,
-        isActive: true,
       })
       .populate("customer paymentMode")
       .sort({ createdAt: -1 });
