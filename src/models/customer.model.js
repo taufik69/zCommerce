@@ -383,7 +383,7 @@ const customerAdvancePaymentRecivedSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-const customerAdvancePaymentModel =
+const customerAdvancePaymentRecivecModel =
   mongoose.models.CustomerAdvancePaymentRecived ||
   mongoose.model(
     "CustomerAdvancePaymentRecived",
@@ -394,5 +394,5 @@ module.exports = {
   CustomerType,
   customerModel,
   customerPaymentRecived,
-  customerAdvancePaymentModel,
+  customerAdvancePaymentRecivecModel,
 };
