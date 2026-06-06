@@ -71,7 +71,7 @@ _.route("/get-customer-advance-payment-reviced").get(
 //   validate(updateCustomerAdvancePaymentSchema),
 //   customerController.updateCustomerAdvancePaymentRecived,
 // );
-_.route("/delete-customer-advance-payment-recived/:customer").delete(
+_.route("/delete-customer-advance-payment-recived/:id").delete(
   customerController.deleteCustomerAdvancePaymentRecived,
 );
 module.exports = _;
