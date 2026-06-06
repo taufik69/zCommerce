@@ -4,7 +4,7 @@ const { asynchandeler } = require("../lib/asyncHandeler");
 const {
   customerModel,
   customerPaymentRecived,
-  customerAdvancePaymentRecivecModel,
+  customerAdvancePaymentModel,
   CustomerType,
 } = require("../models/customer.model");
 const {
@@ -664,7 +664,7 @@ exports.createCustomerAdvancePaymentRecived = asynchandeler(
     }
 
     // existing doc
-    const existing = await customerAdvancePaymentRecivecModel.findOne({
+    const existing = await customerAdvancePaymentModel.findOne({
       customer: customerId,
     });
 
@@ -692,7 +692,7 @@ exports.createCustomerAdvancePaymentRecived = asynchandeler(
       newCashBack = 0;
     }
 
-    const doc = await customerAdvancePaymentRecivecModel.findOneAndUpdate(
+    const doc = await customerAdvancePaymentModel.findOneAndUpdate(
       { customer: customerId },
       {
         $set: {
@@ -745,7 +745,7 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
 
   //  Get single by slug
   if (customer) {
-    const doc = await customerAdvancePaymentRecivecModel
+    const doc = await customerAdvancePaymentModel
       .findOne({
         customer,
       })
@@ -766,7 +766,7 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
-      "Customer payment recived retrieved successfully",
+      "Customer payment received retrieved successfully",
       { customerAdvancePayment: dto, fromCache: false },
     );
   }
@@ -774,7 +774,7 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
   // 2) Search by customer name (partial match)
   let query = {};
 
-  const docs = await customerAdvancePaymentRecivecModel
+  const docs = await customerAdvancePaymentModel
     .find(query)
     .sort({ createdAt: -1 })
     .populate("customer paymentMode")
@@ -795,7 +795,7 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
-    "Customer payments recived retrieved successfully",
+    "Customer advance payments retrieved successfully",
     { customerAdvancePayments: dto, fromCache: false },
   );
 });
@@ -806,10 +806,9 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
 exports.deleteCustomerAdvancePaymentRecived = asynchandeler(
   async (req, res) => {
     const { id } = req.params;
-    const paymentRecived =
-      await customerAdvancePaymentRecivecModel.findOneAndDelete({
-        _id: id,
-      });
+    const paymentRecived = await customerAdvancePaymentModel.findOneAndDelete({
+      _id: id,
+    });
     if (!paymentRecived) {
       return apiResponse.sendError(
         res,
