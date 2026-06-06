@@ -114,11 +114,16 @@ exports.getEmployeeList = asynchandeler(async (req, res) => {
   const cacheKey = await buildCacheKey(NS_EMPLOYEE, "all");
   const cached = await getCache(cacheKey);
   if (cached) {
-    return apiResponse.sendSuccess(res, 200, "Employee list fetch successfully", {
-      count: cached.length,
-      employees: cached,
-      fromCache: true,
-    });
+    return apiResponse.sendSuccess(
+      res,
+      200,
+      "Employee list fetch successfully",
+      {
+        count: cached.length,
+        employees: cached,
+        fromCache: true,
+      },
+    );
   }
 
   const employeeList = await employeeModel
@@ -793,7 +798,10 @@ exports.createEmployeeSection = asynchandeler(async (req, res) => {
 exports.getEmployeeSection = asynchandeler(async (req, res) => {
   const { slug } = req.query;
 
-  const cacheKey = await buildCacheKey(NS_SECTION, slug ? `slug:${slug}` : "all");
+  const cacheKey = await buildCacheKey(
+    NS_SECTION,
+    slug ? `slug:${slug}` : "all",
+  );
   const cached = await getCache(cacheKey);
   if (cached) {
     const dataKey = slug ? "section" : "sections";
@@ -828,15 +836,10 @@ exports.getEmployeeSection = asynchandeler(async (req, res) => {
   await setCache(cacheKey, dataToCache, CACHE_TTL);
 
   const dataKey = slug ? "section" : "sections";
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Section fetch successfully",
-    {
-      [dataKey]: slug ? dto[0] : dto,
-      fromCache: false,
-    },
-  );
+  apiResponse.sendSuccess(res, statusCodes.OK, "Section fetch successfully", {
+    [dataKey]: slug ? dto[0] : dto,
+    fromCache: false,
+  });
 });
 
 // update section using slug  and add caching

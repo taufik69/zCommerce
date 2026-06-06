@@ -17,6 +17,7 @@ exports.employeeAdvancePaymentDTO = (doc) => {
 exports.employeeDesignationDTO = (doc) => {
   if (!doc) return null;
   return {
+    _id: doc._id.toString(),
     name: doc.name,
     slug: doc.slug,
   };
@@ -24,6 +25,7 @@ exports.employeeDesignationDTO = (doc) => {
 exports.employeeDepartmentDTO = (doc) => {
   if (!doc) return null;
   return {
+    _id: doc._id.toString(),
     name: doc.name,
     slug: doc.slug,
   };
