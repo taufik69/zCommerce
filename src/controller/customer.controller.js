@@ -320,16 +320,16 @@ exports.updateCustomer = asynchandeler(async (req, res) => {
   Object.assign(customer, rest);
   const updatedCustomer = await customer.save();
 
-  // 5) Send response
+  // 5) Invalidate cache before clients re-fetch
+  await bumpNsVersion(NS_CUSTOMER);
+
+  // 6) Send response
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Customer updated successfully",
     updatedCustomer,
   );
-
-  // Invalidate cache
-  await bumpNsVersion(NS_CUSTOMER);
 });
 
 // delete customer

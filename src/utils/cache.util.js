@@ -31,6 +31,10 @@ const getNsVersion = async (ns) => {
 const bumpNsVersion = async (ns) => {
   // atomic increment — all old versioned keys become unreachable
   const v = await cache.incr(`${ns}:v`);
+  if (v === 1) {
+    await cache.set(`${ns}:v`, 2);
+    return 2;
+  }
   return v;
 };
 
