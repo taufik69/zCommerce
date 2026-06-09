@@ -55,6 +55,7 @@ exports.createCustomerType = asynchandeler(async (req, res) => {
 
   // Invalidate cache
   await bumpNsVersion(NS_CUSTOMER_TYPE);
+  await bumpNsVersion(NS_CUSTOMER); // Customer list populates customerType
 
   apiResponse.sendSuccess(
     res,
@@ -136,6 +137,7 @@ exports.updateCustomerType = asynchandeler(async (req, res) => {
 
   // Invalidate cache
   await bumpNsVersion(NS_CUSTOMER_TYPE);
+  await bumpNsVersion(NS_CUSTOMER); // Customer list populates customerType
 
   apiResponse.sendSuccess(
     res,
@@ -157,6 +159,7 @@ exports.deleteCustomerType = asynchandeler(async (req, res) => {
 
   // Invalidate cache
   await bumpNsVersion(NS_CUSTOMER_TYPE);
+  await bumpNsVersion(NS_CUSTOMER); // Customer list populates customerType
 
   apiResponse.sendSuccess(
     res,
@@ -322,6 +325,8 @@ exports.updateCustomer = asynchandeler(async (req, res) => {
 
   // 5) Invalidate cache before clients re-fetch
   await bumpNsVersion(NS_CUSTOMER);
+  await bumpNsVersion(NS_CUSTOMER_PAYMENT); // Payment list populates customer
+  await bumpNsVersion(NS_CUSTOMER_ADVANCE); // Advance list populates customer
 
   // 6) Send response
   apiResponse.sendSuccess(
@@ -345,6 +350,8 @@ exports.deleteCustomer = asynchandeler(async (req, res) => {
   }
   // Invalidate cache
   await bumpNsVersion(NS_CUSTOMER);
+  await bumpNsVersion(NS_CUSTOMER_PAYMENT); // Payment list populates customer
+  await bumpNsVersion(NS_CUSTOMER_ADVANCE); // Advance list populates customer
 
   // Delete image from Cloudinary via queue
   const publicId = customer.image?.publicId;
@@ -421,16 +428,16 @@ exports.createCustomerPaymentRecived = asynchandeler(async (req, res) => {
 
     session.endSession();
 
+    // Invalidate cache
+    await bumpNsVersion(NS_CUSTOMER_PAYMENT);
+    await bumpNsVersion(NS_CUSTOMER); // Due might change
+
     apiResponse.sendSuccess(
       res,
       statusCodes.CREATED,
       "Customer payment received successfully",
       customerPaymentDetailsDTO(paymentDoc),
     );
-
-    // Invalidate cache
-    await bumpNsVersion(NS_CUSTOMER_PAYMENT);
-    await bumpNsVersion(NS_CUSTOMER); // Due might change
   } catch (err) {
     session.endSession();
     throw err; // asyncHandler -> global middleware asyncHandler -> global error middleware
