@@ -714,6 +714,21 @@ exports.createCustomerAdvancePaymentRecived = asynchandeler(
       { new: true, upsert: true, runValidators: true },
     );
 
+    // now update the customer document's openingDues as well
+    const customerDoc = await customerModel.findById(customerId);
+    if (!customerDoc) {
+      return apiResponse.sendError(
+        res,
+        statusCodes.NOT_FOUND,
+        "Customer not found",
+      );
+    }
+
+    // openingDues adjust by paidInput (advance payment increases due, cashback decreases due)
+    customerDoc.openingDues =
+      Number(customerDoc.openingDues || 0) + paidInput - cashBackInput;
+    await customerDoc.save();
+
     // Invalidate cache
     await bumpNsVersion(NS_CUSTOMER_ADVANCE);
 
