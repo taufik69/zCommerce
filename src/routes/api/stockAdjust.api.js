@@ -19,4 +19,8 @@ _.route("/deletestockadjust/:id").delete(
   stockAdjustController.deleteStockAdjustById
 );
 
+_.route("/stock-adjust/:id")
+  .get(stockAdjustController.getStockAdjustById)
+  .put(stockAdjustController.updateStockAdjustById);
+
 module.exports = _;
