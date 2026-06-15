@@ -20,14 +20,14 @@ exports.createStockAdjust = asynchandeler(async (req, res) => {
   } = req.body;
 
   if (!variantId && !productId) {
-    return new customError(
+    throw new customError(
       "Please provide either productId or variantId",
       statusCodes.BAD_REQUEST,
     );
   }
 
   if (!adjustReason) {
-    return new customError(
+    throw new customError(
       "Please provide all required fields",
       statusCodes.BAD_REQUEST,
     );
@@ -41,17 +41,11 @@ exports.createStockAdjust = asynchandeler(async (req, res) => {
     decreaseQuantity,
     date,
   });
-  if (!stockAdjust) {
-    return new customError(
-      "Failed to create stock adjustment",
-      statusCodes.SERVER_ERROR,
-    );
-  }
   //   update product stock
   if (productId) {
     const product = await Product.findById(productId);
     if (!product) {
-      return new customError("Product not found", statusCodes.NOT_FOUND);
+      throw new customError("Product not found", statusCodes.NOT_FOUND);
     }
     product.stock += increaseQuantity - decreaseQuantity;
     product.stockAdjustment.push(stockAdjust._id);
@@ -61,14 +55,14 @@ exports.createStockAdjust = asynchandeler(async (req, res) => {
   if (variantId) {
     const variant = await Variant.findById(variantId);
     if (!variant) {
-      return new customError("Variant not found", statusCodes.NOT_FOUND);
+      throw new customError("Variant not found", statusCodes.NOT_FOUND);
     }
     variant.stockVariant += increaseQuantity - decreaseQuantity;
     variant.stockVariantAdjust.push(stockAdjust._id);
     await variant.save();
   }
 
-  apiResponse.sendSuccess(
+  return apiResponse.sendSuccess(
     res,
     statusCodes.CREATED,
     "Stock adjustment created successfully",
@@ -100,13 +94,18 @@ exports.getAllStockAdjusts = asynchandeler(async (req, res) => {
     })
     .sort({ createdAt: -1 });
   if (!stockAdjusts || stockAdjusts.length === 0) {
-    throw new customError("Stock adjustments not found", statusCodes.NOT_FOUND);
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Stock adjustments not found",
+      { stockAdjusts: [], fromCache: false },
+    );
   }
-  apiResponse.sendSuccess(
+  return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Stock adjustments retrieved successfully",
-    stockAdjusts,
+    { stockAdjusts, fromCache: false },
   );
 });
 
@@ -187,34 +186,34 @@ exports.deleteStockAdjustById = asynchandeler(async (req, res) => {
   if (!stockAdjust)
     throw new customError("Stock adjustment not found", statusCodes.NOT_FOUND);
 
-  // Decrease product stock
+  // Reverse the stock change on the source document before deleting
   const { productId, variantId, decreaseQuantity, increaseQuantity } =
     stockAdjust;
   if (productId) {
     const product = await Product.findById(productId);
     if (!product) {
-      return new customError("Product not found", statusCodes.NOT_FOUND);
+      throw new customError("Product not found", statusCodes.NOT_FOUND);
     }
-
-    product.stock -= decreaseQuantity || increaseQuantity;
+    product.stock -= (increaseQuantity || 0) - (decreaseQuantity || 0);
     product.stockAdjustment.pull(stockAdjust._id);
     await product.save();
   }
-  //    update variant stock
   if (variantId) {
     const variant = await Variant.findById(variantId);
     if (!variant) {
-      return new customError("Variant not found", statusCodes.NOT_FOUND);
+      throw new customError("Variant not found", statusCodes.NOT_FOUND);
     }
-    variant.stockVariant -= decreaseQuantity || increaseQuantity;
+    variant.stockVariant -= (increaseQuantity || 0) - (decreaseQuantity || 0);
     variant.stockVariantAdjust.pull(stockAdjust._id);
     await variant.save();
   }
 
-  apiResponse.sendSuccess(
+  await StockAdjust.findByIdAndDelete(id);
+
+  return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Stock adjustment deleted successfully",
-    stockAdjust,
+    { id },
   );
 });

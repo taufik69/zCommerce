@@ -289,7 +289,6 @@ class ProductController {
       .populate({ path: "subcategory", populate: "discount" })
       .populate({
         path: "variant",
-        select: "variantName retailPrice stockVariant size color image",
       })
       .sort({ createdAt: -1 })
       .lean();
