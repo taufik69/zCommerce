@@ -5,6 +5,16 @@ const Product = require("../models/product.model");
 const Variant = require("../models/variant.model");
 const StockAdjust = require("../models/stockadjust.model");
 const { statusCodes } = require("../constant/constant");
+const { getCache, setCache, bumpNsVersion, buildCacheKey } = require("@/utils/cache.util");
+
+const NS = "stock";
+const CACHE_TTL = 60 * 30; // 30 minutes
+
+// Swallow Redis errors so a cache miss never breaks the response
+const safeGet  = async (key) =>           { try { return key ? await getCache(key) : null; } catch { return null; } };
+const safeSet  = async (key, val, ttl) => { try { if (key) await setCache(key, val, ttl); } catch {} };
+const safeKey  = async (ns, suffix) =>    { try { return await buildCacheKey(ns, suffix); } catch { return null; } };
+const safeBump = async (ns) =>            { try { await bumpNsVersion(ns);                } catch {} };
 
 //@desc create stock adjust
 //@route POST /api/stock-adjust
@@ -61,6 +71,9 @@ exports.createStockAdjust = asynchandeler(async (req, res) => {
     variant.stockVariantAdjust.push(stockAdjust._id);
     await variant.save();
   }
+
+  await safeBump(NS);
+  await safeBump("product");
 
   return apiResponse.sendSuccess(
     res,
@@ -155,7 +168,16 @@ exports.getAllStockAdjusts = asynchandeler(async (req, res) => {
     });
   }
 
-  // No search — plain paginated fetch
+  // No search — plain paginated fetch with cache
+  const cacheKey = await safeKey(NS, `adjusts:p${page}:l${limit}`);
+  const cached   = await safeGet(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Stock adjustments retrieved successfully", {
+      ...cached,
+      fromCache: true,
+    });
+  }
+
   const [stockAdjusts, total] = await Promise.all([
     StockAdjust.find()
       .populate({
@@ -175,16 +197,18 @@ exports.getAllStockAdjusts = asynchandeler(async (req, res) => {
     StockAdjust.countDocuments(),
   ]);
 
+  const payload = {
+    stockAdjusts: stockAdjusts ?? [],
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+  };
+  await safeSet(cacheKey, payload, CACHE_TTL);
+
   return apiResponse.sendSuccess(res, statusCodes.OK,
     stockAdjusts.length ? "Stock adjustments retrieved successfully" : "Stock adjustments not found",
-    {
-      stockAdjusts: stockAdjusts ?? [],
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-      fromCache: false,
-    },
+    { ...payload, fromCache: false },
   );
 });
 
@@ -194,47 +218,83 @@ exports.getAllProductCategoryWise = asynchandeler(async (req, res) => {
   const { category } = req.params;
   if (!category)
     throw new customError("Category is required", statusCodes.BAD_REQUEST);
+
+  const cacheKey = await safeKey(NS, `cat:${category}`);
+  const cached   = await safeGet(cacheKey);
+  if (cached) return apiResponse.sendSuccess(res, statusCodes.OK, "Products retrieved successfully", cached);
+
   const products = await Product.find({ category }).populate(
     "stockAdjustment category subcategory brand variant",
   );
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Products retrieved successfully",
-    products,
-  );
+  await safeSet(cacheKey, products, CACHE_TTL);
+  apiResponse.sendSuccess(res, statusCodes.OK, "Products retrieved successfully", products);
 });
+
 exports.getAllProductSSubcategoryWise = asynchandeler(async (req, res) => {
   const { subcategory } = req.params;
   if (!subcategory)
     throw new customError("Subcategory is required", statusCodes.BAD_REQUEST);
+
+  const cacheKey = await safeKey(NS, `subcat:${subcategory}`);
+  const cached   = await safeGet(cacheKey);
+  if (cached) return apiResponse.sendSuccess(res, statusCodes.OK, "Products retrieved successfully", cached);
+
   const products = await Product.find({ subcategory }).populate(
     "stockAdjustment category subcategory brand variant",
   );
   if (!products || products.length === 0)
     throw new customError("Products not found", statusCodes.NOT_FOUND);
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Products retrieved successfully",
-    products,
-  );
+  await safeSet(cacheKey, products, CACHE_TTL);
+  apiResponse.sendSuccess(res, statusCodes.OK, "Products retrieved successfully", products);
 });
 
 // @desc get all variant
 exports.getAllVariants = asynchandeler(async (req, res, next) => {
-  const variants = await Variant.find()
-    .populate("product")
-    .select("-updatedAt")
-    .sort({ createdAt: -1 });
-  if (!variants)
-    throw new customError("Variants not found", statusCodes.NOT_FOUND);
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Variants fetched successfully",
-    variants,
-  );
+  const page  = Math.max(1, parseInt(req.query.page  || "1", 10));
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || "100", 10)));
+  const skip  = (page - 1) * limit;
+
+  const cacheKey = await safeKey(NS, `variants:p${page}:l${limit}`);
+  const cached   = await safeGet(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Variants fetched successfully", {
+      ...cached,
+      fromCache: true,
+    });
+  }
+
+  // Run both queries + counts in parallel
+  const [variants, singleProducts, totalVariants, totalSingle] = await Promise.all([
+    Variant.find()
+      .populate({ path: "product", populate: { path: "subcategory", select: "name _id" } })
+      .select("variantName barCode sku size color stockVariant product")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+
+    Product.find({ variantType: "singleVariant" })
+      .populate("subcategory", "name _id")
+      .select("name barCode sku size color stock subcategory")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+
+    Variant.countDocuments(),
+    Product.countDocuments({ variantType: "singleVariant" }),
+  ]);
+
+  const total      = totalVariants + totalSingle;
+  const totalPages = Math.ceil(total / limit);
+
+  const payload = { variants, singleProducts, total, totalPages, page, limit };
+  await safeSet(cacheKey, payload, CACHE_TTL);
+
+  apiResponse.sendSuccess(res, statusCodes.OK, "Variants fetched successfully", {
+    ...payload,
+    fromCache: false,
+  });
 });
 
 //@desc  get all single varinat product
@@ -288,6 +348,8 @@ exports.deleteStockAdjustById = asynchandeler(async (req, res) => {
   }
 
   await StockAdjust.findByIdAndDelete(id);
+  await safeBump(NS);
+  await safeBump("product");
 
   return apiResponse.sendSuccess(
     res,
@@ -374,6 +436,9 @@ exports.updateStockAdjustById = asynchandeler(async (req, res) => {
   if (adjustReason !== undefined) existing.adjustReason = adjustReason;
   if (date !== undefined) existing.date = date;
   await existing.save();
+
+  await safeBump(NS);
+  await safeBump("product");
 
   return apiResponse.sendSuccess(res, statusCodes.OK, "Stock adjustment updated successfully", { stockAdjust: existing });
 });
