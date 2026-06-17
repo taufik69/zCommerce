@@ -323,8 +323,8 @@ exports.getPurchaseReturn = asynchandeler(async (req, res) => {
   const [purchaseReturns, total] = await Promise.all([
     PurchaseReturn.find(filter)
       .populate("supplier", "supplierName supplierId mobile openingDues totalPurchaseDue")
-      .populate("products.product", "name stock purchaseReturnStock")
-      .populate("products.variant", "variantName stockVariant purchaseReturnStock")
+      .populate("products.product", "name stock purchaseReturnStock barCode")
+      .populate("products.variant", "variantName stockVariant purchaseReturnStock barCode size color")
       .sort(sort)
       .skip(skip)
       .limit(Number(limit))
@@ -393,8 +393,8 @@ exports.getSinglePurchaseReturn = asynchandeler(async (req, res) => {
 
   const purchaseReturn = await PurchaseReturn.findById(id)
     .populate("supplier", "supplierName supplierId mobile openingDues totalPurchaseDue")
-    .populate("products.product", "name stock purchaseReturnStock")
-    .populate("products.variant", "variantName stockVariant purchaseReturnStock")
+    .populate("products.product", "name stock purchaseReturnStock barCode")
+    .populate("products.variant", "variantName stockVariant purchaseReturnStock barCode size color")
     .lean();
 
   if (!purchaseReturn) {
