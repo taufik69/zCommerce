@@ -3,6 +3,8 @@ const {
   SupplierModel,
   SupplierDuePayment,
 } = require("../models/supplier.model");
+const productModel = require("../models/product.model");
+const VariantModel = require("../models/variant.model");
 const { apiResponse } = require("../utils/apiResponse");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const {

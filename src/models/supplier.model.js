@@ -59,6 +59,11 @@ const supplierSchema = new mongoose.Schema(
       default: 0,
       min: [0, "Opening dues cannot be negative"],
     },
+    totalPurchaseDue: {
+      type: Number,
+      default: 0,
+      min: [0, "Total purchase due cannot be negative"],
+    },
 
     // Status + Soft delete
     isActive: {

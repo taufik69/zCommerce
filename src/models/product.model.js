@@ -133,6 +133,7 @@ const productSchema = new mongoose.Schema(
     size: { type: String, trim: true, default: "N/A" },
     color: { type: String, trim: true, default: "N/A" },
     stock: { type: Number, min: 0, default: 0 },
+    purchaseReturnStock: { type: Number, min: 0, default: 0 },
     warehouseLocation: { type: String, trim: true },
 
     // Pricing

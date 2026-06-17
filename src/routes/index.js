@@ -44,6 +44,7 @@ _.use("/merchant", merchantRoutes);
 _.use("/courier", courierRoutes);
 _.use("/stock", stockAdjustRoutes);
 _.use("/purchase", purchaseRoutes);
+_.use("/purchase-return", require("./api/purchase-return.api"));
 _.use("/sizechart", sizeChartRoutes);
 _.use("/sales-return", require("./api/salesReturn.api"));
 _.use("/byretrun-Sale", require("./api/byretrunSale.api"));

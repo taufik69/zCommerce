@@ -96,6 +96,7 @@ const variantSchema = new mongoose.Schema(
 
     // Quantity / stock
     stockVariant: { type: Number, min: 0, default: 0 },
+    purchaseReturnStock: { type: Number, min: 0, default: 0 },
     stockVariantAdjust: [
       { type: mongoose.Schema.Types.ObjectId, ref: "StockAdjust" },
     ],
