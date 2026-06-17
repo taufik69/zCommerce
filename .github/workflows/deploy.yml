@@ -19,11 +19,14 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ~/zcommerce
+            # Set the remote URL
+            git remote set-url origin git@github.com:taufik69/zCommerce.git
+
             # Pull the latest code
             git pull origin main
 
             # Install only production dependencies
-            npm install --production
+            npm ci --omit=dev
 
             echo ">>> Restarting Backend and Worker..."
 
