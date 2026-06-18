@@ -50,13 +50,14 @@ exports.getAllFundHandovers = asynchandeler(async (req, res) => {
   const funds = await FundHandoverDescription.find()
     .populate("fundPaymentMode")
     .sort({ createdAt: -1 });
-  if (!funds.length)
-    throw new customError("Fund Handovers not found", statusCodes.NOT_FOUND);
+  if (!funds.length) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Fund Handovers not found", { funds: [], fromCache: false });
+  }
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Fund Handovers fetched successfully",
-    funds,
+    { funds },
   );
 });
 

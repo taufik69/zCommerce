@@ -53,13 +53,13 @@ exports.getAllMoneyTransfer = asynchandeler(async (req, res) => {
     .populate("toAccount")
     .sort({ createdAt: -1 });
   if (!result.length) {
-    throw new customError("Money Transfer not found", statusCodes.NOT_FOUND);
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Money Transfer not found", { transfers: [], fromCache: false });
   }
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Money Transfer fetched",
-    result,
+    { transfers: result },
   );
 });
 

@@ -30,15 +30,13 @@ exports.addTransactionCategories = asynchandeler(async (req, res) => {
 exports.getAllTransitionCategory = asynchandeler(async (req, res) => {
   const categories = await TransactionCategory.find().sort({ createdAt: -1 });
   if (!categories.length) {
-    throw new customError("Categories not found", statusCodes.NOT_FOUND);
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Categories not found", { categories: [], fromCache: false });
   }
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Categories fetched successfully",
-    {
-      categories,
-    },
+    { categories },
   );
 });
 

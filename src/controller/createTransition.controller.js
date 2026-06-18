@@ -53,28 +53,19 @@ exports.getAllTransaction = asynchandeler(async (req, res) => {
     .sort({ createdAt: -1 });
 
   if (!transactions.length) {
-    throw new customError("Transactions not found", statusCodes.NOT_FOUND);
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Transactions not found", { transactions: [], fromCache: false });
   }
 
-  //  Generate serial numbers dynamically
   const formattedTransactions = transactions.map((tx, index) => {
-    // Convert index (0-based) to serial (1-based)
-    const serial = index + 1;
-
-    // Pad with zeros up to 6 digits → e.g., 1 → 000001
-    const serialNumber = `TRXID-${serial.toString().padStart(6, "0")}`;
-
-    return {
-      ...tx.toObject(),
-      serialNumber, //  Add new field
-    };
+    const serialNumber = `TRXID-${(index + 1).toString().padStart(6, "0")}`;
+    return { ...tx.toObject(), serialNumber };
   });
 
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Transactions fetched successfully",
-    formattedTransactions,
+    { transactions: formattedTransactions },
   );
 });
 
