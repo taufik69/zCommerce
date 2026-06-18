@@ -47,17 +47,34 @@ exports.createFundHandover = asynchandeler(async (req, res) => {
 
 // Get All
 exports.getAllFundHandovers = asynchandeler(async (req, res) => {
-  const funds = await FundHandoverDescription.find()
-    .populate("fundPaymentMode")
-    .sort({ createdAt: -1 });
-  if (!funds.length) {
-    return apiResponse.sendSuccess(res, statusCodes.OK, "Fund Handovers not found", { funds: [], fromCache: false });
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const skip = (page - 1) * limit;
+
+  const [funds, total] = await Promise.all([
+    FundHandoverDescription.find()
+      .populate("fundPaymentMode")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    FundHandoverDescription.countDocuments(),
+  ]);
+
+  if (!funds.length && page === 1) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Fund Handovers not found", {
+      funds: [],
+      total: 0,
+      page,
+      limit,
+      hasNextPage: false,
+    });
   }
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Fund Handovers fetched successfully",
-    { funds },
+    { funds, total, page, limit, hasNextPage: page * limit < total },
   );
 });
 

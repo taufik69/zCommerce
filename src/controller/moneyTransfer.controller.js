@@ -48,18 +48,35 @@ exports.createMoneyTransfer = asynchandeler(async (req, res) => {
 
 // get all money transfer
 exports.getAllMoneyTransfer = asynchandeler(async (req, res) => {
-  const result = await MoneyTransfer.find()
-    .populate("fromAccount")
-    .populate("toAccount")
-    .sort({ createdAt: -1 });
-  if (!result.length) {
-    return apiResponse.sendSuccess(res, statusCodes.OK, "Money Transfer not found", { transfers: [], fromCache: false });
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const skip = (page - 1) * limit;
+
+  const [transfers, total] = await Promise.all([
+    MoneyTransfer.find()
+      .populate("fromAccount")
+      .populate("toAccount")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    MoneyTransfer.countDocuments(),
+  ]);
+
+  if (!transfers.length && page === 1) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Money Transfer not found", {
+      transfers: [],
+      total: 0,
+      page,
+      limit,
+      hasNextPage: false,
+    });
   }
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Money Transfer fetched",
-    { transfers: result },
+    { transfers, total, page, limit, hasNextPage: page * limit < total },
   );
 });
 

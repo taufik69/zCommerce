@@ -48,16 +48,31 @@ exports.createTransaction = asynchandeler(async (req, res) => {
 
 // geta all transaction
 exports.getAllTransaction = asynchandeler(async (req, res) => {
-  const transactions = await CreateTransaction.find()
-    .populate("account transactionCategory")
-    .sort({ createdAt: -1 });
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const skip = (page - 1) * limit;
 
-  if (!transactions.length) {
-    return apiResponse.sendSuccess(res, statusCodes.OK, "Transactions not found", { transactions: [], fromCache: false });
+  const [rawTransactions, total] = await Promise.all([
+    CreateTransaction.find()
+      .populate("account transactionCategory")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    CreateTransaction.countDocuments(),
+  ]);
+
+  if (!rawTransactions.length && page === 1) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Transactions not found", {
+      transactions: [],
+      total: 0,
+      page,
+      limit,
+      hasNextPage: false,
+    });
   }
 
-  const formattedTransactions = transactions.map((tx, index) => {
-    const serialNumber = `TRXID-${(index + 1).toString().padStart(6, "0")}`;
+  const transactions = rawTransactions.map((tx, index) => {
+    const serialNumber = `TRXID-${(skip + index + 1).toString().padStart(6, "0")}`;
     return { ...tx.toObject(), serialNumber };
   });
 
@@ -65,7 +80,7 @@ exports.getAllTransaction = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Transactions fetched successfully",
-    { transactions: formattedTransactions },
+    { transactions, total, page, limit, hasNextPage: page * limit < total },
   );
 });
 

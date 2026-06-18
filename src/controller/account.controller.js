@@ -39,27 +39,41 @@ exports.createAccount = asynchandeler(async (req, res) => {
 
 // get all accounts
 exports.getAllAccounts = asynchandeler(async (req, res) => {
-  const cacheKey = await buildCacheKey(NS, "all");
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const skip = (page - 1) * limit;
+
+  const cacheKey = await buildCacheKey(NS, `page_${page}_limit_${limit}`);
   const cached = await getCache(cacheKey);
   if (cached) {
     return apiResponse.sendSuccess(
       res,
       200,
       "Accounts fetched successfully",
-      { accounts: cached, fromCache: true }
+      { ...cached, fromCache: true }
     );
   }
 
-  const accounts = await Account.find().sort({ createdAt: -1 }).lean();
-  if (!accounts.length) {
-    throw new customError("Accounts not found", 404);
+  const [accounts, total] = await Promise.all([
+    Account.find().sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    Account.countDocuments(),
+  ]);
+
+  if (!accounts.length && page === 1) {
+    return apiResponse.sendSuccess(res, 200, "Accounts not found", {
+      accounts: [],
+      total: 0,
+      page,
+      limit,
+      hasNextPage: false,
+      fromCache: false,
+    });
   }
 
-  await setCache(cacheKey, accounts, CACHE_TTL);
+  const payload = { accounts, total, page, limit, hasNextPage: page * limit < total };
+  await setCache(cacheKey, payload, CACHE_TTL);
 
-  apiResponse.sendSuccess(res, 200, "Accounts fetched successfully", {
-    accounts,
-  });
+  apiResponse.sendSuccess(res, 200, "Accounts fetched successfully", payload);
 });
 
 // get single account using slug

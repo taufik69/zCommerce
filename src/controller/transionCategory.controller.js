@@ -28,15 +28,30 @@ exports.addTransactionCategories = asynchandeler(async (req, res) => {
 
 // get all transaction category
 exports.getAllTransitionCategory = asynchandeler(async (req, res) => {
-  const categories = await TransactionCategory.find().sort({ createdAt: -1 });
-  if (!categories.length) {
-    return apiResponse.sendSuccess(res, statusCodes.OK, "Categories not found", { categories: [], fromCache: false });
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const skip = (page - 1) * limit;
+
+  const [categories, total] = await Promise.all([
+    TransactionCategory.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
+    TransactionCategory.countDocuments(),
+  ]);
+
+  if (!categories.length && page === 1) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Categories not found", {
+      categories: [],
+      total: 0,
+      page,
+      limit,
+      hasNextPage: false,
+    });
   }
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Categories fetched successfully",
-    { categories },
+    { categories, total, page, limit, hasNextPage: page * limit < total },
   );
 });
 
