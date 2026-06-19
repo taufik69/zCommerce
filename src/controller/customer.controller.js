@@ -232,7 +232,7 @@ exports.getAllCustomers = asynchandeler(async (req, res) => {
     );
   }
 
-  const query = { isActive: true };
+  const query = {};
 
   // exact by customerId (highest priority)
   if (customerId) {
@@ -365,6 +365,34 @@ exports.deleteCustomer = asynchandeler(async (req, res) => {
     "Customer deleted successfully",
     customer,
   );
+});
+
+exports.activateCustomer = asynchandeler(async (req, res) => {
+  const { customerId } = req.params;
+  const customer = await customerModel.findOneAndUpdate(
+    { customerId, isActive: false },
+    { isActive: true },
+    { new: true },
+  );
+  if (!customer) {
+    throw new customError("Customer not found or already active", statusCodes.NOT_FOUND);
+  }
+  await bumpNsVersion(NS_CUSTOMER);
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Customer activated successfully", customer);
+});
+
+exports.deactivateCustomer = asynchandeler(async (req, res) => {
+  const { customerId } = req.params;
+  const customer = await customerModel.findOneAndUpdate(
+    { customerId, isActive: true },
+    { isActive: false },
+    { new: true },
+  );
+  if (!customer) {
+    throw new customError("Customer not found or already inactive", statusCodes.NOT_FOUND);
+  }
+  await bumpNsVersion(NS_CUSTOMER);
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Customer deactivated successfully", customer);
 });
 
 // customer payment recived controller

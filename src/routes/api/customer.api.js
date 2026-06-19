@@ -40,6 +40,8 @@ _.route("/update-customer/:customerId").put(
 _.route("/delete-customer/:customerId").delete(
   customerController.deleteCustomer,
 );
+_.route("/activate-customer/:customerId").put(customerController.activateCustomer);
+_.route("/deactivate-customer/:customerId").put(customerController.deactivateCustomer);
 // customer payment recived api
 _.route("/customer-payment-recived").post(
   validate(createCustomerPaymentSchema),
