@@ -19,7 +19,7 @@ const imageSchema = new mongoose.Schema(
   { _id: false },
 );
 
-const siteInformationSchema = new mongoose.Schema(
+const storeInformationSchema = new mongoose.Schema(
   {
     storeName: {
       type: String,
@@ -56,12 +56,10 @@ const siteInformationSchema = new mongoose.Schema(
     },
     businessHours: {
       type: String,
-
       trim: true,
     },
     footer: {
       type: String,
-
       trim: true,
     },
     facebookLink: {
@@ -70,17 +68,14 @@ const siteInformationSchema = new mongoose.Schema(
     },
     youtubeLink: {
       type: String,
-
       trim: true,
     },
     instagramLink: {
       type: String,
-
       trim: true,
     },
     whatsappLink: {
       type: String,
-
       trim: true,
     },
     twitterLink: {
@@ -103,52 +98,30 @@ const siteInformationSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   {
     timestamps: true,
   },
 );
 
-// make a slug
-siteInformationSchema.pre("save", function (next) {
+storeInformationSchema.pre("save", function (next) {
   if (this.isModified("storeName")) {
     this.slug = slugify(this.storeName, { lower: true, strict: true });
   }
   next();
 });
 
-// did not put double siteinformation only take one siteinformation
-siteInformationSchema.pre("save", async function (next) {
+storeInformationSchema.pre("save", async function (next) {
   try {
-    const siteInformationCount = await this.constructor.countDocuments();
-    if (siteInformationCount >= 1 && this.isNew) {
+    const existing = await this.constructor.findOne({ slug: this.slug });
+    if (existing && existing._id.toString() !== this._id.toString()) {
       return next(
         new customError(
-          "Only one SiteInformation document is allowed.",
-          statusCodes.BAD_REQUEST,
-        ),
-      );
-    }
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
-
-// if slug already exist
-siteInformationSchema.pre("save", async function (next) {
-  try {
-    const existSiteInformation = await this.constructor.findOne({
-      slug: this.slug,
-    });
-    if (
-      existSiteInformation &&
-      existSiteInformation._id &&
-      existSiteInformation._id.toString() !== this._id.toString()
-    ) {
-      next(
-        new customError(
-          `${this.storeName} already exists Try another`,
+          `Store with name "${this.storeName}" already exists`,
           statusCodes.BAD_REQUEST,
         ),
       );
@@ -160,5 +133,5 @@ siteInformationSchema.pre("save", async function (next) {
 });
 
 module.exports =
-  mongoose.models.SiteInformation ||
-  mongoose.model("SiteInformation", siteInformationSchema);
+  mongoose.models.StoreInformation ||
+  mongoose.model("StoreInformation", storeInformationSchema);

@@ -19,6 +19,8 @@ const variantModel = require("@/models/variant.model");
 const bannerModel = require("@/models/banner.model");
 const { customerModel } = require("@/models/customer.model");
 const userModel = require("@/models/user.model");
+const siteInformationModel = require("@/models/siteInformation.model");
+const storeInformationModel = require("@/models/storeInformation.model");
 const { bumpNsVersion } = require("@/utils/cache.util");
 const { dbConnect } = require("@/database/db");
 
@@ -31,6 +33,8 @@ const MODELS = {
   user: userModel,
   banner: bannerModel,
   discountBanner: discountBannerModel,
+  siteinformation: siteInformationModel,
+  storeinformation: storeInformationModel,
 };
 
 dbConnect()
@@ -63,7 +67,8 @@ function startImageWorker() {
         index,
       } = job.data;
 
-      const targetField = index !== undefined ? `${fieldName}.${index}` : fieldName;
+      const targetField =
+        index !== undefined ? `${fieldName}.${index}` : fieldName;
 
       console.log(
         `[Worker] Processing ${modelName} image upload for ID: ${documentId} (Field: ${targetField})`,
@@ -114,7 +119,10 @@ function startImageWorker() {
           },
         );
 
-        console.log(`[Worker] DB Update Result for ${modelName}:`, updateResult);
+        console.log(
+          `[Worker] DB Update Result for ${modelName}:`,
+          updateResult,
+        );
 
         // Delete old Cloudinary image (update case) — non-blocking, non-critical
         if (oldPublicId) {
@@ -158,13 +166,9 @@ function startImageWorker() {
   worker.on("active", (job) =>
     console.log(`▶️  Job active  [${job.id}] ${job.name}`),
   );
-  worker.on("completed", (job) =>
-    console.log(`✅ Job completed [${job.id}]`),
-  );
+  worker.on("completed", (job) => console.log(`✅ Job completed [${job.id}]`));
   worker.on("failed", (job, err) =>
     console.error(`❌ Job failed   [${job?.id}]:`, err.message),
   );
-  worker.on("error", (err) =>
-    console.error("🔥 Worker error:", err),
-  );
+  worker.on("error", (err) => console.error("🔥 Worker error:", err));
 }

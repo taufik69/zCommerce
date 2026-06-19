@@ -54,6 +54,7 @@ _.use("/transaction", require("./api/createTransaction.api"));
 _.use("/moneytransfer", require("./api/moneyTransfer.api"));
 _.use("/fundhandover", require("./api/fundhandover.api"));
 _.use("/siteinformation", require("./api/siteinformation.api"));
+_.use("/storeinformation", require("./api/storeinformation.api"));
 _.use("/invoice", require("./api/invoice.api"));
 _.use("/userpermission", require("./api/userpermission.api"));
 _.use("/banner", require("./api/banner.api"));

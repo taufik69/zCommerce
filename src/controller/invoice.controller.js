@@ -15,8 +15,10 @@ const { statusCodes } = require("../constant/constant");
 
 exports.purchaseInvoice = asynchandeler(async (req, res) => {
   const { startDate, endDate, supplierName } = req.body;
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+  const skip = (page - 1) * limit;
 
-  // Required validation
   if (!startDate || !endDate) {
     throw new customError(
       "startDate and endDate are required",
@@ -24,7 +26,6 @@ exports.purchaseInvoice = asynchandeler(async (req, res) => {
     );
   }
 
-  // Base match query
   const match = {
     createdAt: {
       $gte: new Date(startDate),
@@ -32,84 +33,37 @@ exports.purchaseInvoice = asynchandeler(async (req, res) => {
     },
   };
 
-  // Optional supplierName filter
   if (supplierName && supplierName.trim() !== "") {
     match.supplierName = { $regex: supplierName, $options: "i" };
   }
 
-  const result = await purchaseModel.aggregate([
+  const basePipeline = [
     { $match: match },
     { $unwind: { path: "$allproduct", preserveNullAndEmptyArrays: true } },
-
-    // ✅ Convert IDs safely
     {
       $addFields: {
         "allproduct.product": {
           $cond: [
-            {
-              $and: [
-                { $ne: ["$allproduct.product", null] },
-                { $ne: ["$allproduct.product", ""] },
-              ],
-            },
+            { $and: [{ $ne: ["$allproduct.product", null] }, { $ne: ["$allproduct.product", ""] }] },
             { $toObjectId: "$allproduct.product" },
             null,
           ],
         },
         "allproduct.variant": {
           $cond: [
-            {
-              $and: [
-                { $ne: ["$allproduct.variant", null] },
-                { $ne: ["$allproduct.variant", ""] },
-              ],
-            },
+            { $and: [{ $ne: ["$allproduct.variant", null] }, { $ne: ["$allproduct.variant", ""] }] },
             { $toObjectId: "$allproduct.variant" },
             null,
           ],
         },
       },
     },
-
-    // ✅ Lookup product (main)
-    {
-      $lookup: {
-        from: "products",
-        localField: "allproduct.product",
-        foreignField: "_id",
-        as: "productData",
-      },
-    },
+    { $lookup: { from: "products", localField: "allproduct.product", foreignField: "_id", as: "productData" } },
     { $unwind: { path: "$productData", preserveNullAndEmptyArrays: true } },
-
-    // ✅ Lookup variant
-    {
-      $lookup: {
-        from: "variants",
-        localField: "allproduct.variant",
-        foreignField: "_id",
-        as: "variantData",
-      },
-    },
+    { $lookup: { from: "variants", localField: "allproduct.variant", foreignField: "_id", as: "variantData" } },
     { $unwind: { path: "$variantData", preserveNullAndEmptyArrays: true } },
-
-    // ✅ Lookup variant.product → populate variant's product object
-    {
-      $lookup: {
-        from: "products",
-        localField: "variantData.product",
-        foreignField: "_id",
-        as: "variantProductData",
-      },
-    },
-    {
-      $unwind: {
-        path: "$variantProductData",
-        preserveNullAndEmptyArrays: true,
-      },
-    },
-
-    // ✅ Merge all fields properly
+    { $lookup: { from: "products", localField: "variantData.product", foreignField: "_id", as: "variantProductData" } },
+    { $unwind: { path: "$variantProductData", preserveNullAndEmptyArrays: true } },
     {
       $addFields: {
         "variantData.product": "$variantProductData",
@@ -117,17 +71,7 @@ exports.purchaseInvoice = asynchandeler(async (req, res) => {
         "allproduct.product": "$productData",
       },
     },
-
-    // Clean temp data
-    {
-      $project: {
-        productData: 0,
-        variantData: 0,
-        variantProductData: 0,
-      },
-    },
-
-    // ✅ Group by purchase
+    { $project: { productData: 0, variantData: 0, variantProductData: 0 } },
     {
       $group: {
         _id: "$_id",
@@ -144,32 +88,65 @@ exports.purchaseInvoice = asynchandeler(async (req, res) => {
         allproduct: { $push: "$allproduct" },
       },
     },
+  ];
 
-    // ✅ Total summary
-    {
-      $group: {
-        _id: null,
-        totalSubTotal: { $sum: "$subTotal" },
-        totalCommission: { $sum: "$commission" },
-        totalShipping: { $sum: "$shipping" },
-        totalPayable: { $sum: "$payable" },
-        totalDueAmount: { $sum: "$dueAmount" },
-        totalPaid: { $sum: "$paid" },
-        allPurchases: { $push: "$$ROOT" },
+  const [summaryResult, countResult] = await Promise.all([
+    purchaseModel.aggregate([
+      ...basePipeline,
+      {
+        $group: {
+          _id: null,
+          totalSubTotal: { $sum: "$subTotal" },
+          totalCommission: { $sum: "$commission" },
+          totalShipping: { $sum: "$shipping" },
+          totalPayable: { $sum: "$payable" },
+          totalDueAmount: { $sum: "$dueAmount" },
+          totalPaid: { $sum: "$paid" },
+          total: { $sum: 1 },
+        },
       },
-    },
+    ]),
+    purchaseModel.aggregate([...basePipeline, { $count: "total" }]),
   ]);
 
-  if (!result.length) {
-    return apiResponse.sendSuccess(res, statusCodes.OK, "No data found", []);
+  const pageResult = await purchaseModel.aggregate([
+    ...basePipeline,
+    { $sort: { date: -1 } },
+    { $skip: skip },
+    { $limit: limit },
+  ]);
+
+  if (!pageResult.length && page === 1) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No data found", {
+      allPurchases: [],
+      totalSubTotal: 0,
+      totalCommission: 0,
+      totalShipping: 0,
+      totalPayable: 0,
+      totalDueAmount: 0,
+      totalPaid: 0,
+      pagination: { total: 0, page, limit, hasNextPage: false },
+    });
   }
 
-  return apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Invoice summary",
-    result[0],
-  );
+  const totals = summaryResult[0] || {};
+  const totalCount = countResult[0]?.total || 0;
+
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Invoice summary", {
+    allPurchases: pageResult,
+    totalSubTotal: totals.totalSubTotal || 0,
+    totalCommission: totals.totalCommission || 0,
+    totalShipping: totals.totalShipping || 0,
+    totalPayable: totals.totalPayable || 0,
+    totalDueAmount: totals.totalDueAmount || 0,
+    totalPaid: totals.totalPaid || 0,
+    pagination: {
+      total: totalCount,
+      page,
+      limit,
+      hasNextPage: skip + limit < totalCount,
+    },
+  });
 });
 
 // purchaseSummary
@@ -323,86 +300,40 @@ exports.purchaseSummary = asynchandeler(async (req, res) => {
 // buyReturn
 
 exports.getPurchaseBySupplier = asynchandeler(async (req, res) => {
-  const { supplierName, startDate, endDate } = req.query;
+  const { supplierName, startDate, endDate } = req.body || req.query;
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+  const skip = (page - 1) * limit;
 
   const match = {};
 
-  // 🔍 Exact supplier name match (case-insensitive)
-  if (supplierName) {
-    match.supplierName = {
-      $regex: `^${supplierName}$`,
-      $options: "i", // case-insensitive exact match
-    };
+  if (supplierName && supplierName.trim() !== "") {
+    match.supplierName = { $regex: `^${supplierName}$`, $options: "i" };
   }
 
-  // 📅 Optional date range filter
   if (startDate && endDate) {
-    match.date = {
-      $gte: new Date(startDate),
-      $lte: new Date(endDate),
-    };
+    match.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
   }
 
-  const result = await byReturnModel.aggregate([
+  const rowPipeline = [
     { $match: match },
-
-    // 🔗 Lookup product & variant details
-    {
-      $lookup: {
-        from: "products",
-        localField: "product",
-        foreignField: "_id",
-        as: "productData",
-      },
-    },
-    {
-      $lookup: {
-        from: "variants",
-        localField: "variant",
-        foreignField: "_id",
-        as: "variantData",
-      },
-    },
-
-    // 🧮 Flatten arrays
-    {
-      $unwind: {
-        path: "$productData",
-        preserveNullAndEmptyArrays: true,
-      },
-    },
-    {
-      $unwind: {
-        path: "$variantData",
-        preserveNullAndEmptyArrays: true,
-      },
-    },
-
-    // 💰 Calculate dynamic retail price
+    { $lookup: { from: "products", localField: "product", foreignField: "_id", as: "productData" } },
+    { $lookup: { from: "variants", localField: "variant", foreignField: "_id", as: "variantData" } },
+    { $unwind: { path: "$productData", preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$variantData", preserveNullAndEmptyArrays: true } },
     {
       $addFields: {
-        retailPrice: {
-          $ifNull: ["$variantData.retailPrice", "$productData.retailPrice"],
-        },
+        retailPrice: { $ifNull: ["$variantData.retailPrice", "$productData.retailPrice"] },
         productName: "$productData.productTitle",
         variantName: "$variantData.variantName",
         color: "$variantData.color",
         size: "$variantData.size",
+        totalRetailPricePerItem: { $multiply: ["$quantity", { $ifNull: ["$variantData.retailPrice", "$productData.retailPrice"] }] },
       },
     },
-
-    // // 🧾 Calculate total retail price per item
-    {
-      $addFields: {
-        totalRetailPricePerItem: { $multiply: ["$quantity", "$retailPrice"] },
-      },
-    },
-
-    // 📦 Project final structure
     {
       $project: {
         _id: 1,
-        serialId: "$_id",
         supplierName: 1,
         productBarCode: 1,
         productName: 1,
@@ -415,51 +346,58 @@ exports.getPurchaseBySupplier = asynchandeler(async (req, res) => {
         date: 1,
       },
     },
+  ];
 
-    // 📊 Calculate total quantity & retail price
-    {
-      $group: {
-        _id: null,
-        purchases: { $push: "$$ROOT" },
-        totalQuantity: { $sum: "$quantity" },
-        totalRetailPrice: { $sum: "$totalRetailPricePerItem" },
+  const [totalResult, purchases] = await Promise.all([
+    byReturnModel.aggregate([
+      ...rowPipeline,
+      {
+        $group: {
+          _id: null,
+          totalQuantity: { $sum: "$quantity" },
+          totalRetailPrice: { $sum: "$totalRetailPricePerItem" },
+          total: { $sum: 1 },
+        },
       },
-    },
-    {
-      $project: {
-        _id: 0,
-        purchases: 1,
-        totalQuantity: 1,
-        totalRetailPrice: 1,
-      },
-    },
+    ]),
+    byReturnModel.aggregate([
+      ...rowPipeline,
+      { $sort: { date: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+    ]),
   ]);
 
-  if (!result.length) {
-    throw new customError(
-      "No data found for this supplier",
-      statusCodes.NOT_FOUND,
-    );
+  if (!purchases.length && page === 1) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No data found for this supplier", {
+      purchases: [],
+      totalQuantity: 0,
+      totalRetailPrice: 0,
+      pagination: { total: 0, page, limit, hasNextPage: false },
+    });
   }
 
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Supplier purchase data fetched successfully",
-    result[0],
-  );
+  const totals = totalResult[0] || { totalQuantity: 0, totalRetailPrice: 0, total: 0 };
+
+  apiResponse.sendSuccess(res, statusCodes.OK, "Supplier purchase data fetched successfully", {
+    purchases,
+    totalQuantity: totals.totalQuantity,
+    totalRetailPrice: totals.totalRetailPrice,
+    pagination: {
+      total: totals.total,
+      page,
+      limit,
+      hasNextPage: skip + limit < totals.total,
+    },
+  });
 });
 
 // get supplier name wise summary
 exports.getSupplierSummary = asynchandeler(async (req, res) => {
-  const result = await purchaseModel
-    .find({
-      supplierName: { $ne: "" },
-    })
-    .select("supplierName");
-  if (!result.length) {
-    return apiResponse.sendSuccess(res, statusCodes.OK, "No data found", []);
-  }
+  const names = await purchaseModel.distinct("supplierName", {
+    supplierName: { $ne: "" },
+  });
+  const result = names.sort().map((name) => ({ supplierName: name }));
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -470,148 +408,134 @@ exports.getSupplierSummary = asynchandeler(async (req, res) => {
 
 // geta all order and calculate tatoal product price or varinat producxt price or deliveryCharge price
 exports.getInvoiceReport = asynchandeler(async (req, res) => {
-  const { startDate, endDate } = req.query;
+  const startDate = req.query.startDate || req.body?.startDate;
+  const endDate = req.query.endDate || req.body?.endDate;
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+  const skip = (page - 1) * limit;
 
-  // 🔍 Date Filter
-  const filter = {};
+  const match = {};
   if (startDate && endDate) {
-    filter.createdAt = {
-      $gte: new Date(startDate),
-      $lte: new Date(endDate),
-    };
+    match.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
   }
 
-  // 🧾 Fetch Orders
-  const orders = await orderModel
-    .find(filter)
-    .populate("followUp", "name") // Follow up by user name
-    .populate("deliveryCharge", "amount")
-    .sort({ createdAt: 1 });
-
-  if (!orders.length) {
-    return apiResponse.sendSuccess(
-      res,
-      statusCodes.OK,
-      "No invoice data found",
-      [],
-    );
-  }
-
-  // 🧮 Summary calculation
-  const summary = {
-    totalOrders: 0,
-    totalOrderValue: 0,
-    totalDiscountQty: 0,
-    totalDiscountValue: 0,
-    totalDeliveryValue: 0,
-    totalCourierQty: 0,
-    totalCourierValue: 0,
-    totalPendingQty: 0,
-    totalPendingValue: 0,
-    totalConfirmedQty: 0,
-    totalConfirmedValue: 0,
-    totalHoldQty: 0,
-    totalHoldValue: 0,
-    totalPackagingQty: 0,
-    totalPackagingValue: 0,
-    totalDeliveredQty: 0,
-    totalDeliveredValue: 0,
-    totalCancelledQty: 0,
-    totalCancelledValue: 0,
-  };
-
-  const orderList = orders.map((order) => {
-    // === Customer Info ===
-    const customerInfo = {
-      name: order.shippingInfo.fullName,
-      phone: order.shippingInfo.phone,
-      address: order.shippingInfo.address,
-    };
-
-    // === Product Info ===
-    const productInfo = order.items.map((item) => ({
-      productName: item.name,
-      color: item.color,
-      size: item.size,
-      sku: item.sku || null, // থাকলে SKU
-      quantity: item.quantity,
-      retailPrice: item.retailPrice,
-      totalPrice: item.totalPrice,
-    }));
-
-    // === Price Info ===
-    const total = order.items.reduce((sum, i) => sum + (i.retailPrice || 0), 0);
-    const discount = order.discountAmount || 0;
-    const subTotal = order.finalAmount || 0;
-
-    // === Delivery Info ===
-    const delivery = order.deliveryCharge?.amount || 0;
-
-    // === Follow Up ===
-    const followUpBy = order.followUp?.name || "-";
-
-    // === Update summary ===
-    summary.totalOrders += 1;
-    summary.totalOrderValue += subTotal;
-    summary.totalDiscountQty += order.items.length;
-    summary.totalDiscountValue += discount;
-    summary.totalDeliveryValue += delivery;
-
-    // === Status Based Counts ===
-    const addTo = (qtyField, valueField, qty, val) => {
-      summary[qtyField] += qty;
-      summary[valueField] += val;
-    };
-
-    switch (order.orderStatus) {
-      case "Pending":
-        addTo("totalPendingQty", "totalPendingValue", 1, subTotal);
-        break;
-      case "Hold":
-        addTo("totalHoldQty", "totalHoldValue", 1, subTotal);
-        break;
-      case "Confirmed":
-        addTo("totalConfirmedQty", "totalConfirmedValue", 1, subTotal);
-        break;
-      case "Packaging":
-        addTo("totalPackagingQty", "totalPackagingValue", 1, subTotal);
-        break;
-      case "Courier":
-        addTo("totalCourierQty", "totalCourierValue", 1, subTotal);
-        break;
-      case "Delivered":
-        addTo("totalDeliveredQty", "totalDeliveredValue", 1, subTotal);
-        break;
-      case "Cancelled":
-        addTo("totalCancelledQty", "totalCancelledValue", 1, subTotal);
-        break;
-    }
-
-    // === Final Order Info ===
-    return {
-      orderId: order.invoiceId,
-      date: order.createdAt,
-      customerInfo,
-      productInfo,
-      total,
-      discount,
-      subTotal,
-      delivery,
-      followUpBy,
-      status: order.orderStatus,
-    };
-  });
-
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Invoice report fetched successfully",
+  const basePipeline = [
+    { $match: match },
     {
-      reportPeriod: { startDate, endDate },
-      summary,
-      orderList,
+      $lookup: {
+        from: "users",
+        localField: "followUp",
+        foreignField: "_id",
+        as: "followUpData",
+        pipeline: [{ $project: { name: 1 } }],
+      },
     },
-  );
+    {
+      $lookup: {
+        from: "deliveries",
+        localField: "deliveryCharge",
+        foreignField: "_id",
+        as: "deliveryData",
+        pipeline: [{ $project: { amount: 1 } }],
+      },
+    },
+    {
+      $addFields: {
+        followUpName: { $ifNull: [{ $arrayElemAt: ["$followUpData.name", 0] }, "-"] },
+        deliveryAmount: { $ifNull: [{ $arrayElemAt: ["$deliveryData.amount", 0] }, 0] },
+      },
+    },
+  ];
+
+  const [summaryResult, totalResult, orders] = await Promise.all([
+    orderModel.aggregate([
+      ...basePipeline,
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          totalOrderValue: { $sum: "$finalAmount" },
+          totalDiscountValue: { $sum: "$discountAmount" },
+          totalDeliveryValue: { $sum: "$deliveryAmount" },
+          totalPendingQty: { $sum: { $cond: [{ $eq: ["$orderStatus", "Pending"] }, 1, 0] } },
+          totalPendingValue: { $sum: { $cond: [{ $eq: ["$orderStatus", "Pending"] }, "$finalAmount", 0] } },
+          totalHoldQty: { $sum: { $cond: [{ $eq: ["$orderStatus", "Hold"] }, 1, 0] } },
+          totalHoldValue: { $sum: { $cond: [{ $eq: ["$orderStatus", "Hold"] }, "$finalAmount", 0] } },
+          totalConfirmedQty: { $sum: { $cond: [{ $eq: ["$orderStatus", "Confirmed"] }, 1, 0] } },
+          totalConfirmedValue: { $sum: { $cond: [{ $eq: ["$orderStatus", "Confirmed"] }, "$finalAmount", 0] } },
+          totalPackagingQty: { $sum: { $cond: [{ $eq: ["$orderStatus", "Packaging"] }, 1, 0] } },
+          totalPackagingValue: { $sum: { $cond: [{ $eq: ["$orderStatus", "Packaging"] }, "$finalAmount", 0] } },
+          totalCourierQty: { $sum: { $cond: [{ $eq: ["$orderStatus", "Courier"] }, 1, 0] } },
+          totalCourierValue: { $sum: { $cond: [{ $eq: ["$orderStatus", "Courier"] }, "$finalAmount", 0] } },
+          totalDeliveredQty: { $sum: { $cond: [{ $eq: ["$orderStatus", "Delivered"] }, 1, 0] } },
+          totalDeliveredValue: { $sum: { $cond: [{ $eq: ["$orderStatus", "Delivered"] }, "$finalAmount", 0] } },
+          totalCancelledQty: { $sum: { $cond: [{ $eq: ["$orderStatus", "Cancelled"] }, 1, 0] } },
+          totalCancelledValue: { $sum: { $cond: [{ $eq: ["$orderStatus", "Cancelled"] }, "$finalAmount", 0] } },
+        },
+      },
+    ]),
+    orderModel.aggregate([...basePipeline, { $count: "total" }]),
+    orderModel.aggregate([
+      ...basePipeline,
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $project: {
+          orderId: "$invoiceId",
+          date: "$createdAt",
+          customerInfo: {
+            name: "$shippingInfo.fullName",
+            phone: "$shippingInfo.phone",
+            address: "$shippingInfo.address",
+          },
+          productInfo: {
+            $map: {
+              input: "$items",
+              as: "item",
+              in: {
+                productName: "$$item.name",
+                color: "$$item.color",
+                size: "$$item.size",
+                sku: "$$item.sku",
+                quantity: "$$item.quantity",
+                retailPrice: "$$item.retailPrice",
+                totalPrice: "$$item.totalPrice",
+              },
+            },
+          },
+          total: { $sum: "$items.retailPrice" },
+          discount: { $ifNull: ["$discountAmount", 0] },
+          subTotal: { $ifNull: ["$finalAmount", 0] },
+          delivery: "$deliveryAmount",
+          followUpBy: "$followUpName",
+          status: "$orderStatus",
+        },
+      },
+    ]),
+  ]);
+
+  const summary = summaryResult[0] || {
+    totalOrders: 0, totalOrderValue: 0, totalDiscountValue: 0, totalDeliveryValue: 0,
+    totalPendingQty: 0, totalPendingValue: 0, totalHoldQty: 0, totalHoldValue: 0,
+    totalConfirmedQty: 0, totalConfirmedValue: 0, totalPackagingQty: 0, totalPackagingValue: 0,
+    totalCourierQty: 0, totalCourierValue: 0, totalDeliveredQty: 0, totalDeliveredValue: 0,
+    totalCancelledQty: 0, totalCancelledValue: 0,
+  };
+  delete summary._id;
+  const totalCount = totalResult[0]?.total || 0;
+
+  apiResponse.sendSuccess(res, statusCodes.OK, "Invoice report fetched successfully", {
+    reportPeriod: { startDate, endDate },
+    summary,
+    orderList: orders,
+    pagination: {
+      total: totalCount,
+      page,
+      limit,
+      hasNextPage: skip + limit < totalCount,
+    },
+  });
 });
 
 // get all order info
@@ -757,54 +681,88 @@ exports.getCourierSendInformation = asynchandeler(async (req, res) => {
   );
 });
 exports.overallStock = asynchandeler(async (req, res) => {
-  const { startDate, endDate } = req.query; // or req.body if POST
+  const { startDate, endDate } = req.query;
 
-  const filter = {};
-
-  // ✅ Apply date filter if provided
+  const match = {};
   if (startDate && endDate) {
-    filter.createdAt = {
-      $gte: new Date(startDate),
-      $lte: new Date(endDate),
-    };
+    match.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
   }
 
-  const stockAdjusts = await StockAdjustModel.find(filter)
-    .populate({
-      path: "productId",
-      populate: {
-        path: "variant category subcategory brand discount",
+  const excludeFields = {
+    description: 0, warrantyInformation: 0, shippingInformation: 0,
+    retailProfitMarginbyPercentance: 0, retailProfitMarginbyAmount: 0,
+    wholesaleProfitMarginPercentage: 0, wholesaleProfitMarginAmount: 0,
+    reviews: 0, updatedAt: 0,
+  };
+
+  const stockAdjusts = await StockAdjustModel.aggregate([
+    { $match: match },
+    { $sort: { createdAt: -1 } },
+    {
+      $lookup: {
+        from: "products",
+        localField: "productId",
+        foreignField: "_id",
+        as: "productId",
+        pipeline: [
+          { $project: excludeFields },
+          { $lookup: { from: "categories", localField: "category", foreignField: "_id", as: "category" } },
+          { $lookup: { from: "subcategories", localField: "subcategory", foreignField: "_id", as: "subcategory" } },
+          { $lookup: { from: "brands", localField: "brand", foreignField: "_id", as: "brand" } },
+          { $lookup: { from: "discounts", localField: "discount", foreignField: "_id", as: "discount" } },
+          { $unwind: { path: "$category", preserveNullAndEmptyArrays: true } },
+          { $unwind: { path: "$subcategory", preserveNullAndEmptyArrays: true } },
+          { $unwind: { path: "$brand", preserveNullAndEmptyArrays: true } },
+          { $unwind: { path: "$discount", preserveNullAndEmptyArrays: true } },
+        ],
       },
-      select:
-        "-description  -warrantyInformation -shippingInformation -retailProfitMarginbyPercentance -retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt",
-    })
-    .populate({
-      path: "variantId",
-      populate: {
-        path: "product",
-        populate: "category subcategory brand discount",
-        select:
-          "-description  -warrantyInformation -shippingInformation -retailProfitMarginbyPercentance -retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt",
+    },
+    { $unwind: { path: "$productId", preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: "variants",
+        localField: "variantId",
+        foreignField: "_id",
+        as: "variantId",
+        pipeline: [
+          {
+            $project: {
+              retailProfitMarginbyAmount: 0, wholesaleProfitMarginPercentage: 0,
+              wholesaleProfitMarginAmount: 0, reviews: 0, updatedAt: 0,
+              retailProfitMarginbyPercentance: 0,
+            },
+          },
+          {
+            $lookup: {
+              from: "products",
+              localField: "product",
+              foreignField: "_id",
+              as: "product",
+              pipeline: [
+                { $project: excludeFields },
+                { $lookup: { from: "categories", localField: "category", foreignField: "_id", as: "category" } },
+                { $lookup: { from: "subcategories", localField: "subcategory", foreignField: "_id", as: "subcategory" } },
+                { $lookup: { from: "brands", localField: "brand", foreignField: "_id", as: "brand" } },
+                { $lookup: { from: "discounts", localField: "discount", foreignField: "_id", as: "discount" } },
+                { $unwind: { path: "$category", preserveNullAndEmptyArrays: true } },
+                { $unwind: { path: "$subcategory", preserveNullAndEmptyArrays: true } },
+                { $unwind: { path: "$brand", preserveNullAndEmptyArrays: true } },
+                { $unwind: { path: "$discount", preserveNullAndEmptyArrays: true } },
+              ],
+            },
+          },
+          { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+        ],
       },
-      select:
-        "-retailProfitMarginbyAmount -wholesaleProfitMarginPercentage -wholesaleProfitMarginAmount -reviews -updatedAt -retailProfitMarginbyPercentance",
-    })
-    .sort({ createdAt: -1 })
-    .lean();
+    },
+    { $unwind: { path: "$variantId", preserveNullAndEmptyArrays: true } },
+  ]);
 
   if (!stockAdjusts.length) {
-    throw new customError(
-      "No stock adjustments found for given filter",
-      statusCodes.NOT_FOUND,
-    );
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No stock adjustments found", []);
   }
 
-  return apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Stock adjustments retrieved successfully",
-    stockAdjusts,
-  );
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Stock adjustments retrieved successfully", stockAdjusts);
 });
 
 // get account all
@@ -923,7 +881,7 @@ exports.getTransactionReport = asynchandeler(async (req, res) => {
   //  Send Response
   apiResponse.sendSuccess(
     res,
-    STATUSCODES.OK,
+    statusCodes.OK,
     "Transaction report fetched successfully",
     {
       filters: { startDate, endDate, transactionCategory },
@@ -1041,59 +999,81 @@ exports.getTransactionSummaryByDate = asynchandeler(async (req, res) => {
 // getCashLedgerReport
 exports.getCashLedgerReport = asynchandeler(async (req, res) => {
   const { startDate, endDate } = req.body;
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+  const skip = (page - 1) * limit;
 
   const match = {};
 
-  //  Filter by date range (if provided)
   if (startDate && endDate) {
-    match.date = {
-      $gte: new Date(startDate),
-      $lte: new Date(endDate),
-    };
+    match.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
   }
 
-  //  Fetch all transactions within range
-  const report = await createTransactionModel
-    .find(match)
-    .populate("transactionCategory")
-    .populate("account")
-    .sort({ date: -1 });
+  const basePipeline = [
+    { $match: match },
+    {
+      $lookup: {
+        from: "transitioncategories",
+        localField: "transactionCategory",
+        foreignField: "_id",
+        as: "transactionCategory",
+        pipeline: [{ $project: { name: 1 } }],
+      },
+    },
+    { $unwind: { path: "$transactionCategory", preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: "accounts",
+        localField: "account",
+        foreignField: "_id",
+        as: "account",
+        pipeline: [{ $project: { name: 1 } }],
+      },
+    },
+    { $unwind: { path: "$account", preserveNullAndEmptyArrays: true } },
+  ];
 
-  //  Calculate totals
-  let totalCashReceived = 0;
-  let totalCashPayment = 0;
+  const [summaryResult, totalResult, transactions] = await Promise.all([
+    createTransactionModel.aggregate([
+      ...basePipeline,
+      {
+        $group: {
+          _id: null,
+          totalCashReceived: { $sum: { $cond: [{ $eq: ["$transactionType", "cash recived"] }, "$amount", 0] } },
+          totalCashPayment: { $sum: { $cond: [{ $eq: ["$transactionType", "cash payment"] }, "$amount", 0] } },
+        },
+      },
+    ]),
+    createTransactionModel.aggregate([...basePipeline, { $count: "total" }]),
+    createTransactionModel.aggregate([
+      ...basePipeline,
+      { $sort: { date: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $addFields: {
+          transactionId: { $toString: "$_id" },
+        },
+      },
+    ]),
+  ]);
 
-  report.forEach((transaction) => {
-    if (transaction.transactionType === "cash recived") {
-      totalCashReceived += transaction.amount;
-    } else if (transaction.transactionType === "cash payment") {
-      totalCashPayment += transaction.amount;
-    }
-  });
+  const totals = summaryResult[0] || { totalCashReceived: 0, totalCashPayment: 0 };
+  const totalCount = totalResult[0]?.total || 0;
+  const balance = totals.totalCashReceived - totals.totalCashPayment;
 
-  //  Add serial numbers (TRXID-00001, TRXID-00002 ...)
-  const transactionsWithSerial = report.map((transaction, index) => ({
-    transactionId: `TRXID-${String(index + 1).padStart(6, "0")}`, // -> TRXID-000001
-    ...transaction.toObject(),
-  }));
-
-  // Calculate balance
-  const balance = totalCashReceived - totalCashPayment;
-
-  //  Final response
-  const result = {
-    totalCashReceived,
-    totalCashPayment,
+  apiResponse.sendSuccess(res, statusCodes.OK, "Cash ledger report fetched successfully", {
+    totalCashReceived: totals.totalCashReceived,
+    totalCashPayment: totals.totalCashPayment,
     balance,
-    transactions: transactionsWithSerial,
-  };
-
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "Cash ledger report fetched successfully",
-    result,
-  );
+    transactions,
+    pagination: {
+      total: totalCount,
+      page,
+      limit,
+      hasNextPage: skip + limit < totalCount,
+    },
+  });
 });
 
 // account wise transaction summary

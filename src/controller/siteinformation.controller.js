@@ -2,99 +2,106 @@ const { customError } = require("../lib/CustomError");
 const { asynchandeler } = require("../lib/asyncHandeler");
 const { apiResponse } = require("../utils/apiResponse");
 const SiteInformation = require("../models/siteInformation.model");
-const {
-  validateSiteInformation,
-} = require("../validation/siteinformation.validation");
-
-const {
-  cloudinaryFileUpload,
-  deleteCloudinaryFile,
-} = require("../helpers/cloudinary");
+const { validateSiteInformation } = require("../validation/siteinformation.validation");
+const { deleteCloudinaryFile } = require("../helpers/cloudinary");
 const { statusCodes } = require("../constant/constant");
+const { getCache, setCache, bumpNsVersion, buildCacheKey } = require("@/utils/cache.util");
+const { imageQueue } = require("@/queues/image.queue");
 
-// create siteinformation
-exports.createSiteInformation = asynchandeler(async (req, res, next) => {
-  const value = await validateSiteInformation(req, res, next);
+const NS = "siteinformation";
+const CACHE_TTL = 60 * 60;
 
-  //  Create doc first with image = null
-  const siteInformation = await SiteInformation.create({
-    ...value,
-    image: null,
+// @desc  Create site information
+exports.createSiteInformation = asynchandeler(async (req, res) => {
+  const { image, ...fields } = await validateSiteInformation(req);
+
+  const site = await SiteInformation.create({
+    ...fields,
+    image: {
+      status: "pending",
+      localPath: image.path,
+    },
   });
 
-  if (!siteInformation) {
-    throw new customError(
-      "SiteInformation not created",
-      statusCodes.BAD_REQUEST,
+  await imageQueue.add("create-siteinformation-image", {
+    modelName: "siteinformation",
+    documentId: site._id,
+    localPath: image.path,
+  });
+
+  await bumpNsVersion(NS);
+
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    "Site information created successfully",
+    { storeName: site.storeName, slug: site.slug },
+  );
+});
+
+// @desc  Get all site information
+exports.getAllSiteInformation = asynchandeler(async (req, res) => {
+  const cacheKey = await buildCacheKey(NS, "all");
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Site information fetched successfully", cached);
+  }
+
+  const sites = await SiteInformation.find().sort({ createdAt: -1 }).lean();
+
+  if (!sites.length) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "Site information not found", []);
+  }
+
+  await setCache(cacheKey, sites, CACHE_TTL);
+
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Site information fetched successfully",
+    sites,
+  );
+});
+
+// @desc  Get single site information by slug
+exports.getSingleSiteInformation = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+  const cacheKey = await buildCacheKey(NS, `slug:${slug}`);
+
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Site information fetched successfully",
+      { site: cached, fromCache: true },
     );
   }
 
-  //  Send response immediately
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.CREATED,
-    "SiteInformation is being processed in background...",
-  );
-
-  //  Background Upload + Update
-  (async () => {
-    try {
-      const { optimizeUrl } = await cloudinaryFileUpload(value.image.path);
-
-      const updatedInfo = await SiteInformation.findByIdAndUpdate(
-        siteInformation._id,
-        { image: optimizeUrl },
-        { new: true },
-      );
-
-      console.log(" Background SiteInformation Update Completed:", updatedInfo);
-    } catch (error) {
-      console.error(
-        "❌ Background SiteInformation image upload failed:",
-        error.message,
-      );
-    }
-  })();
-});
-
-// get all siteinformation
-exports.getAllSiteInformation = asynchandeler(async (req, res) => {
-  const siteInformation = await SiteInformation.find();
-  if (!siteInformation.length) {
-    throw new customError("SiteInformation not found", statusCodes.NOT_FOUND);
-  }
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "SiteInformation fetched successfully",
-    siteInformation,
-  );
-});
-
-// get single siteinformation using slug
-exports.getSingleSiteInformation = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-  const siteInformation = await SiteInformation.findOne({ slug: slug });
-  if (!siteInformation)
-    throw new customError("SiteInformation not found", statusCodes.NOT_FOUND);
-  apiResponse.sendSuccess(
-    res,
-    statusCodes.OK,
-    "SiteInformation fetched successfully",
-    siteInformation,
-  );
-});
-
-// update sideinformation when user upload image then remove old image and upload new image
-exports.updateSiteInformationWithImage = asynchandeler(async (req, res) => {
-  const { slug } = req.params;
-
-  const siteInformation = await SiteInformation.findOne({ slug });
-  if (!siteInformation) {
-    throw new customError("SiteInformation not found", statusCodes.NOT_FOUND);
+  const site = await SiteInformation.findOne({ slug }).lean();
+  if (!site) {
+    throw new customError("Site information not found", statusCodes.NOT_FOUND);
   }
 
-  //  Update other fields immediately
+  await setCache(cacheKey, site, CACHE_TTL);
+
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Site information fetched successfully",
+    { site, fromCache: false },
+  );
+});
+
+// @desc  Update site information by slug
+exports.updateSiteInformation = asynchandeler(async (req, res) => {
+  const { slug } = req.params;
+
+  const site = await SiteInformation.findOne({ slug });
+  if (!site) {
+    throw new customError("Site information not found", statusCodes.NOT_FOUND);
+  }
+
   const updatableFields = [
     "storeName",
     "propiterSlogan",
@@ -106,82 +113,68 @@ exports.updateSiteInformationWithImage = asynchandeler(async (req, res) => {
     "facebookLink",
     "youtubeLink",
     "instagramLink",
+    "whatsappLink",
+    "twitterLink",
+    "messengerLink",
+    "linkedinLink",
+    "googleMapLink",
+    "qrCode",
   ];
 
   updatableFields.forEach((field) => {
-    if (req.body[field]) siteInformation[field] = req.body[field];
+    if (req.body[field] !== undefined) site[field] = req.body[field];
   });
 
-  await siteInformation.save();
+  if (req.file) {
+    const oldPublicId = site.image?.publicId || null;
+    site.image.status = "pending";
+    site.image.localPath = req.file.path;
+    site.image.tries = 0;
+    site.image.lastError = "";
 
-  apiResponse.sendSuccess(
+    await imageQueue.add("update-siteinformation-image", {
+      modelName: "siteinformation",
+      documentId: site._id,
+      localPath: req.file.path,
+      oldPublicId,
+    });
+  }
+
+  const updated = await site.save();
+  await bumpNsVersion(NS);
+
+  return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
-    "SiteInformation update started",
-    siteInformation,
+    "Site information updated successfully",
+    updated,
   );
-
-  //  Background image upload/delete
-  if (req.file) {
-    (async () => {
-      try {
-        if (siteInformation.image) {
-          const imageUrl = siteInformation.image;
-          const parts = imageUrl.split("/");
-          const fileName = parts[parts.length - 1];
-          const publicId = fileName.split(".")[0].split("?")[0];
-
-          await deleteCloudinaryFile(publicId);
-          console.log(" Old image deleted:", publicId);
-        }
-
-        const { optimizeUrl } = await cloudinaryFileUpload(req.file.path);
-        siteInformation.image = optimizeUrl;
-        await siteInformation.save();
-        console.log(" New image uploaded:", optimizeUrl);
-      } catch (error) {
-        console.error("❌ Background image update failed:", error.message);
-      }
-    })();
-  }
 });
 
+// @desc  Delete site information by slug
 exports.deleteSiteInformation = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
-  // Find the existing SiteInformation
-  const siteInformation = await SiteInformation.findOne({ slug });
-  if (!siteInformation) {
-    throw new customError("SiteInformation not found", statusCodes.NOT_FOUND);
+  const site = await SiteInformation.findOneAndDelete({ slug });
+  if (!site) {
+    throw new customError("Site information not found", statusCodes.NOT_FOUND);
   }
 
-  // Send immediate response to client
-  apiResponse.sendSuccess(
+  await bumpNsVersion(NS);
+
+  const publicId = site.image?.publicId;
+  if (publicId) {
+    setImmediate(() =>
+      deleteCloudinaryFile(publicId).catch((e) =>
+        console.error("[Cloudinary] SiteInformation image delete failed:", e.message),
+      ),
+    );
+  }
+
+  return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
-    "SiteInformation deletion started",
-    siteInformation,
+    "Site information deleted successfully",
+    { slug },
   );
-
-  // Background delete
-  (async () => {
-    try {
-      // Delete image from Cloudinary if exists
-      if (siteInformation.image) {
-        const imageUrl = siteInformation.image;
-        const parts = imageUrl.split("/");
-        const fileName = parts[parts.length - 1];
-        const publicId = fileName.split(".")[0].split("?")[0];
-
-        await deleteCloudinaryFile(publicId);
-        console.log(" Cloudinary image deleted:", publicId);
-      }
-
-      // Delete the document from DB
-      await SiteInformation.deleteOne({ slug });
-      console.log(" SiteInformation document deleted:", slug);
-    } catch (error) {
-      console.error("❌ Background deletion failed:", error.message);
-    }
-  })();
 });
