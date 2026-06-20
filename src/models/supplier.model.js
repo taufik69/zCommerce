@@ -4,14 +4,13 @@ const { statusCodes } = require("../constant/constant");
 
 const supplierSchema = new mongoose.Schema(
   {
-    // Supplier ID * (you said: mobile # as ID)
+    // Supplier ID — auto-set from mobile number on create
     supplierId: {
       type: String,
-      required: [true, "Supplier ID is required"],
       trim: true,
       unique: true,
+      sparse: true,
       index: true,
-      match: [/^(?:\+?88)?01[3-9]\d{8}$/, "Invalid mobile number"],
     },
 
     // Supplier Name *
@@ -39,11 +38,12 @@ const supplierSchema = new mongoose.Schema(
       default: "",
     },
 
-    // Mobile (optional, but recommended)
+    // Mobile *
     mobile: {
       type: String,
+      required: [true, "Mobile number is required"],
       trim: true,
-      default: "",
+      match: [/^(?:\+?88)?01[3-9]\d{8}$/, "Invalid Bangladeshi mobile number"],
     },
 
     // Supplier Address (optional)
@@ -79,23 +79,26 @@ const supplierSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Ensure supplierId unique (DB level)
-supplierSchema.index({ supplierId: 1 }, { unique: true });
-
-// pre-save duplicate check (like your Purchase model)
+// Auto-set supplierId from mobile on first save
 supplierSchema.pre("save", async function (next) {
   try {
-    const existing = await this.constructor.findOne({
-      supplierId: this.supplierId,
-    });
+    if (this.isNew && this.mobile) {
+      this.supplierId = this.mobile;
+    }
 
-    if (existing && existing._id.toString() !== this._id.toString()) {
-      return next(
-        new customError(
-          `Supplier with supplierId ${this.supplierId} already exists.`,
-          statusCodes.BAD_REQUEST,
-        ),
-      );
+    if (this.supplierId) {
+      const existing = await this.constructor.findOne({
+        supplierId: this.supplierId,
+        _id: { $ne: this._id },
+      });
+      if (existing) {
+        return next(
+          new customError(
+            `Supplier with mobile ${this.supplierId} already exists.`,
+            statusCodes.BAD_REQUEST,
+          ),
+        );
+      }
     }
 
     next();
@@ -110,12 +113,11 @@ const SupplierModel =
 //
 const supplierDuePaymentSchema = new mongoose.Schema(
   {
-    // Transaction ID (auto generate)
+    // Transaction ID — auto-generated in pre-save hook, not required at input
     transactionId: {
       type: String,
       trim: true,
       unique: true,
-      required: [true, "Transaction ID is required"],
     },
 
     // Date
@@ -125,12 +127,12 @@ const supplierDuePaymentSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Supplier info
+    // Supplier info — stores the phone-number-based supplierId, not an ObjectId
     supplierId: {
-      type: mongoose.Types.ObjectId,
+      type: String,
       required: [true, "Supplier ID is required"],
       index: true,
-      ref: "Supplier ",
+      ref: "Supplier",
     },
 
     // Paid Amount *

@@ -50,4 +50,13 @@ _.route("/soft-delete-supplier-due-payment/:supplierId").delete(
 _.route("/delete-supplier-due-payment/:supplierId").delete(
   supplierController.deleteSupplierDuePayment,
 );
+
+_.route("/supplier-due-payment/:id/activate").put(
+  supplierController.activateSupplierDuePayment,
+);
+
+_.route("/supplier-due-payment/:id/deactivate").put(
+  supplierController.deactivateSupplierDuePayment,
+);
+
 module.exports = _;

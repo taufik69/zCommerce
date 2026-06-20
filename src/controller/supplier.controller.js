@@ -16,10 +16,12 @@ const { statusCodes } = require("../constant/constant");
 
 // @desc create a new supplier
 exports.createSupplier = asynchandeler(async (req, res) => {
-  const supplier = new SupplierModel(req.body);
+  const { mobile } = req.body;
+  const supplier = new SupplierModel({
+    ...req.body,
+    supplierId: mobile,
+  });
   await supplier.save();
-  if (!supplier)
-    apiResponse.sendError(res, statusCodes.NOT_FOUND, "Supplier not found");
   apiResponse.sendSuccess(
     res,
     statusCodes.CREATED,
@@ -164,19 +166,21 @@ exports.createSupplierDuePayment = asynchandeler(async (req, res) => {
     date,
   } = req.body;
 
-  const totalReduce = Number(paidAmount) + Number(lessAmount);
+  const paid = Number(paidAmount);
+  const less = Number(lessAmount);
+  const totalReduce = paid + less;
 
-  if (totalReduce <= 0) {
+  if (paid <= 0) {
     return apiResponse.sendError(
       res,
       statusCodes.BAD_REQUEST,
-      "Paid amount or less amount must be greater than 0",
+      "Paid amount must be greater than 0",
     );
   }
 
-  // 1️Find supplier
+  // Find supplier by supplierId (phone number)
   const supplier = await SupplierModel.findOne({
-    _id: supplierId,
+    supplierId,
     isActive: true,
   });
   if (!supplier) {
@@ -193,49 +197,32 @@ exports.createSupplierDuePayment = asynchandeler(async (req, res) => {
     return apiResponse.sendError(
       res,
       statusCodes.BAD_REQUEST,
-      `Payment exceeds due. Current due: ${currentDue}`,
+      `Payment of ৳${totalReduce} exceeds current due of ৳${currentDue}`,
     );
   }
 
-  //  Update supplier due
+  // Deduct from supplier opening dues
   supplier.openingDues = currentDue - totalReduce;
   await supplier.save();
 
-  //  Find existing payment doc (ONE per supplier)
-  let paymentDoc = await SupplierDuePayment.findOne({
+  // Create a new payment record for every transaction
+  const paymentDoc = new SupplierDuePayment({
     supplierId,
-    isActive: true,
+    date: date || new Date(),
+    paidAmount: paid,
+    lessAmount: less,
+    paymentMode,
+    remarks: remarks || "",
+    remainingDue: supplier.openingDues,
   });
-
-  if (paymentDoc) {
-    // UPDATE existing
-    paymentDoc.paidAmount += Number(paidAmount);
-    paymentDoc.lessAmount += Number(lessAmount);
-    paymentDoc.remainingDue = supplier.openingDues;
-    paymentDoc.paymentMode = paymentMode;
-    paymentDoc.remarks = remarks || paymentDoc.remarks;
-    paymentDoc.date = date || new Date();
-
-    await paymentDoc.save();
-  } else {
-    //  CREATE first time only
-    paymentDoc = await SupplierDuePayment.create({
-      supplierId,
-      date: date || new Date(),
-      paidAmount,
-      lessAmount,
-      paymentMode,
-      remarks,
-      remainingDue: supplier.openingDues,
-    });
-  }
+  await paymentDoc.save();
 
   apiResponse.sendSuccess(
     res,
-    statusCodes.OK,
-    "Supplier due payment updated successfully",
+    statusCodes.CREATED,
+    "Supplier payment recorded successfully",
     {
-      ...supplierDTO(supplier),
+      supplier: supplierDTO(supplier),
       payment: supplierDuePaymentDTO(paymentDoc),
     },
   );
@@ -258,7 +245,7 @@ exports.getAllSupplierDuePayment = asynchandeler(async (req, res) => {
       $lookup: {
         from: "suppliers",
         localField: "supplierId",
-        foreignField: "_id",
+        foreignField: "supplierId",
         as: "supplier",
       },
     },
@@ -458,7 +445,7 @@ exports.deleteSupplierDuePayment = asynchandeler(async (req, res) => {
     _id: req.params.supplierId,
   });
   if (!payment)
-    apiResponse.sendError(
+    return apiResponse.sendError(
       res,
       statusCodes.NOT_FOUND,
       "Supplier due payment not found",
@@ -469,4 +456,28 @@ exports.deleteSupplierDuePayment = asynchandeler(async (req, res) => {
     "Supplier due payment deleted successfully",
     supplierDuePaymentDTO(payment),
   );
+});
+
+// activate supplier due payment
+exports.activateSupplierDuePayment = asynchandeler(async (req, res) => {
+  const payment = await SupplierDuePayment.findByIdAndUpdate(
+    req.params.id,
+    { isActive: true, deletedAt: null },
+    { new: true },
+  );
+  if (!payment)
+    return apiResponse.sendError(res, statusCodes.NOT_FOUND, "Payment not found");
+  apiResponse.sendSuccess(res, statusCodes.OK, "Payment activated successfully", supplierDuePaymentDTO(payment));
+});
+
+// deactivate supplier due payment
+exports.deactivateSupplierDuePayment = asynchandeler(async (req, res) => {
+  const payment = await SupplierDuePayment.findByIdAndUpdate(
+    req.params.id,
+    { isActive: false, deletedAt: Date.now() },
+    { new: true },
+  );
+  if (!payment)
+    return apiResponse.sendError(res, statusCodes.NOT_FOUND, "Payment not found");
+  apiResponse.sendSuccess(res, statusCodes.OK, "Payment deactivated successfully", supplierDuePaymentDTO(payment));
 });

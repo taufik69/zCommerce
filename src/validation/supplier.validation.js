@@ -7,12 +7,6 @@ const bdMobileRegex = /^(?:\+?88)?01[3-9]\d{8}$/;
  * CREATE SUPPLIER
  */
 exports.createSupplierSchema = Joi.object({
-  supplierId: Joi.string().trim().pattern(bdMobileRegex).required().messages({
-    "string.pattern.base":
-      "Supplier ID must be a valid Bangladeshi mobile number",
-    "any.required": "Supplier ID is required",
-  }),
-
   supplierName: Joi.string().trim().min(2).max(120).required().messages({
     "string.base": "Supplier Name must be a string",
     "string.min": "Supplier Name must be at least 2 characters",
@@ -24,14 +18,10 @@ exports.createSupplierSchema = Joi.object({
 
   contactPersonDesignation: Joi.string().trim().max(80).allow("").optional(),
 
-  mobile: Joi.string()
-    .trim()
-    .pattern(bdMobileRegex)
-    .allow("")
-    .optional()
-    .messages({
-      "string.pattern.base": "Mobile must be a valid Bangladeshi mobile number",
-    }),
+  mobile: Joi.string().trim().pattern(bdMobileRegex).required().messages({
+    "string.pattern.base": "Mobile must be a valid Bangladeshi mobile number",
+    "any.required": "Mobile number is required",
+  }),
 
   supplierAddress: Joi.string().trim().max(300).allow("").optional(),
 
@@ -50,8 +40,6 @@ exports.createSupplierSchema = Joi.object({
  * UPDATE SUPPLIER
  */
 exports.updateSupplierSchema = Joi.object({
-  supplierId: Joi.string().trim().pattern(bdMobileRegex).optional(),
-
   supplierName: Joi.string().trim().min(2).max(120).optional(),
 
   contactPersonName: Joi.string().trim().max(80).allow("").optional(),
