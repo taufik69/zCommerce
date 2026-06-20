@@ -136,15 +136,24 @@ exports.customerDetailsDTO = (doc) => {
 // customerPayment.dto.js
 exports.customerPaymentListDTO = (docs = []) => {
   return docs.map((doc) => ({
-    customerName: doc.customerName,
-    slug: doc.slug,
+    _id: doc._id?.toString(),
+    customer: doc.customer
+      ? {
+          _id: doc.customer._id?.toString(),
+          fullName: doc.customer.fullName || "",
+          mobileNumber: doc.customer.mobileNumber || "",
+          customerId: doc.customer.customerId || "",
+        }
+      : null,
     referenceInvoice: doc.referenceInvoice || "",
     dueBalance: doc.dueBalance ?? 0,
     paidAmount: doc.paidAmount ?? 0,
     lessAmount: doc.lessAmount ?? 0,
     cashBack: doc.cashBack ?? 0,
     date: doc.date,
-    paymentMode: doc.paymentMode || "",
+    paymentMode: doc.paymentMode
+      ? { _id: doc.paymentMode._id?.toString(), name: doc.paymentMode.name || "" }
+      : null,
     remarks: doc.remarks || "",
     deletedAt: doc.deletedAt,
     createdAt: doc.createdAt,
@@ -155,15 +164,24 @@ exports.customerPaymentDetailsDTO = (doc) => {
   if (!doc) return null;
 
   return {
-    customerName: doc.customerName,
-    slug: doc.slug,
+    _id: doc._id?.toString(),
+    customer: doc.customer
+      ? {
+          _id: doc.customer._id?.toString(),
+          fullName: doc.customer.fullName || "",
+          mobileNumber: doc.customer.mobileNumber || "",
+          customerId: doc.customer.customerId || "",
+        }
+      : null,
     referenceInvoice: doc.referenceInvoice || "",
     dueBalance: doc.dueBalance ?? 0,
     paidAmount: doc.paidAmount ?? 0,
     lessAmount: doc.lessAmount ?? 0,
     cashBack: doc.cashBack ?? 0,
     date: doc.date,
-    paymentMode: doc.paymentMode || "",
+    paymentMode: doc.paymentMode
+      ? { _id: doc.paymentMode._id?.toString(), name: doc.paymentMode.name || "" }
+      : null,
     remarks: doc.remarks || "",
     deletedAt: doc.deletedAt,
     createdAt: doc.createdAt,
@@ -174,12 +192,21 @@ exports.customerPaymentDetailsDTO = (doc) => {
 exports.customerAdvancePaymentListDTO = (docs = []) => {
   return docs.map((doc) => ({
     _id: doc._id?.toString(),
-    customerName: doc.customerName,
-    slug: doc.slug,
+    customer: doc.customer
+      ? {
+          _id: doc.customer._id?.toString(),
+          fullName: doc.customer.fullName || "",
+          mobileNumber: doc.customer.mobileNumber || "",
+          customerId: doc.customer.customerId || "",
+        }
+      : null,
     balance: doc.balance ?? 0,
     paidAmount: doc.paidAmount ?? 0,
+    advanceAmount: doc.advanceAmount ?? 0,
     advanceCashBack: doc.advanceCashBack ?? 0,
-    paymentMode: doc.paymentMode || "",
+    paymentMode: doc.paymentMode
+      ? { _id: doc.paymentMode._id?.toString(), name: doc.paymentMode.name || "" }
+      : null,
     date: doc.date,
     remarks: doc.remarks || "",
     createdAt: doc.createdAt,
@@ -191,12 +218,21 @@ exports.customerAdvancePaymentDetailsDTO = (doc) => {
 
   return {
     _id: doc._id?.toString(),
-    customerName: doc.customerName,
-    slug: doc.slug,
+    customer: doc.customer
+      ? {
+          _id: doc.customer._id?.toString(),
+          fullName: doc.customer.fullName || "",
+          mobileNumber: doc.customer.mobileNumber || "",
+          customerId: doc.customer.customerId || "",
+        }
+      : null,
     balance: doc.balance ?? 0,
     paidAmount: doc.paidAmount ?? 0,
+    advanceAmount: doc.advanceAmount ?? 0,
     advanceCashBack: doc.advanceCashBack ?? 0,
-    paymentMode: doc.paymentMode || "",
+    paymentMode: doc.paymentMode
+      ? { _id: doc.paymentMode._id?.toString(), name: doc.paymentMode.name || "" }
+      : null,
     date: doc.date,
     remarks: doc.remarks || "",
     createdAt: doc.createdAt,
