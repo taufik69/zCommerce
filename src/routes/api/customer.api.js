@@ -55,7 +55,7 @@ _.route("/get-customer-payment-recived").get(
 _.route("/update-customer-payment-recived/:customer").put(
   customerController.updateCustomerPaymentRecived,
 );
-_.route("/delete-customer-payment-recived/:customer").delete(
+_.route("/delete-customer-payment-recived/:id").delete(
   customerController.deleteCustomerPaymentRecived,
 );
 

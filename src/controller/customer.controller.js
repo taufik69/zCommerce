@@ -434,19 +434,21 @@ exports.createCustomerPaymentRecived = asynchandeler(async (req, res) => {
         );
       }
 
-      // 2) payment accumulate (single doc per customer)
-      paymentDoc = await customerPaymentRecived.findOneAndUpdate(
-        { customer: customerid },
-        {
-          $inc: { paidAmount, lessAmount, cashBack },
-          $set: {
+      // 2) create a new payment doc per transaction
+      [paymentDoc] = await customerPaymentRecived.create(
+        [
+          {
+            customer: customerid,
+            paidAmount,
+            lessAmount,
+            cashBack,
             paymentMode: req.body.paymentMode,
             remarks: req.body.remarks,
             date: req.body.date,
             referenceInvoice: req.body.referenceInvoice,
           },
-        },
-        { new: true, upsert: true, runValidators: true, session },
+        ],
+        { session },
       );
 
       //  due reduce
@@ -659,10 +661,8 @@ exports.updateCustomerPaymentRecived = asynchandeler(async (req, res) => {
 //@route DELETE /api/delete-customer-payment-reviced
 //@param slug
 exports.deleteCustomerPaymentRecived = asynchandeler(async (req, res) => {
-  const { customer } = req.params;
-  const paymentRecived = await customerPaymentRecived.findOneAndDelete({
-    customer,
-  });
+  const { id } = req.params;
+  const paymentRecived = await customerPaymentRecived.findByIdAndDelete(id);
   if (!paymentRecived) {
     return apiResponse.sendError(
       res,
@@ -685,72 +685,67 @@ exports.deleteCustomerPaymentRecived = asynchandeler(async (req, res) => {
 // customerAdvancePayment controlle
 exports.createCustomerAdvancePaymentRecived = asynchandeler(
   async (req, res) => {
-    const customerId = req.body.customer;
+    const session = await mongoose.startSession();
+    try {
+      const customerId = req.body.customer;
+      const paidInput = Number(req.body.paidAmount || 0);
+      const cashBackInput = Number(req.body.advanceCashBack || 0);
 
-    const paidInput = Number(req.body.paidAmount || 0);
-    const cashBackInput = Number(req.body.advanceCashBack || 0);
+      if (!customerId) {
+        throw new customError("Customer is required", statusCodes.BAD_REQUEST);
+      }
+      if (paidInput <= 0) {
+        throw new customError("Paid amount must be greater than 0", statusCodes.BAD_REQUEST);
+      }
 
-    if (!customerId) {
-      return apiResponse.sendError(
+      let doc;
+
+      await session.withTransaction(async () => {
+        const customer = await customerModel.findById(customerId).session(session);
+        if (!customer) throw new customError("Customer not found", statusCodes.NOT_FOUND);
+
+        const currentDue = Number(customer.openingDues || 0);
+        if (paidInput > currentDue) {
+          throw new customError(
+            `Opening due not enough. Current: ${currentDue}`,
+            statusCodes.BAD_REQUEST,
+          );
+        }
+
+        [doc] = await customerAdvancePaymentModel.create(
+          [
+            {
+              customer: customerId,
+              paidAmount: paidInput,
+              advanceCashBack: cashBackInput,
+              balance: paidInput - cashBackInput,
+              paymentMode: req.body.paymentMode,
+              date: req.body.date,
+              remarks: req.body.remarks,
+            },
+          ],
+          { session },
+        );
+
+        customer.openingDues = currentDue - paidInput;
+        await customer.save({ session });
+      });
+
+      session.endSession();
+
+      await bumpNsVersion(NS_CUSTOMER_ADVANCE);
+      await bumpNsVersion(NS_CUSTOMER);
+
+      return apiResponse.sendSuccess(
         res,
-        statusCodes.BAD_REQUEST,
-        "Customer is required",
+        statusCodes.CREATED,
+        "Customer advance payment received successfully",
+        customerAdvancePaymentDetailsDTO(doc),
       );
+    } catch (err) {
+      session.endSession();
+      throw err;
     }
-
-    // existing doc
-    const existing = await customerAdvancePaymentModel.findOne({
-      customer: customerId,
-    });
-
-    const oldPaid = existing?.paidAmount || 0;
-    const oldCashBack = existing?.advanceCashBack || 0;
-    const oldBalance = existing?.balance || 0;
-
-    // prevent extra cashback
-    if (cashBackInput > oldBalance) {
-      return apiResponse.sendError(
-        res,
-        statusCodes.BAD_REQUEST,
-        `Advance balance not enough. Current: ${oldBalance}`,
-      );
-    }
-
-    // new totals
-    let newPaid = oldPaid + paidInput;
-    let newCashBack = oldCashBack + cashBackInput;
-    let newBalance = newPaid - newCashBack;
-
-    //  Reset rule
-    if (newBalance === 0) {
-      newPaid = 0;
-      newCashBack = 0;
-    }
-
-    const doc = await customerAdvancePaymentModel.findOneAndUpdate(
-      { customer: customerId },
-      {
-        $set: {
-          paidAmount: newPaid,
-          advanceCashBack: newCashBack,
-          balance: newBalance,
-          paymentMode: req.body.paymentMode,
-          date: req.body.date,
-          remarks: req.body.remarks,
-        },
-      },
-      { new: true, upsert: true, runValidators: true },
-    );
-
-    // Invalidate cache
-    await bumpNsVersion(NS_CUSTOMER_ADVANCE);
-
-    return apiResponse.sendSuccess(
-      res,
-      statusCodes.CREATED,
-      "Customer advance payment updated successfully",
-      customerAdvancePaymentDetailsDTO(doc),
-    );
   },
 );
 

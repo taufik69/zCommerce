@@ -135,14 +135,16 @@ exports.customerDetailsDTO = (doc) => {
 
 // customerPayment.dto.js
 exports.customerPaymentListDTO = (docs = []) => {
-  return docs.map((doc) => ({
+  return docs.map((doc, index) => ({
     _id: doc._id?.toString(),
+    paymentId: `CPR-SI-${(index + 1).toString().padStart(2, "0")}`,
     customer: doc.customer
       ? {
           _id: doc.customer._id?.toString(),
           fullName: doc.customer.fullName || "",
           mobileNumber: doc.customer.mobileNumber || "",
           customerId: doc.customer.customerId || "",
+          openingDues: doc.customer.openingDues ?? 0,
         }
       : null,
     referenceInvoice: doc.referenceInvoice || "",
@@ -150,6 +152,7 @@ exports.customerPaymentListDTO = (docs = []) => {
     paidAmount: doc.paidAmount ?? 0,
     lessAmount: doc.lessAmount ?? 0,
     cashBack: doc.cashBack ?? 0,
+    remainAmount: doc.customer?.openingDues ?? 0,
     date: doc.date,
     paymentMode: doc.paymentMode
       ? { _id: doc.paymentMode._id?.toString(), name: doc.paymentMode.name || "" }
@@ -190,20 +193,23 @@ exports.customerPaymentDetailsDTO = (doc) => {
 
 // customerAdvancePayment.dto.js;
 exports.customerAdvancePaymentListDTO = (docs = []) => {
-  return docs.map((doc) => ({
+  return docs.map((doc, index) => ({
     _id: doc._id?.toString(),
+    paymentId: `CAP-SI-${(index + 1).toString().padStart(2, "0")}`,
     customer: doc.customer
       ? {
           _id: doc.customer._id?.toString(),
           fullName: doc.customer.fullName || "",
           mobileNumber: doc.customer.mobileNumber || "",
           customerId: doc.customer.customerId || "",
+          openingDues: doc.customer.openingDues ?? 0,
         }
       : null,
     balance: doc.balance ?? 0,
     paidAmount: doc.paidAmount ?? 0,
     advanceAmount: doc.advanceAmount ?? 0,
     advanceCashBack: doc.advanceCashBack ?? 0,
+    remainAmount: doc.customer?.openingDues ?? 0,
     paymentMode: doc.paymentMode
       ? { _id: doc.paymentMode._id?.toString(), name: doc.paymentMode.name || "" }
       : null,
