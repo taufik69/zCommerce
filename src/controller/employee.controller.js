@@ -129,13 +129,16 @@ exports.getEmployeeList = asynchandeler(async (req, res) => {
   const cacheKey = await buildCacheKey(NS_EMPLOYEE, "all");
   const cached = await getCache(cacheKey);
   if (cached) {
+    const sorted = [...cached].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+    );
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
       "Employee list fetch successfully",
       {
-        count: cached.length,
-        employees: cached,
+        count: sorted.length,
+        employees: sorted,
         fromCache: true,
       },
     );
@@ -671,6 +674,9 @@ exports.deleteEmployeeDesignation = asynchandeler(async (req, res) => {
     "Designation deleted successfully",
     employeeDesignationDTO(designation),
   );
+
+  await bumpNsVersion(NS_DESIGNATION);
+  await bumpNsVersion(NS_EMPLOYEE);
 });
 
 // ---------------------- employee department controller -----------------------
@@ -800,6 +806,9 @@ exports.deleteEmployeeDepartment = asynchandeler(async (req, res) => {
     "Department deleted successfully",
     employeeDepartmentDTO(department),
   );
+
+  await bumpNsVersion(NS_DEPARTMENT);
+  await bumpNsVersion(NS_EMPLOYEE);
 });
 
 // ------ section controller ------
@@ -920,4 +929,7 @@ exports.deleteEmployeeSection = asynchandeler(async (req, res) => {
     "Section deleted successfully",
     employeeDepartmentDTO(section),
   );
+
+  await bumpNsVersion(NS_SECTION);
+  await bumpNsVersion(NS_EMPLOYEE);
 });
