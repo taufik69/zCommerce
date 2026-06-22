@@ -13,7 +13,6 @@ const {
   departmentModel,
   sectionModel,
 } = require("../models/advancePayment.model");
-const { deleteCloudinaryFile } = require("../helpers/cloudinary");
 const {
   employeeAdvancePaymentDTO,
   employeeDesignationDTO,
@@ -273,15 +272,6 @@ exports.deleteEmployeeHard = asynchandeler(async (req, res) => {
     );
   }
 
-  const publicId = employee.image?.publicId;
-  if (publicId) {
-    try {
-      await deleteCloudinaryFile(publicId);
-    } catch (error) {
-      console.error("Cloudinary delete failed:", error.message);
-    }
-  }
-
   await employeeModel.deleteOne({ _id: employee._id });
 
   apiResponse.sendSuccess(
@@ -293,8 +283,18 @@ exports.deleteEmployeeHard = asynchandeler(async (req, res) => {
     },
   );
 
-  // Invalidate employee cache
   await bumpNsVersion(NS_EMPLOYEE);
+
+  // Enqueue Cloudinary deletions — non-blocking, retried by worker
+  const imagePublicId = employee.image?.publicId;
+  if (imagePublicId) {
+    await imageQueue.add("delete-cloudinary-image", { publicId: imagePublicId });
+  }
+
+  const certPublicId = employee.certImage?.publicId;
+  if (certPublicId) {
+    await imageQueue.add("delete-cloudinary-image", { publicId: certPublicId });
+  }
 });
 
 // soft delete employee
