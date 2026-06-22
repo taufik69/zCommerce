@@ -1,9 +1,24 @@
 const mongoose = require("mongoose");
 const { customError } = require("../lib/CustomError");
 const Counter = require("./counter.model");
-const { apiResponse } = require("../utils/apiResponse");
 const { statusCodes } = require("../constant/constant");
-const { required } = require("joi");
+
+const imageSchema = new mongoose.Schema(
+  {
+    url: { type: String, default: "" },
+    publicId: { type: String, default: "" },
+    status: {
+      type: String,
+      enum: ["pending", "processing", "uploaded", "failed"],
+      default: "pending",
+    },
+    localPath: { type: String, default: "" },
+    tries: { type: Number, default: 0 },
+    lastError: { type: String, default: "" },
+  },
+  { _id: false },
+);
+
 const employeeSchema = new mongoose.Schema(
   {
     employeeId: {
@@ -20,10 +35,7 @@ const employeeSchema = new mongoose.Schema(
       maxlength: [100, "Full name cannot exceed 100 characters"],
     },
 
-    nidNumber: {
-      type: String,
-      trim: true,
-    },
+    nidNumber: { type: String, trim: true },
 
     designation: {
       type: mongoose.Types.ObjectId,
@@ -35,16 +47,14 @@ const employeeSchema = new mongoose.Schema(
       ref: "Department",
       default: null,
     },
+
     section: {
       type: mongoose.Types.ObjectId,
       ref: "Section",
       default: null,
     },
 
-    educationalQualification: {
-      type: String,
-      trim: true,
-    },
+    educationalQualification: { type: String, trim: true },
     dateOfBirth: { type: Date },
 
     gender: {
@@ -55,30 +65,20 @@ const employeeSchema = new mongoose.Schema(
     },
 
     religion: { type: String, trim: true },
-    bloodGroup: {
-      type: String,
-      trim: true,
-    },
-
+    bloodGroup: { type: String, trim: true },
     nationality: { type: String, trim: true },
     fathersName: { type: String, trim: true },
     mothersName: { type: String, trim: true },
 
-    mobile: {
-      type: String,
-      trim: true,
-      unique: true,
-    },
-
+    mobile: { type: String, trim: true, unique: true },
     secondaryMobile: { type: String, trim: true },
-    image: { type: String, trim: true },
 
-    email: {
-      type: String,
-      trim: true,
-      lowercase: true,
+    image: {
+      type: imageSchema,
+      default: () => ({}),
     },
 
+    email: { type: String, trim: true, lowercase: true },
     presentAddress: { type: String, trim: true },
     permanentAddress: { type: String, trim: true },
 
@@ -98,6 +98,19 @@ const employeeSchema = new mongoose.Schema(
       grossSalary: { type: Number, default: 0, min: 0 },
     },
 
+    certifications: [
+      {
+        title: { type: String, trim: true },
+        institute: { type: String, trim: true },
+        year: { type: String, trim: true },
+        details: { type: String, trim: true },
+        image: {
+          type: imageSchema,
+          default: () => ({}),
+        },
+      },
+    ],
+
     comments: { type: String, trim: true, maxlength: 500 },
 
     isActive: { type: Boolean, default: true },
@@ -107,42 +120,32 @@ const employeeSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// before save check the employeeid is duplicate or not
+// Prevent manual employeeId on create
 employeeSchema.pre("save", async function (next) {
   try {
     const emp = this;
-
     if (emp.isModified("employeeId") && emp.employeeId) {
       const existing = await mongoose.model("Employee").findOne({
         employeeId: emp.employeeId,
         _id: { $ne: emp._id },
       });
-
       if (existing) {
         return next(
-          new customError(
-            "Employee ID already exists",
-            statusCodes.BAD_REQUEST,
-          ),
+          new customError("Employee ID already exists", statusCodes.BAD_REQUEST),
         );
       }
     }
-
     next();
   } catch (error) {
     next(error);
   }
 });
 
-/**
- * - employeeId manually set
- */
+// Auto-generate employeeId after first save
 employeeSchema.post("save", async function (doc, next) {
   try {
-    //  already set থাকলে আবার run করবে না
     if (doc.employeeId) return next();
 
-    //  atomic counter
     const counter = await Counter.findOneAndUpdate(
       { key: "EMPLOYEE" },
       { $inc: { seq: 1 } },
@@ -150,49 +153,34 @@ employeeSchema.post("save", async function (doc, next) {
     );
 
     const padded = String(counter.seq).padStart(5, "0");
-    const employeeId = `EMP-${padded}`;
-
-    // update same document (NO recursion)
-    await doc.constructor.updateOne({ _id: doc._id }, { $set: { employeeId } });
-
+    await doc.constructor.updateOne(
+      { _id: doc._id },
+      { $set: { employeeId: `EMP-${padded}` } },
+    );
     next();
   } catch (error) {
     next(error);
   }
 });
-/**
- * (MongoDB duplicate key error -> 11000)
- */
+
+// Duplicate key handler
 employeeSchema.post("save", function (error, doc, next) {
   if (error && error.code === 11000) {
     const field =
       (error.keyPattern && Object.keys(error.keyPattern)[0]) ||
       (error.keyValue && Object.keys(error.keyValue)[0]) ||
       "field";
-
-    return next(new customError(`${field} already exists`, 400));
+    return next(new customError(`${field} already exists`, statusCodes.BAD_REQUEST));
   }
-
   return next(error);
 });
 
-// calculate salary
-employeeSchema.pre("save", async function (next) {
+// Calculate gross salary before save
+employeeSchema.pre("save", function (next) {
   try {
-    const basicSalary = this.salary.basicSalary || 0;
-    const houseRent = this.salary.houseRent || 0;
-    const medicalAllowance = this.salary.medicalAllowance || 0;
-    const othersAllowance = this.salary.othersAllowance || 0;
-    const specialAllowance = this.salary.specialAllowance || 0;
-    const providentFund = this.salary.providentFund || 0;
-    const wholeSalary =
-      basicSalary +
-      houseRent +
-      medicalAllowance +
-      othersAllowance +
-      specialAllowance;
-
-    this.salary.grossSalary = wholeSalary - providentFund;
+    const { basicSalary = 0, houseRent = 0, medicalAllowance = 0, othersAllowance = 0, specialAllowance = 0, providentFund = 0 } = this.salary;
+    this.salary.grossSalary =
+      basicSalary + houseRent + medicalAllowance + othersAllowance + specialAllowance - providentFund;
     next();
   } catch (error) {
     next(error);

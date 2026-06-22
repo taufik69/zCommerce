@@ -21,6 +21,7 @@ const { customerModel } = require("@/models/customer.model");
 const userModel = require("@/models/user.model");
 const siteInformationModel = require("@/models/siteInformation.model");
 const storeInformationModel = require("@/models/storeInformation.model");
+const employeeModel = require("@/models/employee.model");
 const { bumpNsVersion } = require("@/utils/cache.util");
 const { dbConnect } = require("@/database/db");
 
@@ -35,6 +36,7 @@ const MODELS = {
   discountBanner: discountBannerModel,
   siteinformation: siteInformationModel,
   storeinformation: storeInformationModel,
+  employee: employeeModel,
 };
 
 dbConnect()

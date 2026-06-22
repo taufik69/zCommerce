@@ -2,6 +2,7 @@ const joi = require("joi");
 const { customError } = require("../lib/CustomError");
 const { apiResponse } = require("../utils/apiResponse");
 const { statusCodes } = require("../constant/constant");
+const { expandBracketKeys } = require("../utils/parseFormData.util");
 
 const GENDERS = ["male", "female", "other"];
 
@@ -36,6 +37,18 @@ const employeeCreateSchema = joi
         "any.required": "Gender is required.",
         "string.empty": "Gender is required.",
       }),
+
+    certifications: joi
+      .array()
+      .items(
+        joi.object({
+          title: joi.string().trim().allow("").optional(),
+          institute: joi.string().trim().allow("").optional(),
+          year: joi.string().trim().allow("").optional(),
+          details: joi.string().trim().allow("").optional(),
+        }),
+      )
+      .optional(),
   })
   .options({ abortEarly: false, allowUnknown: true });
 
@@ -48,51 +61,21 @@ const employeeUpdateSchema = employeeCreateSchema
   .fork(["fullName", "designation", "gender"], (schema) => schema.optional())
   .unknown(true);
 
-const validateImageFile = (req, res, next) => {
+// Extract profile image (fieldname === "image") from req.files array (upload.any())
+const extractImageFile = (req) => {
   if (!req.files || req.files.length === 0) return null;
+  return req.files.find((f) => f.fieldname === "image") || null;
+};
 
-  if (req.files.length > 1) {
-    return next(
-      new customError(
-        "You can upload a maximum of 1 image",
-        statusCodes.BAD_REQUEST,
-      ),
-    );
-  }
-
-  const file = req.files[0];
-
-  if (file.fieldname !== "image") {
-    return next(
-      new customError(
-        "Please provide a valid image fieldName (image)",
-        statusCodes.BAD_REQUEST,
-      ),
-    );
-  }
-
-  // 1MB example (তোমার UI screenshot এ max 1MB ছিল)
-  if (file.size > 1 * 1024 * 1024) {
-    return next(
-      new customError(
-        "Image size should be less than 1MB",
-        statusCodes.BAD_REQUEST,
-      ),
-    );
-  }
-
-  // Optional mime check
-  const allowed = ["image/png", "image/jpeg", "image/jpg", "image/gif"];
-  if (file.mimetype && !allowed.includes(file.mimetype)) {
-    return next(
-      new customError(
-        "Invalid image type. Allowed: PNG, JPG, GIF, SVG",
-        statusCodes.BAD_REQUEST,
-      ),
-    );
-  }
-
-  return file;
+// Extract cert images: certImage_0, certImage_1, … → { 0: file, 1: file, … }
+const extractCertImageFiles = (req) => {
+  if (!req.files || req.files.length === 0) return {};
+  const map = {};
+  req.files.forEach((f) => {
+    const match = f.fieldname.match(/^certImage_(\d+)$/);
+    if (match) map[Number(match[1])] = f;
+  });
+  return map;
 };
 
 const buildJoiError = (error) => {
@@ -103,10 +86,13 @@ const buildJoiError = (error) => {
 //  CREATE VALIDATION
 const validateEmployeeCreate = async (req, res, next) => {
   try {
-    const value = await employeeCreateSchema.validateAsync(req.body);
+    const expanded = expandBracketKeys(req.body);
+    const value = await employeeCreateSchema.validateAsync(expanded);
 
-    const imageFile = validateImageFile(req, res, next);
+    const imageFile = extractImageFile(req);
     if (imageFile) value.image = imageFile;
+
+    value.certImageFiles = extractCertImageFiles(req);
 
     return value;
   } catch (error) {
@@ -123,10 +109,13 @@ const validateEmployeeCreate = async (req, res, next) => {
 //  UPDATE VALIDATION
 const validateEmployeeUpdate = async (req, res, next) => {
   try {
-    const value = await employeeUpdateSchema.validateAsync(req.body);
+    const expanded = expandBracketKeys(req.body);
+    const value = await employeeUpdateSchema.validateAsync(expanded);
 
-    const imageFile = validateImageFile(req, res, next);
+    const imageFile = extractImageFile(req);
     if (imageFile) value.image = imageFile;
+
+    value.certImageFiles = extractCertImageFiles(req);
 
     return value;
   } catch (error) {

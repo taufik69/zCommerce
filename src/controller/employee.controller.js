@@ -7,17 +7,13 @@ const {
   validateEmployeeUpdate,
 } = require("../validation/employee.validation");
 const employeeModel = require("../models/employee.model");
-const {} = require("../models/advancePayment.model");
 const {
   employeeAdvancePayment,
   employeeDesignationModel,
   departmentModel,
   sectionModel,
 } = require("../models/advancePayment.model");
-const {
-  cloudinaryFileUpload,
-  deleteCloudinaryFile,
-} = require("../helpers/cloudinary");
+const { deleteCloudinaryFile } = require("../helpers/cloudinary");
 const {
   employeeAdvancePaymentDTO,
   employeeDesignationDTO,
@@ -30,6 +26,7 @@ const {
   bumpNsVersion,
   buildCacheKey,
 } = require("../utils/cache.util");
+const { imageQueue } = require("@/queues/image.queue");
 
 // ─── cache constants ──────────────────────────────────────────────────────────
 const NS_EMPLOYEE = "employee";
@@ -43,37 +40,55 @@ const CACHE_TTL = 60 * 60; // 1 hour
 exports.createEmployee = asynchandeler(async (req, res, next) => {
   const value = await validateEmployeeCreate(req, res, next);
 
-  const newEmployee = new employeeModel({ ...value, image: "" });
-  await newEmployee.save();
-  if (!newEmployee)
-    throw new customError("Employee not found", statusCodes.NOT_FOUND);
-  apiResponse.sendSuccess(
+  const imageFile = value.image;
+  const certImageFiles = value.certImageFiles || {};
+  delete value.image;
+  delete value.certImageFiles;
+
+  // Seed pending image subdoc for each cert that has a file
+  if (value.certifications && value.certifications.length > 0) {
+    value.certifications = value.certifications.map((cert, i) => ({
+      ...cert,
+      ...(certImageFiles[i]
+        ? { image: { status: "pending", localPath: certImageFiles[i].path } }
+        : {}),
+    }));
+  }
+
+  const newEmployee = await employeeModel.create({
+    ...value,
+    image: imageFile
+      ? { status: "pending", localPath: imageFile.path }
+      : {},
+  });
+
+  if (imageFile) {
+    await imageQueue.add("create-employee-image", {
+      modelName: NS_EMPLOYEE,
+      documentId: newEmployee._id,
+      localPath: imageFile.path,
+    });
+  }
+
+  // Enqueue cert image uploads
+  for (const [idxStr, certFile] of Object.entries(certImageFiles)) {
+    const idx = Number(idxStr);
+    await imageQueue.add("create-employee-cert-image", {
+      modelName: NS_EMPLOYEE,
+      documentId: newEmployee._id,
+      localPath: certFile.path,
+      fieldName: `certifications.${idx}.image`,
+    });
+  }
+
+  await bumpNsVersion(NS_EMPLOYEE);
+
+  return apiResponse.sendSuccess(
     res,
     statusCodes.CREATED,
     "Employee created successfully",
     newEmployee,
   );
-
-  // Invalidate employee cache
-  await bumpNsVersion(NS_EMPLOYEE);
-
-  // Background Async Task
-  (async () => {
-    try {
-      // Upload Image in background
-      const { optimizeUrl } = await cloudinaryFileUpload(value.image.path);
-      console.log(optimizeUrl);
-
-      // now push the image url into the database
-      await employeeModel.findByIdAndUpdate(newEmployee._id, {
-        image: optimizeUrl,
-      });
-
-      console.log(" Employee Created (BG Task):", newEmployee.fullName);
-    } catch (error) {
-      console.error("Background Employee Creation Failed:", error.message);
-    }
-  })();
 });
 
 // get all employee or single employee by id
@@ -116,7 +131,7 @@ exports.getEmployeeList = asynchandeler(async (req, res) => {
   if (cached) {
     return apiResponse.sendSuccess(
       res,
-      200,
+      statusCodes.OK,
       "Employee list fetch successfully",
       {
         count: cached.length,
@@ -135,7 +150,7 @@ exports.getEmployeeList = asynchandeler(async (req, res) => {
 
   await setCache(cacheKey, employeeList, CACHE_TTL);
 
-  apiResponse.sendSuccess(res, 200, "Employee list fetch successfully", {
+  return apiResponse.sendSuccess(res, statusCodes.OK, "Employee list fetch successfully", {
     count: employeeList.length,
     employees: employeeList,
     fromCache: false,
@@ -144,77 +159,102 @@ exports.getEmployeeList = asynchandeler(async (req, res) => {
 
 // UPDATE EMPLOYEE
 exports.updateEmployee = asynchandeler(async (req, res, next) => {
-  // 1) Validate request
   const value = await validateEmployeeUpdate(req, res, next);
 
-  // 2) Prevent forbidden updates
   delete value.employeeId;
   delete value.createdAt;
   delete value.updatedAt;
 
-  // 3) Fetch current employee first (need previous image)
-  const employee = await employeeModel.findOne({
-    employeeId: req.params.id,
-  });
-
+  const employee = await employeeModel.findOne({ employeeId: req.params.id });
   if (!employee) {
-    return apiResponse.sendError(
-      res,
-      statusCodes.NOT_FOUND,
-      "Employee not found",
+    return apiResponse.sendError(res, statusCodes.NOT_FOUND, "Employee not found");
+  }
+
+  const { image: imageFile, certImageFiles = {}, ...rest } = value;
+
+  if (imageFile) {
+    const oldPublicId = employee.image?.publicId || null;
+
+    rest["image.status"] = "pending";
+    rest["image.localPath"] = imageFile.path;
+    rest["image.tries"] = 0;
+    rest["image.lastError"] = "";
+
+    await imageQueue.add("update-employee-image", {
+      modelName: NS_EMPLOYEE,
+      documentId: employee._id,
+      localPath: imageFile.path,
+      oldPublicId,
+    });
+  }
+
+  // Build cert image dot-path updates separately — cannot mix "certifications"
+  // array key and "certifications.N.*" dot-paths in the same $set (MongoDB conflict).
+  const certImageUpdate = {};
+  for (const [idxStr, certFile] of Object.entries(certImageFiles)) {
+    const idx = Number(idxStr);
+    const oldPublicId = employee.certifications?.[idx]?.image?.publicId || null;
+    certImageUpdate[`certifications.${idx}.image.status`] = "pending";
+    certImageUpdate[`certifications.${idx}.image.localPath`] = certFile.path;
+    certImageUpdate[`certifications.${idx}.image.tries`] = 0;
+    certImageUpdate[`certifications.${idx}.image.lastError`] = "";
+
+    await imageQueue.add("update-employee-cert-image", {
+      modelName: NS_EMPLOYEE,
+      documentId: employee._id,
+      localPath: certFile.path,
+      fieldName: `certifications.${idx}.image`,
+      oldPublicId,
+    });
+  }
+
+  // Recalculate grossSalary manually since findByIdAndUpdate bypasses pre-save hooks
+  if (rest.salary || Object.keys(rest).some((k) => k.startsWith("salary."))) {
+    const merged = {
+      basicSalary: 0,
+      houseRent: 0,
+      medicalAllowance: 0,
+      othersAllowance: 0,
+      specialAllowance: 0,
+      providentFund: 0,
+      ...employee.salary?.toObject?.() ?? employee.salary ?? {},
+      ...(rest.salary ?? {}),
+    };
+    rest["salary.grossSalary"] =
+      Number(merged.basicSalary) +
+      Number(merged.houseRent) +
+      Number(merged.medicalAllowance) +
+      Number(merged.othersAllowance) +
+      Number(merged.specialAllowance) -
+      Number(merged.providentFund);
+    delete rest.salary;
+  }
+
+  // First update: all scalar/array fields (includes certifications array as-is)
+  await employeeModel.findByIdAndUpdate(
+    employee._id,
+    { $set: rest },
+    { runValidators: true },
+  );
+
+  // Second update: cert image dot-paths (separate to avoid $set conflict)
+  if (Object.keys(certImageUpdate).length > 0) {
+    await employeeModel.findByIdAndUpdate(
+      employee._id,
+      { $set: certImageUpdate },
     );
   }
 
-  // keep old image url for later delete
-  const oldImageUrl = employee.image;
+  const updatedEmployee = await employeeModel.findById(employee._id);
 
-  // 4) Update non-image fields immediately
-  // (Don't include value.image here because it's file object)
-  const { image, ...rest } = value;
+  await bumpNsVersion(NS_EMPLOYEE);
 
-  const updatedEmployee = await employeeModel.findByIdAndUpdate(
-    employee._id,
-    { $set: rest },
-    { new: true, runValidators: true },
-  );
-
-  apiResponse.sendSuccess(
+  return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Employee updated successfully",
     updatedEmployee,
   );
-
-  // Invalidate employee cache
-  await bumpNsVersion(NS_EMPLOYEE);
-
-  // 5) Background image flow (safe order)
-  if (image) {
-    (async () => {
-      try {
-        //  Upload new image first
-        const { optimizeUrl } = await cloudinaryFileUpload(image.path);
-
-        // Update DB with new image URL
-        await employeeModel.findByIdAndUpdate(employee._id, {
-          image: optimizeUrl,
-        });
-
-        // Delete old image only AFTER DB updated
-        const parts = oldImageUrl.split("/");
-        const publicId = parts[parts.length - 1].split("?")[0];
-
-        // If no old image, skip delete
-        if (publicId) {
-          await deleteCloudinaryFile(publicId);
-        }
-
-        console.log("Employee image updated (BG):", employee.fullName);
-      } catch (error) {
-        console.error("Image update failed (BG):", error.message);
-      }
-    })();
-  }
 });
 
 // hard delete employee
@@ -230,16 +270,10 @@ exports.deleteEmployeeHard = asynchandeler(async (req, res) => {
     );
   }
 
-  if (employee.image) {
+  const publicId = employee.image?.publicId;
+  if (publicId) {
     try {
-      // Delete old image only AFTER DB updated
-      const parts = employee.image.split("/");
-      const publicId = parts[parts.length - 1].split("?")[0];
-
-      // If no old image, skip delete
-      if (publicId) {
-        await deleteCloudinaryFile(publicId);
-      }
+      await deleteCloudinaryFile(publicId);
     } catch (error) {
       console.error("Cloudinary delete failed:", error.message);
     }

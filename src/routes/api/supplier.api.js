@@ -38,6 +38,10 @@ _.route("/get-supplier-due-payment").get(
   supplierController.getAllSupplierDuePayment,
 );
 
+_.route("/get-supplier-due-payment/:id").get(
+  supplierController.getSupplierDuePaymentById,
+);
+
 _.route("/update-supplier-due-payment/:id").put(
   validate(updateSupplierDuePaymentSchema),
   supplierController.updateSupplierDuePayment,

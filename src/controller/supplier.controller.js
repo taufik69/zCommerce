@@ -228,6 +228,67 @@ exports.createSupplierDuePayment = asynchandeler(async (req, res) => {
   );
 });
 
+// get single supplier due payment by _id
+exports.getSupplierDuePaymentById = asynchandeler(async (req, res) => {
+  const mongoose = require("mongoose");
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return apiResponse.sendError(res, statusCodes.BAD_REQUEST, "Invalid payment ID");
+  }
+
+  const payments = await SupplierDuePayment.aggregate([
+    { $match: { _id: new mongoose.Types.ObjectId(id) } },
+    {
+      $lookup: {
+        from: "suppliers",
+        localField: "supplierId",
+        foreignField: "supplierId",
+        as: "supplier",
+      },
+    },
+    { $unwind: { path: "$supplier", preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: "accounts",
+        localField: "paymentMode",
+        foreignField: "_id",
+        as: "paymentMethod",
+      },
+    },
+    {
+      $project: {
+        transactionId: 1,
+        date: 1,
+        paidAmount: 1,
+        lessAmount: 1,
+        paymentMode: 1,
+        remarks: 1,
+        paymentMethod: { name: 1, isActive: 1, createdAt: 1, slug: 1, _id: 1 },
+        remainingDue: 1,
+        isActive: 1,
+        supplierId: 1,
+        supplier: {
+          supplierName: 1,
+          supplierId: 1,
+          mobile: 1,
+          supplierAddress: 1,
+          openingDues: 1,
+          isActive: 1,
+          contactPersonDesignation: 1,
+          contactPersonName: 1,
+        },
+      },
+    },
+  ]);
+
+  if (!payments.length) {
+    return apiResponse.sendError(res, statusCodes.NOT_FOUND, "Payment not found");
+  }
+
+  apiResponse.sendSuccess(res, statusCodes.OK, "Payment fetched successfully", payments[0]);
+});
+
 // get all supplier due payment or single supplier due amount
 exports.getAllSupplierDuePayment = asynchandeler(async (req, res) => {
   const matchStage = {};
@@ -319,9 +380,9 @@ exports.updateSupplierDuePayment = asynchandeler(async (req, res) => {
     );
   }
 
-  // 2) find supplier
+  // 2) find supplier — supplierId is a phone-number string, not an ObjectId
   const supplier = await SupplierModel.findOne({
-    _id: paymentDoc.supplierId,
+    supplierId: paymentDoc.supplierId,
     isActive: true,
   });
   if (!supplier) {

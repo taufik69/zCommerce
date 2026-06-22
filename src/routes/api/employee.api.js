@@ -2,19 +2,19 @@ const express = require("express");
 const _ = express.Router();
 const employeeController = require("../../controller/employee.controller");
 
-const { multipleFileUpload } = require("../../middleware/multer.middleware");
+const { anyFileUpload } = require("../../middleware/multer.middleware");
 const {
   createEmployeeAdvancePaymentSchema,
   updateEmployeeAdvancePaymentSchema,
 } = require("../../validation/employeeAdvancePayment.validation");
 const validate = require("../../middleware/validate");
 _.route("/create-employee").post(
-  multipleFileUpload("image", 1),
+  anyFileUpload(),
   employeeController.createEmployee,
 );
 _.route("/get-employee").get(employeeController.getEmployeeList);
 _.route("/update-employee/:id").put(
-  multipleFileUpload("image", 1),
+  anyFileUpload(),
   employeeController.updateEmployee,
 );
 _.route("/delete-employee/:id").delete(employeeController.deleteEmployeeHard);
