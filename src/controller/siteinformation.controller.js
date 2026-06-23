@@ -11,9 +11,48 @@ const { imageQueue } = require("@/queues/image.queue");
 const NS = "siteinformation";
 const CACHE_TTL = 60 * 60;
 
-// @desc  Create site information
+// @desc  Create or update site information (singleton upsert)
 exports.createSiteInformation = asynchandeler(async (req, res) => {
   const { image, ...fields } = await validateSiteInformation(req);
+
+  const existing = await SiteInformation.findOne().lean();
+
+  if (existing) {
+    const oldPublicId =
+      typeof existing.image === "object" ? existing.image?.publicId || null : null;
+
+    const updated = await SiteInformation.findByIdAndUpdate(
+      existing._id,
+      {
+        ...fields,
+        image: {
+          status: "pending",
+          localPath: image.path,
+          publicId: "",
+          url: "",
+          tries: 0,
+          lastError: "",
+        },
+      },
+      { new: true, runValidators: false },
+    );
+
+    await imageQueue.add("update-siteinformation-image", {
+      modelName: "siteinformation",
+      documentId: updated._id,
+      localPath: image.path,
+      oldPublicId,
+    });
+
+    await bumpNsVersion(NS);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Site information updated successfully",
+      { storeName: updated.storeName, slug: updated.slug },
+    );
+  }
 
   const site = await SiteInformation.create({
     ...fields,
@@ -107,8 +146,12 @@ exports.updateSiteInformation = asynchandeler(async (req, res) => {
     "propiterSlogan",
     "adress",
     "phone",
+    "secondaryPhone",
     "email",
     "businessHours",
+    "businessType",
+    "ownerName",
+    "websiteLink",
     "footer",
     "facebookLink",
     "youtubeLink",
