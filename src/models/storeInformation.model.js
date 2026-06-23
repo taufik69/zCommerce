@@ -98,6 +98,22 @@ const storeInformationSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    ownerName: {
+      type: String,
+      trim: true,
+    },
+    secondaryPhone: {
+      type: String,
+      trim: true,
+    },
+    businessType: {
+      type: String,
+      trim: true,
+    },
+    websiteLink: {
+      type: String,
+      trim: true,
+    },
     isActive: {
       type: Boolean,
       default: true,
