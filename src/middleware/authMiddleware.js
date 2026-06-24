@@ -21,11 +21,14 @@ exports.authGuard = asynchandeler(async (req, res, next) => {
   const user = await User.findOne({
     $or: [{ email: decoded.email }, { phone: decoded.phone }],
   })
-    .populate("roles")
+    .populate({
+      path: "roles",
+      populate: { path: "permissions.permission" },
+    })
     .populate("permissions.permission")
     .populate("createdBy")
     .select(
-      "-__v -wishList -cart -newsLetterSubscribe -refreshToken -password -twoFactorEnabled  "
+      "-__v -wishList -cart -newsLetterSubscribe -refreshToken -password -twoFactorEnabled"
     );
 
   if (!user) {

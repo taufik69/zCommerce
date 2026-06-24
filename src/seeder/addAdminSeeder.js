@@ -21,7 +21,7 @@ async function seedSuperAdmin() {
     if (roles.length === 0) {
       throw new customError(
         "Superadmin role not found. Please seed roles first.",
-        500
+        500,
       );
     }
     // now crate super admin user
@@ -69,3 +69,13 @@ mongoose
     console.error("Error connecting to MongoDB or seeding superadmin:", err);
     process.exit(1);
   });
+
+// ┌─────────────┬─────────────────────┬────────────────┐
+// │    Role     │        Email        │    Password    │
+// ├─────────────┼─────────────────────┼────────────────┤
+// │ Super Admin │ superadmin@baig.com │ SuperAdmin@123 │
+// ├─────────────┼─────────────────────┼────────────────┤
+// │ Admin       │ admin@baig.com      │ Admin@1234     │
+// ├─────────────┼─────────────────────┼────────────────┤
+// │ Manager     │ manager@baig.com    │ Manager@123    │
+// └─────────────┴─────────────────────┴────────────────┘

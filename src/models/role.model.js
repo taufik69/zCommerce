@@ -9,6 +9,12 @@ const roleSchema = new mongoose.Schema(
     slug: { type: String, unique: true },
     name: { type: String, required: true, unique: true, default: "user" },
     isActive: { type: Boolean, default: true },
+    permissions: [
+      {
+        permission: { type: mongoose.Schema.Types.ObjectId, ref: "Permission" },
+        actions: [{ type: String }],
+      },
+    ],
   },
   { timestamps: true },
 );

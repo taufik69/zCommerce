@@ -10,8 +10,10 @@
     "worker:image": "node src/workers/image.worker.js",
     "worker:sms": "node src/workers/sms.worker.js",
     "seed:permissions": "node src/seeder/permissionSeeder.js",
-    "seed:delivery": "node src/seeder/deliverySeeder.js",
     "seed:roles": "node src/seeder/roleSeeder.js",
+    "seed:role-permissions": "node src/seeder/rolePermissionSeeder.js",
+    "seed:users": "node src/seeder/seedUsers.js",
+    "seed:delivery": "node src/seeder/deliverySeeder.js",
     "socket": "node src/socket/client.js",
     "admin": "node src/seeder/addAdminSeeder.js"
   },
