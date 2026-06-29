@@ -42,29 +42,34 @@ exports.getAllUsers = asynchandeler(async (req, res) => {
 exports.getUserPermissions = asynchandeler(async (req, res) => {
   const { userId } = req.params;
 
-  // ✅ Find user and populate permissions
   const user = await User.findById(userId)
-    .populate({
-      path: "permissions.permission",
-      model: "Permission",
-      select: "permissionName slug isActive",
-    })
-    .select("name email permissions");
+    .populate({ path: "permissions.permission", model: "Permission", select: "permissionName slug isActive" })
+    .populate({ path: "roles", select: "name slug" })
+    .select("name email permissions Options Reports roles");
 
   if (!user) {
     throw new customError("User not found", 404);
   }
 
-  // ✅ Fetch all active permissions
-  const allPermissions = await Permission.find({ isActive: true }).sort({
-    permissionName: 1,
-  });
+  const allPermissions = await Permission.find({ isActive: true }).sort({ permissionName: 1 });
 
-  // ✅ Format permissions
+  const isSuperAdmin = user.roles?.some((r) => r.slug === "superadmin");
+
   const formattedPermissions = allPermissions.map((permission) => {
     const userPerm = user.permissions.find(
       (p) => p.permission?._id?.toString() === permission._id.toString()
     );
+
+    // Superadmin implicitly has all permissions with all actions
+    if (isSuperAdmin) {
+      return {
+        _id: permission._id,
+        permissionName: permission.permissionName,
+        slug: permission.slug,
+        actions: ["view", "add", "edit", "delete"],
+        hasPermission: true,
+      };
+    }
 
     return {
       _id: permission._id,
@@ -75,12 +80,13 @@ exports.getUserPermissions = asynchandeler(async (req, res) => {
     };
   });
 
-  // ✅ Send response
   apiResponse.sendSuccess(res, 200, "User permissions fetched successfully", {
     user: {
       _id: user._id,
       name: user.name,
       email: user.email,
+      Options: user.Options || [],
+      Reports: user.Reports || [],
     },
     permissions: formattedPermissions,
   });
