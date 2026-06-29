@@ -44,7 +44,11 @@ exports.getUserPermissions = asynchandeler(async (req, res) => {
 
   // ✅ Find user and populate permissions
   const user = await User.findById(userId)
-    .populate("permissions")
+    .populate({
+      path: "permissions.permission",
+      model: "Permission",
+      select: "permissionName slug isActive",
+    })
     .select("name email permissions");
 
   if (!user) {
@@ -58,31 +62,17 @@ exports.getUserPermissions = asynchandeler(async (req, res) => {
 
   // ✅ Format permissions
   const formattedPermissions = allPermissions.map((permission) => {
-    const userHasPermission = user.permissions.some(
-      (p) => p._id.toString() === permission._id.toString()
+    const userPerm = user.permissions.find(
+      (p) => p.permission?._id?.toString() === permission._id.toString()
     );
 
-    if (userHasPermission) {
-      const userPermission = user.permissions.find(
-        (p) => p._id.toString() === permission._id.toString()
-      );
-
-      return {
-        _id: permission._id,
-        permissionName: permission.permissionName,
-        slug: permission.slug,
-        actions: userPermission.actions || [],
-        hasPermission: true,
-      };
-    } else {
-      return {
-        _id: permission._id,
-        permissionName: permission.permissionName,
-        slug: permission.slug,
-        actions: [],
-        hasPermission: false,
-      };
-    }
+    return {
+      _id: permission._id,
+      permissionName: permission.permissionName,
+      slug: permission.slug,
+      actions: userPerm?.actions || [],
+      hasPermission: !!userPerm,
+    };
   });
 
   // ✅ Send response
@@ -134,7 +124,11 @@ exports.updateUserPermissions = asynchandeler(async (req, res) => {
   await user.save();
 
   const updatedUser = await User.findById(userId)
-    .populate("permissions")
+    .populate({
+      path: "permissions.permission",
+      model: "Permission",
+      select: "permissionName slug isActive",
+    })
     .select("name email permissions");
 
   apiResponse.sendSuccess(res, 200, "User permissions updated successfully", {
@@ -142,6 +136,7 @@ exports.updateUserPermissions = asynchandeler(async (req, res) => {
       _id: updatedUser._id,
       name: updatedUser.name,
       email: updatedUser.email,
+      permissions: updatedUser.permissions,
     },
   });
 });

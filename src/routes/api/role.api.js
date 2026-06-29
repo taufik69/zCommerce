@@ -1,12 +1,12 @@
 const express = require("express");
 const _ = express.Router();
 const roleController = require("../../controller/role.controller");
-// const { authGuard } = require("../../middleware/authMiddleware");
+const { authGuard } = require("../../middleware/authMiddleware");
 // const { authorize } = require("../../middleware/checkPermission.middleware");
 
 _.route("/create-role")
   .post(
-    // authGuard,
+    authGuard,
     // authorize("create-role", "add"),
     roleController.createRole
   );
@@ -19,14 +19,14 @@ _.route("/singlerole/:slug")
 
 _.route("/updaterole/:slug")
   .put(
-    // authGuard,
+    authGuard,
     // authorize("create-role", "edit"),
     roleController.updateRole
   );
 
 _.route("/deleterole/:slug")
   .delete(
-    // authGuard,
+    authGuard,
     // authorize("create-role", "delete"),
     roleController.deleteRole
   );
@@ -34,8 +34,8 @@ _.route("/deleterole/:slug")
 _.route("/role/:slug/permissions")
   .get(roleController.getRolePermissions)
   .put(
-    // authGuard,
-    // authorize("create-role", "edit"),
+    authGuard,
+    // authorize("create-role", "edit") — omitted so superadmin always has access via authGuard alone
     roleController.assignPermissionsToRole
   );
 

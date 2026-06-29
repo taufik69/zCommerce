@@ -6,34 +6,34 @@ const { authorize } = require("../../middleware/checkPermission.middleware");
 const siteInformationController = require("../../controller/siteinformation.controller");
 
 _.route("/create-siteinformation").post(
-  // authGuard,
-  // authorize("siteinformation", "add"),
+  authGuard,
+  authorize("site-information", "add"),
   singleFileUpload("image"),
   siteInformationController.createSiteInformation,
 );
 
 _.route("/get-siteinformation").get(
-  // authGuard,
-  // authorize("siteinformation", "view"),
+  authGuard,
+  authorize("site-information", "view"),
   siteInformationController.getAllSiteInformation,
 );
 
 _.route("/single-siteinformation/:slug").get(
-  // authGuard,
-  // authorize("siteinformation", "view"),
+  authGuard,
+  authorize("site-information", "view"),
   siteInformationController.getSingleSiteInformation,
 );
 
 _.route("/update-siteinformation/:slug").put(
-  // authGuard,
-  // authorize("siteinformation", "edit"),
+  authGuard,
+  authorize("site-information", "edit"),
   singleFileUpload("image"),
   siteInformationController.updateSiteInformation,
 );
 
 _.route("/delete-siteinformation/:slug").delete(
-  // authGuard,
-  // authorize("siteinformation", "delete"),
+  authGuard,
+  authorize("site-information", "delete"),
   siteInformationController.deleteSiteInformation,
 );
 

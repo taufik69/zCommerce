@@ -5,23 +5,69 @@ const {
   anyFileUpload,
   multipleFileUploadWithFields,
 } = require("../../middleware/multer.middleware");
+const { authGuard } = require("../../middleware/authMiddleware");
+const { authorize } = require("../../middleware/checkPermission.middleware");
 
 _.route("/variant")
-  .post(anyFileUpload(), variantController.createVariant)
-  .get(variantController.getAllVariants);
+  .post(
+    authGuard,
+    authorize("variant", "add"),
+    anyFileUpload(),
+    variantController.createVariant,
+  )
+  .get(
+    authGuard,
+    authorize("variant", "view"),
+    variantController.getAllVariants,
+  );
 
-_.route("/search-variant").get(variantController.searchVariants);
-_.route("/variant/deactive").post(variantController.deactivateVariant);
-_.route("/variant/active").post(variantController.activateVariant);
+_.route("/search-variant").get(
+  authGuard,
+  authorize("variant", "view"),
+  variantController.searchVariants,
+);
+
+_.route("/variant/deactive").post(
+  authGuard,
+  authorize("variant", "edit"),
+  variantController.deactivateVariant,
+);
+
+_.route("/variant/active").post(
+  authGuard,
+  authorize("variant", "edit"),
+  variantController.activateVariant,
+);
+
 _.route("/addvariantimage/:slug").post(
+  authGuard,
+  authorize("variant", "edit"),
   multipleFileUploadWithFields([{ name: "image", maxCount: 10 }]),
   variantController.addVariantImage,
 );
-_.route("/deletevariantimage/:slug").delete(variantController.deleteVariantImage);
+
+_.route("/deletevariantimage/:slug").delete(
+  authGuard,
+  authorize("variant", "edit"),
+  variantController.deleteVariantImage,
+);
 
 _.route("/variant/:slug")
-  .get(variantController.getSingleVariant)
-  .put(anyFileUpload(), variantController.updateVariant)
-  .delete(variantController.deleteVariant);
+  .get(
+    authGuard,
+    authorize("variant", "view"),
+    variantController.getSingleVariant,
+  )
+  .put(
+    authGuard,
+    authorize("variant", "edit"),
+    anyFileUpload(),
+    variantController.updateVariant,
+  )
+  .delete(
+    authGuard,
+    authorize("variant", "delete"),
+    variantController.deleteVariant,
+  );
 
 module.exports = _;

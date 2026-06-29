@@ -50,7 +50,7 @@ exports.deleteRole = asynchandeler(async (req, res) => {
 // GET /role/:slug/permissions — returns role with populated permissions
 exports.getRolePermissions = asynchandeler(async (req, res) => {
   const role = await Role.findOne({ slug: req.params.slug })
-    .populate("permissions.permission");
+    .populate({ path: "permissions.permission", model: "Permission", select: "permissionName slug isActive" });
   if (!role) throw new customError("Role not found", statusCodes.NOT_FOUND);
   apiResponse.sendSuccess(res, statusCodes.OK, "Role permissions fetched successfully", role);
 });
@@ -74,5 +74,13 @@ exports.assignPermissionsToRole = asynchandeler(async (req, res) => {
   await role.save();
   await bumpNsVersion(NS);
 
-  apiResponse.sendSuccess(res, statusCodes.OK, "Role permissions updated successfully", { slug: role.slug });
+  // Re-fetch with populated permission details for the response
+  const updatedRole = await Role.findOne({ slug: req.params.slug })
+    .populate({
+      path: "permissions.permission",
+      model: "Permission",
+      select: "permissionName slug isActive",
+    });
+
+  apiResponse.sendSuccess(res, statusCodes.OK, "Role permissions updated successfully", updatedRole);
 });

@@ -118,7 +118,7 @@ exports.login = asynchandeler(async (req, res) => {
     secure: isProduction,
     sameSite: isProduction ? "none" : "lax",
     path: "/",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 15 * 24 * 60 * 60 * 1000, // 15 days — matches REFRESH_TOKEN_EXPIRY
   });
 
   return apiResponse.sendSuccess(res, statusCodes.OK, "Login successful", {
@@ -130,69 +130,53 @@ exports.login = asynchandeler(async (req, res) => {
 // make a refresh token using cookie data or headers data
 exports.refreshToken = asynchandeler(async (req, res) => {
   const refreshToken =
-    req.cookies.refreshToken.trim() || req.headers["x-refresh-token"].trim();
+    (req.cookies?.refreshToken?.trim()) ||
+    (req.headers["x-refresh-token"]?.trim());
   if (!refreshToken) {
     throw new customError("Refresh token not found", statusCodes.UNAUTHORIZED);
   }
 
-  // check refresh token in database
+  // check refresh token in database — ensures token was not revoked on logout
   const user = await User.findOne({ refreshToken });
   if (!user) {
     throw new customError("Invalid refresh token", statusCodes.UNAUTHORIZED);
   }
-  // vefiy token using
-  const decoded = jwt.verify(
-    user.refreshToken,
-    process.env.REFRESH_TOKEN_SCCERET,
-  );
-  if (!decoded) {
-    throw new customError("Invalid refresh token", statusCodes.UNAUTHORIZED);
-  }
 
-  // generate access token and refresh token
+  // verify signature + expiry
+  jwt.verify(user.refreshToken, process.env.REFRESH_TOKEN_SCCERET);
+
   const accessToken = await user.generateJwtAccessToken();
 
   return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Refresh token send successful",
-    {
-      accessToken,
-    },
+    { accessToken },
   );
 });
 
 //logout user
 exports.logout = asynchandeler(async (req, res) => {
   const refreshToken =
-    req.cookies.refreshToken.trim() || req.headers["x-refresh-token"].trim();
-  if (!refreshToken) {
-    throw new customError("Refresh token not found", statusCodes.UNAUTHORIZED);
-  }
+    (req.cookies?.refreshToken?.trim()) ||
+    (req.headers["x-refresh-token"]?.trim());
 
-  // check refresh token in database
-  const user = await User.findOne({ refreshToken });
-  if (!user) {
-    throw new customError("Invalid refresh token", statusCodes.UNAUTHORIZED);
+  if (refreshToken) {
+    // Revoke the token in DB so it cannot be used for refresh
+    const user = await User.findOne({ refreshToken });
+    if (user) {
+      user.refreshToken = null;
+      await user.save();
+    }
   }
-  // vefiy token using
-  const decoded = jwt.verify(
-    user.refreshToken,
-    process.env.REFRESH_TOKEN_SCCERET,
-  );
-  if (!decoded) {
-    throw new customError("Invalid refresh token", statusCodes.UNAUTHORIZED);
-  }
-
-  // delete refresh token from database
-  user.refreshToken = null;
-  await user.save();
 
   // remove refresh token from cookie
+  const isProduction = process.env.NODE_ENV === "production";
   res.clearCookie("refreshToken", {
-    httpOnly: process.env.NODE_ENV === "production" ? true : false, // secure: true,
-    secure: process.env.NODE_ENV === "production" ? true : false, // set to true in production
-    sameSite: "none",
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    path: "/",
   });
 
   apiResponse.sendSuccess(res, statusCodes.OK, "Logout successful");
@@ -370,7 +354,29 @@ exports.getUserbyEmailOrPhone = asynchandeler(async (req, res) => {
 
 //get me routes
 exports.getMe = asynchandeler(async (req, res) => {
-  const user = req.user;
+  if (!req.user) throw new customError("User not found", statusCodes.NOT_FOUND);
+
+  // Re-fetch with deep populate so roles → permissions → permission doc
+  // and user.permissions → permission doc are both fully resolved.
+  const user = await User.findById(req.user._id)
+    .populate({
+      path: "roles",
+      select: "-__v -createdAt -updatedAt",
+      populate: {
+        path: "permissions.permission",
+        model: "Permission",
+        select: "permissionName slug isActive",
+      },
+    })
+    .populate({
+      path: "permissions.permission",
+      model: "Permission",
+      select: "permissionName slug isActive",
+    })
+    .select(
+      "-password -__v -resetPasswordToken -resetPasswordExpires -refreshToken -twoFactorEnabled",
+    );
+
   if (!user) throw new customError("User not found", statusCodes.NOT_FOUND);
 
   apiResponse.sendSuccess(

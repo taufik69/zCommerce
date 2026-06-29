@@ -2,22 +2,20 @@ const express = require("express");
 const _ = express.Router();
 const wishListController = require("../../controller/wishList.controller");
 const { authGuard } = require("../../middleware/authMiddleware");
-const { authorize } = require("../../middleware/checkPermission.middleware");
+
 _.route("/add-wishtlist").post(
-  //   authGuard,
-  //   authorize("wishlist", "add"),
-  wishListController.addToWishlist
+  authGuard,
+  wishListController.addToWishlist,
 );
 
 _.route("/get-wishtlist").get(
-  //   authGuard,
-  //   authorize("wishlist", "view"),
-  wishListController.getAllUserWishlist
+  authGuard,
+  wishListController.getAllUserWishlist,
 );
 
 _.route("/delete-wishtlist").delete(
-  //   authGuard,
-  //   authorize("wishlist", "delete"),
-  wishListController.deleteWishlistItem
+  authGuard,
+  wishListController.deleteWishlistItem,
 );
+
 module.exports = _;

@@ -1,26 +1,58 @@
 const express = require("express");
 const _ = express.Router();
 const stockAdjustController = require("../../controller/stockAdjust.controller");
+const { authGuard } = require("../../middleware/authMiddleware");
+const { authorize } = require("../../middleware/checkPermission.middleware");
 
 _.route("/stock-adjust")
-  .post(stockAdjustController.createStockAdjust)
-  .get(stockAdjustController.getAllStockAdjusts);
+  .post(
+    authGuard,
+    authorize("stock-adjustment", "add"),
+    stockAdjustController.createStockAdjust,
+  )
+  .get(
+    authGuard,
+    authorize("stock-adjustment", "view"),
+    stockAdjustController.getAllStockAdjusts,
+  );
 
 _.route("/stock-adjust/category/:category").get(
-  stockAdjustController.getAllProductCategoryWise
+  authGuard,
+  authorize("stock-adjustment", "view"),
+  stockAdjustController.getAllProductCategoryWise,
 );
 
 _.route("/stock-adjust/subcategory/:subcategory").get(
-  stockAdjustController.getAllProductSSubcategoryWise
+  authGuard,
+  authorize("stock-adjustment", "view"),
+  stockAdjustController.getAllProductSSubcategoryWise,
 );
-_.route("/getallmultiplevariant").get(stockAdjustController.getAllVariants);
-_.route("/getsinglevariant").get(stockAdjustController.getSingleVariant);
+_.route("/getallmultiplevariant").get(
+  authGuard,
+  authorize("stock-adjustment", "view"),
+  stockAdjustController.getAllVariants,
+);
+_.route("/getsinglevariant").get(
+  authGuard,
+  authorize("stock-adjustment", "view"),
+  stockAdjustController.getSingleVariant,
+);
 _.route("/deletestockadjust/:id").delete(
-  stockAdjustController.deleteStockAdjustById
+  authGuard,
+  authorize("stock-adjustment", "delete"),
+  stockAdjustController.deleteStockAdjustById,
 );
 
 _.route("/stock-adjust/:id")
-  .get(stockAdjustController.getStockAdjustById)
-  .put(stockAdjustController.updateStockAdjustById);
+  .get(
+    authGuard,
+    authorize("stock-adjustment", "view"),
+    stockAdjustController.getStockAdjustById,
+  )
+  .put(
+    authGuard,
+    authorize("stock-adjustment", "edit"),
+    stockAdjustController.updateStockAdjustById,
+  );
 
 module.exports = _;
