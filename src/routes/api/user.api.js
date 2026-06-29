@@ -26,7 +26,7 @@ _.get(
   authController.getUserbyEmailOrPhone,
 );
 _.get("/getme", authGuard, authController.getMe);
-_.put("/add-user-permission", authGuard, authController.addPermissionToUser);
+_.put("/add-user-permission", authGuard, authorize("create-user", "edit"), authController.addPermissionToUser);
 _.put(
   "/remove-user-permission/:id",
   authGuard,

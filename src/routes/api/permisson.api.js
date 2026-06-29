@@ -11,7 +11,6 @@ _.route("/addpermission").post(
 );
 _.route("/allpermissions").get(
   authGuard,
-  authorize("create-permission", "view"),
   Permission.getAllPermissions,
 );
 _.route("/permission/:slug").get(

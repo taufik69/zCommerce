@@ -32,7 +32,7 @@ exports.authGuard = asynchandeler(async (req, res, next) => {
     );
 
   if (!user) {
-    return apiResponse.sendSuccess(res, 401, "User not found");
+    throw new customError("User not found", 401);
   }
   req.user = user;
   next();

@@ -3,9 +3,10 @@ const { apiResponse } = require("../utils/apiResponse");
 const { customError } = require("../lib/CustomError");
 const validatePermission = require("../validation/permission.validation");
 const { statusCodes } = require("../constant/constant");
+const { asynchandeler } = require("../lib/asyncHandeler");
 
 // Create a new permission
-exports.createPermission = async (req, res) => {
+exports.createPermission = asynchandeler(async (req, res) => {
   const { permissionName, actions } = await validatePermission(req);
 
   const permission = new Permission({ permissionName, actions });
@@ -17,10 +18,10 @@ exports.createPermission = async (req, res) => {
     "Permission created successfully",
     permission,
   );
-};
+});
 
 // Get all permissions
-exports.getAllPermissions = async (req, res) => {
+exports.getAllPermissions = asynchandeler(async (req, res) => {
   const permissions = await Permission.find().sort({ createdAt: 1 });
   if (!permissions || permissions.length === 0)
     throw new customError("Permissions not found", statusCodes.NOT_FOUND);
@@ -30,10 +31,10 @@ exports.getAllPermissions = async (req, res) => {
     "Permissions fetched successfully",
     permissions,
   );
-};
+});
 
 // get single permission using slug
-exports.getPermissionBySlug = async (req, res) => {
+exports.getPermissionBySlug = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const permission = await Permission.findOne({ slug: slug });
   if (!permission)
@@ -44,10 +45,10 @@ exports.getPermissionBySlug = async (req, res) => {
     "Permission fetched successfully",
     permission,
   );
-};
+});
 
 // update permission using slug
-exports.updatePermission = async (req, res) => {
+exports.updatePermission = asynchandeler(async (req, res) => {
   const { slug } = req.params;
 
   const permission = await Permission.findOneAndUpdate(
@@ -63,10 +64,10 @@ exports.updatePermission = async (req, res) => {
     "Permission updated successfully",
     permission,
   );
-};
+});
 
 // search permission using slug and update isActive field to false
-exports.deactivatePermission = async (req, res) => {
+exports.deactivatePermission = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const permission = await Permission.findOneAndUpdate(
     { slug: slug },
@@ -81,10 +82,10 @@ exports.deactivatePermission = async (req, res) => {
     "Permission deactivated  successfully",
     permission,
   );
-};
+});
 
 //active permission using slug
-exports.activePermission = async (req, res) => {
+exports.activePermission = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const permission = await Permission.findOneAndUpdate(
     { slug: slug },
@@ -99,10 +100,10 @@ exports.activePermission = async (req, res) => {
     "Permission activated  successfully",
     permission,
   );
-};
+});
 
 //delete permisson using slug
-exports.deletePermission = async (req, res) => {
+exports.deletePermission = asynchandeler(async (req, res) => {
   const { slug } = req.params;
   const permission = await Permission.findOneAndDelete({ slug: slug });
   if (!permission)
@@ -113,4 +114,4 @@ exports.deletePermission = async (req, res) => {
     "Permission deleted successfully",
     permission,
   );
-};
+});
