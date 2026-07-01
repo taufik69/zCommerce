@@ -723,6 +723,82 @@ class ProductController {
     );
   });
 
+  // ─── SINGLE-VARIANT PRODUCTS (paginated, for barcode print) ────────────────
+  getAllSingleVariantProducts = asynchandeler(async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 30));
+    const search = (req.query.search || req.query.q || "").trim();
+    const skip = (page - 1) * limit;
+
+    const cacheKey = await buildCacheKey(
+      NS,
+      `single-variant:p${page}:l${limit}:s${search}`,
+    );
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Single variant products fetched successfully",
+        { ...cached, fromCache: true },
+      );
+    }
+
+    const query = { variantType: "singleVariant" };
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { sku: { $regex: search, $options: "i" } },
+        { barCode: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const [products, total] = await Promise.all([
+      Product.find(query)
+        .select(
+          "name slug sku barCode thumbnail retailPrice wholesalePrice size color stock isActive",
+        )
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Product.countDocuments(query),
+    ]);
+
+    if (!products.length) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Single variant products not found",
+        {
+          products: [],
+          total: 0,
+          page,
+          limit,
+          hasNextPage: false,
+          fromCache: false,
+        },
+      );
+    }
+
+    const payload = {
+      products,
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
+
+    await setCache(cacheKey, payload, CACHE_TTL_LIST);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Single variant products fetched successfully",
+      { ...payload, fromCache: false },
+    );
+  });
+
   // ─── MULTIPLE-VARIANT PRODUCTS ─────────────────────────────────────────────
   getAllMultipleVariantProducts = asynchandeler(async (req, res) => {
     const cacheKey = await buildCacheKey(NS, "multiple-variants");

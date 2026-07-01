@@ -69,6 +69,12 @@ _.route("/multiplevarinatproduct").get(
   Product.getAllMultipleVariantProducts
 );
 
+_.route("/all-single-variant-products").get(
+  authGuard,
+  authorize("product", "view"),
+  Product.getAllSingleVariantProducts
+);
+
 _.route("/newarrival").get(Product.getNewArrivalProducts);
 
 _.route("/price-range").get(Product.getProductsByPriceRange);
