@@ -9,6 +9,11 @@ const SmsLog = require("../models/smsLog.model");
 const { smsQueue } = require("../queues/sms.queue");
 const { default: axios } = require("axios");
 const { statusCodes } = require("../constant/constant");
+const {
+  RECIPIENT_TYPES,
+  resolveRecipients,
+  countRecipients,
+} = require("../helpers/smsRecipients");
 
 exports.sendSMS = asynchandeler(async (req, res) => {
   const { message, phoneNumber } = req.body;
@@ -211,4 +216,206 @@ exports.getSmsLogs = asynchandeler(async (req, res) => {
     return apiResponse.sendSuccess(res, statusCodes.OK, "No SMS logs found", { logs: [], fromCache: false });
   }
   return apiResponse.sendSuccess(res, statusCodes.OK, "SMS logs fetched", { logs, fromCache: false });
+});
+
+/* =========================================================================
+ * Bulk SMS by recipient group (Logged / Order / Sales customers)
+ * ========================================================================= */
+
+// @desc Get recipient counts for every group (dynamic dropdown counts)
+exports.getRecipientCounts = asynchandeler(async (req, res) => {
+  const counts = await countRecipients();
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.OK,
+    "Recipient counts fetched",
+    { counts, labels: RECIPIENT_TYPES },
+  );
+});
+
+// @desc Send bulk SMS to a recipient group — queued via BullMQ worker
+exports.sendBulkSmsByGroup = asynchandeler(async (req, res) => {
+  const { message, recipientType } = req.body;
+
+  if (!message || !message.trim()) {
+    throw new customError("Message is required", statusCodes.BAD_REQUEST);
+  }
+  if (!RECIPIENT_TYPES[recipientType]) {
+    throw new customError(
+      "Invalid recipient type. Use one of: logged, order, sales",
+      statusCodes.BAD_REQUEST,
+    );
+  }
+
+  const resolved = await resolveRecipients(recipientType);
+  if (!resolved || resolved.length === 0) {
+    throw new customError(
+      `No recipients found for ${RECIPIENT_TYPES[recipientType]}`,
+      statusCodes.NOT_FOUND,
+    );
+  }
+
+  const recipients = resolved.map((r) => ({
+    customerId: r.customerId || undefined,
+    name: r.name || "",
+    phone: r.phone,
+    status: "pending",
+  }));
+
+  const sentByName = req.user?.name || req.user?.email || "admin";
+
+  const log = await SmsLog.create({
+    type: "bulk",
+    recipientType,
+    message: message.trim(),
+    totalCount: recipients.length,
+    sentCount: 0,
+    failedCount: 0,
+    status: "queued",
+    recipients,
+    triggeredBy: sentByName,
+    sentBy: req.user?._id,
+    sentByName,
+  });
+
+  const job = await smsQueue.add(
+    "send-bulk-sms-group",
+    {
+      logId: log._id.toString(),
+      message: message.trim(),
+      recipientType,
+      recipients: recipients.map((r, index) => ({
+        index,
+        customerId: r.customerId ? r.customerId.toString() : null,
+        phone: r.phone,
+      })),
+    },
+    { jobId: log._id.toString() },
+  );
+
+  await SmsLog.updateOne({ _id: log._id }, { $set: { jobId: job.id } });
+
+  return apiResponse.sendSuccess(
+    res,
+    statusCodes.CREATED,
+    `Bulk SMS queued for ${recipients.length} ${RECIPIENT_TYPES[recipientType]}.`,
+    {
+      logId: log._id,
+      jobId: job.id,
+      recipientType,
+      totalCount: recipients.length,
+      status: "queued",
+    },
+  );
+});
+
+// @desc Get SMS campaigns (history / status), filterable by recipientType
+exports.getSmsCampaigns = asynchandeler(async (req, res) => {
+  const { recipientType, status } = req.query;
+
+  const filter = { type: "bulk" };
+  if (recipientType && RECIPIENT_TYPES[recipientType]) {
+    filter.recipientType = recipientType;
+  }
+  if (status) {
+    filter.status = status;
+  }
+
+  const campaigns = await SmsLog.find(filter)
+    .select("-recipients")
+    .sort({ createdAt: -1 })
+    .limit(500)
+    .lean();
+
+  if (!campaigns || campaigns.length === 0) {
+    return apiResponse.sendSuccess(res, statusCodes.OK, "No SMS campaigns found", {
+      campaigns: [],
+      fromCache: false,
+    });
+  }
+
+  return apiResponse.sendSuccess(res, statusCodes.OK, "SMS campaigns fetched", {
+    campaigns,
+    fromCache: false,
+  });
+});
+
+// @desc Download SMS report (csv | xls) — optional recipientType filter
+exports.downloadSmsReport = asynchandeler(async (req, res) => {
+  const { recipientType, format = "csv" } = req.query;
+
+  const filter = { type: "bulk" };
+  if (recipientType && RECIPIENT_TYPES[recipientType]) {
+    filter.recipientType = recipientType;
+  }
+
+  const campaigns = await SmsLog.find(filter)
+    .select("-recipients")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const rows = campaigns.map((c) => ({
+    "Campaign Date": new Date(c.createdAt).toLocaleString(),
+    "Recipient Type": RECIPIENT_TYPES[c.recipientType] || c.recipientType || "",
+    "SMS Content": (c.message || "").replace(/\s+/g, " ").trim(),
+    "Total Recipients": c.totalCount || 0,
+    Successful: c.sentCount || 0,
+    Failed: c.failedCount || 0,
+    "Sent By": c.sentByName || c.triggeredBy || "admin",
+    Status: c.status || "",
+  }));
+
+  const headers = [
+    "Campaign Date",
+    "Recipient Type",
+    "SMS Content",
+    "Total Recipients",
+    "Successful",
+    "Failed",
+    "Sent By",
+    "Status",
+  ];
+
+  const ts = new Date().toISOString().slice(0, 10);
+
+  if (format === "xls" || format === "xlsx") {
+    // Excel-openable HTML table (no external dependency)
+    const esc = (v) =>
+      String(v ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    const thead = `<tr>${headers.map((h) => `<th>${esc(h)}</th>`).join("")}</tr>`;
+    const tbody = rows
+      .map(
+        (r) =>
+          `<tr>${headers.map((h) => `<td>${esc(r[h])}</td>`).join("")}</tr>`,
+      )
+      .join("");
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"/></head><body><table border="1">${thead}${tbody}</table></body></html>`;
+
+    res.setHeader("Content-Type", "application/vnd.ms-excel");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="sms-report-${ts}.xls"`,
+    );
+    return res.send(html);
+  }
+
+  // Default: CSV
+  const csvEscape = (v) => {
+    const s = String(v ?? "");
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [
+    headers.join(","),
+    ...rows.map((r) => headers.map((h) => csvEscape(r[h])).join(",")),
+  ].join("\n");
+
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="sms-report-${ts}.csv"`,
+  );
+  return res.send("﻿" + csv); // BOM for Excel UTF-8
 });

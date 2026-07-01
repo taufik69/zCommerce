@@ -8,9 +8,17 @@ const smsLogSchema = new mongoose.Schema(
       enum: ["single", "bulk"],
       required: true,
     },
+    // Recipient group this campaign targeted.
+    // "due" is kept for the legacy due-SMS flow (Listed customers with dues).
+    recipientType: {
+      type: String,
+      enum: ["logged", "order", "sales", "due"],
+      default: "due",
+    },
     recipients: [
       {
         customerId: { type: mongoose.Schema.Types.ObjectId, ref: "Customer" },
+        name: { type: String, default: "" },
         phone: { type: String },
         status: {
           type: String,
@@ -30,9 +38,13 @@ const smsLogSchema = new mongoose.Schema(
       default: "queued",
     },
     triggeredBy: { type: String, default: "admin" },
+    sentBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    sentByName: { type: String, default: "admin" },
   },
   { timestamps: true },
 );
+
+smsLogSchema.index({ recipientType: 1, createdAt: -1 });
 
 const SmsLog =
   mongoose.models.SmsLog || mongoose.model("SmsLog", smsLogSchema);

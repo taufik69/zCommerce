@@ -32,21 +32,24 @@ function startSmsWorker() {
       let sentCount = 0;
       let failedCount = 0;
 
-      // Send to all recipients in parallel batches of 10
+      // Send to all recipients in parallel batches of 10.
+      // Recipients are matched back to the log by their array index so that
+      // walking / order recipients (which have no customerId) are tracked too.
       const BATCH_SIZE = 10;
       for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
         const batch = recipients.slice(i, i + BATCH_SIZE);
 
         await Promise.all(
-          batch.map(async (recipient) => {
+          batch.map(async (recipient, offset) => {
+            const idx = typeof recipient.index === "number" ? recipient.index : i + offset;
             try {
               await sendSMS(recipient.phone, message);
               await SmsLog.updateOne(
-                { _id: logId, "recipients.customerId": recipient.customerId },
+                { _id: logId },
                 {
                   $set: {
-                    "recipients.$.status": "sent",
-                    "recipients.$.error": "",
+                    [`recipients.${idx}.status`]: "sent",
+                    [`recipients.${idx}.error`]: "",
                   },
                   $inc: { sentCount: 1 },
                 },
@@ -54,11 +57,11 @@ function startSmsWorker() {
               sentCount++;
             } catch (err) {
               await SmsLog.updateOne(
-                { _id: logId, "recipients.customerId": recipient.customerId },
+                { _id: logId },
                 {
                   $set: {
-                    "recipients.$.status": "failed",
-                    "recipients.$.error": err.message || "Send failed",
+                    [`recipients.${idx}.status`]: "failed",
+                    [`recipients.${idx}.error`]: err.message || "Send failed",
                   },
                   $inc: { failedCount: 1 },
                 },

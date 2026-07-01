@@ -4,6 +4,8 @@ const smsController = require("../../controller/sms.controller");
 const { authGuard } = require("../../middleware/authMiddleware");
 const { authorize } = require("../../middleware/checkPermission.middleware");
 
+
+
 _.route("/send-sms").post(
   authGuard,
   authorize("send-sms", "add"),
@@ -50,6 +52,28 @@ _.route("/due-sms/send/:customerId").post(
   authGuard,
   authorize("send-sms", "add"),
   smsController.sendDueSmsToCustomer,
+);
+
+// Bulk SMS by recipient group (Logged / Order / Sales customers)
+_.route("/recipient-counts").get(
+  authGuard,
+  authorize("send-bulk-sms", "view"),
+  smsController.getRecipientCounts,
+);
+_.route("/bulk-sms/send").post(
+  authGuard,
+  authorize("send-bulk-sms", "add"),
+  smsController.sendBulkSmsByGroup,
+);
+_.route("/campaigns").get(
+  authGuard,
+  authorize("sms-info", "view"),
+  smsController.getSmsCampaigns,
+);
+_.route("/report/download").get(
+  authGuard,
+  authorize("sms-info", "view"),
+  smsController.downloadSmsReport,
 );
 
 module.exports = _;
