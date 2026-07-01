@@ -45,7 +45,7 @@ exports.getUserPermissions = asynchandeler(async (req, res) => {
   const user = await User.findById(userId)
     .populate({ path: "permissions.permission", model: "Permission", select: "permissionName slug isActive" })
     .populate({ path: "roles", select: "name slug" })
-    .select("name email permissions Options Reports roles");
+    .select("name email permissions Options roles");
 
   if (!user) {
     throw new customError("User not found", 404);
@@ -86,7 +86,6 @@ exports.getUserPermissions = asynchandeler(async (req, res) => {
       name: user.name,
       email: user.email,
       Options: user.Options || [],
-      Reports: user.Reports || [],
     },
     permissions: formattedPermissions,
   });
@@ -97,7 +96,7 @@ exports.getUserPermissions = asynchandeler(async (req, res) => {
 // ===============================
 exports.updateUserPermissions = asynchandeler(async (req, res) => {
   const { userId } = req.params;
-  const { permissions, Options, Reports } = req.body;
+  const { permissions, Options } = req.body;
 
   if (!permissions || !Array.isArray(permissions)) {
     throw new customError("Permissions array is required", 400);
@@ -125,7 +124,6 @@ exports.updateUserPermissions = asynchandeler(async (req, res) => {
 
   user.permissions = userPermissions;
   user.Options = Options || [];
-  user.Reports = Reports || [];
   user.createdBy = req.user?.id;
   await user.save();
 

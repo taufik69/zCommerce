@@ -44,7 +44,7 @@ const userSchema = new mongoose.Schema(
       },
     ],
     Options: [{ type: String }],
-    Reports: [{ type: String }],
+
     phone: { type: String, unique: true },
     address: { type: String },
     city: { type: String },
