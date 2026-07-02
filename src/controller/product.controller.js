@@ -18,6 +18,7 @@ const {
   buildCacheKey,
 } = require("@/utils/cache.util");
 const { imageQueue } = require("@/queues/image.queue");
+const { logAudit } = require("@/service/audit.service");
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -248,6 +249,15 @@ class ProductController {
 
     await bumpNsVersion(NS);
 
+    logAudit({
+      req,
+      action: "CREATE",
+      entityType: "product",
+      entityId: product._id,
+      entityLabel: product.name,
+      after: product,
+    });
+
     return apiResponse.sendSuccess(
       res,
       statusCodes.CREATED,
@@ -405,6 +415,9 @@ class ProductController {
       oldOgPublicId = product.seo?.ogImage?.publicId || null;
     }
 
+    // Snapshot changed fields only — keeps the audit diff free of populated-ref noise
+    const auditBeforeDoc = await Product.findOne({ slug }).lean();
+
     // Build $set payload — flatten seo so ogImage merges instead of replacing
     const seoData = mergeSeoData(updateData);
     const $set = { ...updateData };
@@ -479,6 +492,24 @@ class ProductController {
 
     await bumpNsVersion(NS);
 
+    if (auditBeforeDoc) {
+      const auditBefore = {};
+      for (const key of Object.keys($set)) {
+        auditBefore[key] = key
+          .split(".")
+          .reduce((obj, k) => obj?.[k], auditBeforeDoc);
+      }
+      logAudit({
+        req,
+        action: "UPDATE",
+        entityType: "product",
+        entityId: product._id,
+        entityLabel: product.name,
+        before: auditBefore,
+        after: $set,
+      });
+    }
+
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
@@ -499,6 +530,10 @@ class ProductController {
       );
     }
 
+    const previous = await Product.findOne({ slug })
+      .select("isActive")
+      .lean();
+
     const product = await Product.findOneAndUpdate(
       { slug },
       { $set: { isActive } },
@@ -510,6 +545,16 @@ class ProductController {
     }
 
     await bumpNsVersion(NS);
+
+    logAudit({
+      req,
+      action: "STATUS_CHANGE",
+      entityType: "product",
+      entityId: product._id,
+      entityLabel: product.name,
+      before: { isActive: previous?.isActive },
+      after: { isActive: product.isActive },
+    });
 
     return apiResponse.sendSuccess(
       res,
@@ -714,6 +759,15 @@ class ProductController {
     }
 
     await bumpNsVersion(NS);
+
+    logAudit({
+      req,
+      action: "DELETE",
+      entityType: "product",
+      entityId: product._id,
+      entityLabel: product.name,
+      before: product,
+    });
 
     return apiResponse.sendSuccess(
       res,

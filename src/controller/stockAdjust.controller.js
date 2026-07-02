@@ -6,6 +6,7 @@ const Variant = require("../models/variant.model");
 const StockAdjust = require("../models/stockadjust.model");
 const { statusCodes } = require("../constant/constant");
 const { getCache, setCache, bumpNsVersion, buildCacheKey } = require("@/utils/cache.util");
+const { logAudit } = require("@/service/audit.service");
 
 const NS = "stock";
 const CACHE_TTL = 60 * 30; // 30 minutes
@@ -74,6 +75,15 @@ exports.createStockAdjust = asynchandeler(async (req, res) => {
 
   await safeBump(NS);
   await safeBump("product");
+
+  logAudit({
+    req,
+    action: "STOCK_ADJUST",
+    entityType: "stockadjust",
+    entityId: stockAdjust._id,
+    entityLabel: adjustReason,
+    after: stockAdjust,
+  });
 
   return apiResponse.sendSuccess(
     res,
@@ -353,6 +363,15 @@ exports.deleteStockAdjustById = asynchandeler(async (req, res) => {
   await safeBump(NS);
   await safeBump("product");
 
+  logAudit({
+    req,
+    action: "DELETE",
+    entityType: "stockadjust",
+    entityId: stockAdjust._id,
+    entityLabel: stockAdjust.adjustReason,
+    before: stockAdjust,
+  });
+
   return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -433,6 +452,7 @@ exports.updateStockAdjustById = asynchandeler(async (req, res) => {
     }
   }
 
+  const beforeAdjust = existing.toObject();
   existing.increaseQuantity = resolvedInc || null;
   existing.decreaseQuantity = resolvedDec || null;
   if (adjustReason !== undefined) existing.adjustReason = adjustReason;
@@ -441,6 +461,16 @@ exports.updateStockAdjustById = asynchandeler(async (req, res) => {
 
   await safeBump(NS);
   await safeBump("product");
+
+  logAudit({
+    req,
+    action: "UPDATE",
+    entityType: "stockadjust",
+    entityId: existing._id,
+    entityLabel: existing.adjustReason,
+    before: beforeAdjust,
+    after: existing,
+  });
 
   return apiResponse.sendSuccess(res, statusCodes.OK, "Stock adjustment updated successfully", { stockAdjust: existing });
 });

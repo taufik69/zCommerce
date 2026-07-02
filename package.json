@@ -9,6 +9,7 @@
     "build": "pm2 start index.js --name jahirCommerce --watch --ignore-watch=\"node_modules\" --env production",
     "worker:image": "node src/workers/image.worker.js",
     "worker:sms": "node src/workers/sms.worker.js",
+    "worker:audit": "node src/workers/audit.worker.js",
     "seed:permissions": "node src/seeder/permissionSeeder.js",
     "seed:roles": "node src/seeder/roleSeeder.js",
     "seed:role-permissions": "node src/seeder/rolePermissionSeeder.js",

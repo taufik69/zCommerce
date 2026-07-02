@@ -11,6 +11,8 @@ const {
   buildCacheKey,
 } = require("@/utils/cache.util");
 
+const { logAudit } = require("@/service/audit.service");
+
 const NS = "coupon";
 const CACHE_TTL = 60 * 60; // 1 hour
 
@@ -27,6 +29,15 @@ exports.createCoupon = asynchandeler(async (req, res, next) => {
   const coupon = await Coupon.create(validatedData);
 
   await bumpNsVersion(NS);
+
+  logAudit({
+    req,
+    action: "CREATE",
+    entityType: "coupon",
+    entityId: coupon._id,
+    entityLabel: coupon.code,
+    after: coupon,
+  });
 
   apiResponse.sendSuccess(
     res,
@@ -68,11 +79,23 @@ exports.updateCoupon = asynchandeler(async (req, res, next) => {
   const coupon = await Coupon.findOne({ slug });
   if (!coupon) throw new customError("Coupon not found", statusCodes.NOT_FOUND);
 
+  const beforeCoupon = coupon.toObject();
+
   // Update fields
   Object.assign(coupon, validatedData);
-  
+
   await coupon.save();
   await bumpNsVersion(NS);
+
+  logAudit({
+    req,
+    action: "UPDATE",
+    entityType: "coupon",
+    entityId: coupon._id,
+    entityLabel: coupon.code,
+    before: beforeCoupon,
+    after: coupon,
+  });
 
   apiResponse.sendSuccess(res, statusCodes.OK, "Coupon updated successfully", { coupon });
 });
@@ -87,6 +110,15 @@ exports.deleteCoupon = asynchandeler(async (req, res) => {
 
   await bumpNsVersion(NS);
 
+  logAudit({
+    req,
+    action: "DELETE",
+    entityType: "coupon",
+    entityId: coupon._id,
+    entityLabel: coupon.code,
+    before: coupon,
+  });
+
   apiResponse.sendSuccess(res, statusCodes.OK, "Coupon deleted successfully", { coupon });
 });
 
@@ -97,12 +129,23 @@ exports.activateCoupon = asynchandeler(async (req, res) => {
   const coupon = await Coupon.findOneAndUpdate(
     { slug },
     { isActive: true },
-    { new: true },
+    { new: false },
   );
 
   if (!coupon) throw new customError("Coupon not found", statusCodes.NOT_FOUND);
 
   await bumpNsVersion(NS);
+
+  logAudit({
+    req,
+    action: "STATUS_CHANGE",
+    entityType: "coupon",
+    entityId: coupon._id,
+    entityLabel: coupon.code,
+    before: { isActive: coupon.isActive },
+    after: { isActive: true },
+  });
+  coupon.isActive = true;
 
   apiResponse.sendSuccess(res, statusCodes.OK, "Coupon activated successfully", { coupon });
 });
@@ -114,12 +157,23 @@ exports.deactivateCoupon = asynchandeler(async (req, res) => {
   const coupon = await Coupon.findOneAndUpdate(
     { slug },
     { isActive: false },
-    { new: true },
+    { new: false },
   );
 
   if (!coupon) throw new customError("Coupon not found", statusCodes.NOT_FOUND);
 
   await bumpNsVersion(NS);
+
+  logAudit({
+    req,
+    action: "STATUS_CHANGE",
+    entityType: "coupon",
+    entityId: coupon._id,
+    entityLabel: coupon.code,
+    before: { isActive: coupon.isActive },
+    after: { isActive: false },
+  });
+  coupon.isActive = false;
 
   apiResponse.sendSuccess(res, statusCodes.OK, "Coupon deactivated successfully", { coupon });
 });

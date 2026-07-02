@@ -27,6 +27,7 @@ const {
   buildCacheKey,
 } = require("../utils/cache.util");
 const { imageQueue } = require("../queues/image.queue");
+const { logAudit } = require("@/service/audit.service");
 
 // ─── constants ────────────────────────────────────────────────────────────────
 const NS_CUSTOMER = "customer";
@@ -201,6 +202,15 @@ exports.createCustomer = asynchandeler(async (req, res) => {
   // Invalidate cache
   await bumpNsVersion(NS_CUSTOMER);
 
+  logAudit({
+    req,
+    action: "CREATE",
+    entityType: "customer",
+    entityId: customer._id,
+    entityLabel: customer.fullName || customer.customerId,
+    after: customer,
+  });
+
   apiResponse.sendSuccess(
     res,
     statusCodes.CREATED,
@@ -320,8 +330,19 @@ exports.updateCustomer = asynchandeler(async (req, res) => {
   }
 
   // 4) Update other fields
+  const beforeCustomer = customer.toObject();
   Object.assign(customer, rest);
   const updatedCustomer = await customer.save();
+
+  logAudit({
+    req,
+    action: "UPDATE",
+    entityType: "customer",
+    entityId: customer._id,
+    entityLabel: customer.fullName || customer.customerId,
+    before: beforeCustomer,
+    after: updatedCustomer,
+  });
 
   // 5) Invalidate cache before clients re-fetch
   await bumpNsVersion(NS_CUSTOMER);
@@ -359,6 +380,15 @@ exports.deleteCustomer = asynchandeler(async (req, res) => {
     await imageQueue.add("delete-cloudinary-image", { publicId });
   }
 
+  logAudit({
+    req,
+    action: "DELETE",
+    entityType: "customer",
+    entityId: customer._id,
+    entityLabel: customer.fullName || customer.customerId,
+    before: customer,
+  });
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
@@ -378,6 +408,15 @@ exports.activateCustomer = asynchandeler(async (req, res) => {
     throw new customError("Customer not found or already active", statusCodes.NOT_FOUND);
   }
   await bumpNsVersion(NS_CUSTOMER);
+  logAudit({
+    req,
+    action: "STATUS_CHANGE",
+    entityType: "customer",
+    entityId: customer._id,
+    entityLabel: customer.fullName || customer.customerId,
+    before: { isActive: false },
+    after: { isActive: true },
+  });
   return apiResponse.sendSuccess(res, statusCodes.OK, "Customer activated successfully", customer);
 });
 
@@ -392,6 +431,15 @@ exports.deactivateCustomer = asynchandeler(async (req, res) => {
     throw new customError("Customer not found or already inactive", statusCodes.NOT_FOUND);
   }
   await bumpNsVersion(NS_CUSTOMER);
+  logAudit({
+    req,
+    action: "STATUS_CHANGE",
+    entityType: "customer",
+    entityId: customer._id,
+    entityLabel: customer.fullName || customer.customerId,
+    before: { isActive: true },
+    after: { isActive: false },
+  });
   return apiResponse.sendSuccess(res, statusCodes.OK, "Customer deactivated successfully", customer);
 });
 

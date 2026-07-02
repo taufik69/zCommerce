@@ -82,6 +82,8 @@ const permissionList = [
   { permissionName: "Create User" },
   { permissionName: "Create Role" },
   { permissionName: "Create Permission" },
+  // Audit
+  { permissionName: "Audit Log" },
 ];
 
 async function seedPermission() {

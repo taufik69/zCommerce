@@ -18,6 +18,7 @@ const { orderTemplate } = require("../emailTemplate/orderTemplate");
 const { sendSMS } = require("../helpers/sms");
 const { getIO } = require("../socket/socket");
 const { statusCodes } = require("../constant/constant");
+const { logAudit } = require("@/service/audit.service");
 
 // applyDeliveryCharge
 const applyDeliveryCharge = async (deliveryChargeID) => {
@@ -341,6 +342,15 @@ exports.createOrder = asynchandeler(async (req, res) => {
       guestId: req.body.guestId || null,
     });
 
+    logAudit({
+      req,
+      action: "CREATE",
+      entityType: "order",
+      entityId: order._id,
+      entityLabel: order.invoiceId,
+      after: order,
+    });
+
     // Step 11: SSLCommerz or COD Success
     if (paymentMethod === "sslcommerz") {
       const data = {
@@ -540,6 +550,7 @@ exports.updateOrder = asynchandeler(async (req, res) => {
   }
 
   // Update order fields
+  const previousStatus = singleOrder.orderStatus;
   singleOrder.orderStatus = orderStatus;
   singleOrder.shippingInfo = shippingInfo || singleOrder.shippingInfo;
   singleOrder.followUp = req.user?._id || null;
@@ -549,6 +560,16 @@ exports.updateOrder = asynchandeler(async (req, res) => {
   }
 
   await singleOrder.save();
+
+  logAudit({
+    req,
+    action: "STATUS_CHANGE",
+    entityType: "order",
+    entityId: singleOrder._id,
+    entityLabel: singleOrder.invoiceId,
+    before: { orderStatus: previousStatus },
+    after: { orderStatus: singleOrder.orderStatus },
+  });
 
   apiResponse.sendSuccess(
     res,
@@ -664,6 +685,15 @@ exports.deleteOrder = asynchandeler(async (req, res) => {
   await Order.deleteOne({ _id: id });
   // Also delete associated invoice
   await Invoice.deleteOne({ order: id });
+
+  logAudit({
+    req,
+    action: "DELETE",
+    entityType: "order",
+    entityId: singleOrder._id,
+    entityLabel: singleOrder.invoiceId,
+    before: singleOrder,
+  });
 
   apiResponse.sendSuccess(
     res,

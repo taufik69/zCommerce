@@ -14,6 +14,7 @@ const {
 } = require("../helpers/cloudinary");
 const { statusCodes } = require("../constant/constant");
 const { imageQueue } = require("@/queues/image.queue");
+const { logAudit } = require("@/service/audit.service");
 const {
   getCache,
   setCache,
@@ -89,6 +90,14 @@ exports.login = asynchandeler(async (req, res) => {
   //check password
   const isPasswordMatch = await user.comparePassword(password);
   if (!isPasswordMatch) {
+    logAudit({
+      req,
+      user,
+      action: "LOGIN_FAILED",
+      entityType: "user",
+      entityId: user._id,
+      entityLabel: user.email || user.phone,
+    });
     throw new customError("Invalid credentials", statusCodes.BAD_REQUEST);
   }
 
@@ -100,6 +109,15 @@ exports.login = asynchandeler(async (req, res) => {
   user.refreshToken = refreshToken;
   user.lastlogin = Date.now();
   await user.save();
+
+  logAudit({
+    req,
+    user,
+    action: "LOGIN",
+    entityType: "user",
+    entityId: user._id,
+    entityLabel: user.email || user.phone,
+  });
 
   // now remove password from response
   const {
