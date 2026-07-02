@@ -177,6 +177,7 @@ exports.getAllPurchases = asynchandeler(async (req, res) => {
     })
     .populate({
       path: "allproduct.variant",
+      populate: { path: "product" },
     })
     .populate("category subCategory brand cashType supplierId")
     .sort({ createdAt: -1 })
@@ -228,6 +229,7 @@ exports.getSinglePurchase = asynchandeler(async (req, res) => {
     })
     .populate({
       path: "allproduct.variant",
+      populate: { path: "product" },
     })
     .populate("category subCategory brand cashType supplierId")
     .lean();
@@ -522,7 +524,7 @@ exports.searchPurchase = asynchandeler(async (req, res) => {
 
   const purchases = await Purchase.find(query)
     .populate({ path: "allproduct.product" })
-    .populate({ path: "allproduct.variant" })
+    .populate({ path: "allproduct.variant", populate: { path: "product" } })
     .populate("category subCategory brand cashType supplierId")
     .sort({ createdAt: -1 })
     .lean();

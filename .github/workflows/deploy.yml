@@ -37,6 +37,9 @@ jobs:
             pm2 restart "zcommerce-worker" || pm2 start npm --name "zcommerce-worker" -- run worker:image
 
             # 3. SMS worker restart
-            pm2 restart "zcommerce-sms-worker" || pm2 start npm --name "zcommerce-sms-worker" -- run worker:sms
+            pm2 restart "zcommerce-sms-worker" || pm2 start npm --name "zcommerce-sms-worker" -- run worker:sms 
+
+            # 4 worker:audit restart
+            pm2 restart "zcommerce-audit-worker" || pm2 start npm --name "zcommerce-audit-worker" -- run worker:audit
 
             echo ">>> Backend Deployment complete!"
