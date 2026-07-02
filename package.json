@@ -16,7 +16,8 @@
     "seed:users": "node src/seeder/seedUsers.js",
     "seed:delivery": "node src/seeder/deliverySeeder.js",
     "socket": "node src/socket/client.js",
-    "admin": "node src/seeder/addAdminSeeder.js"
+    "superAdmin": "node src/seeder/addAdminSeeder.js",
+    "worker:all": "concurrently \"npm run worker:image\" \"npm run worker:sms\" \"npm run worker:audit\""
   },
   "_moduleAliases": {
     "@": "src"
@@ -57,5 +58,8 @@
     "socket.io-client": "^4.8.1",
     "sslcommerz-lts": "^1.1.0",
     "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
   }
 }
