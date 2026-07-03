@@ -11,7 +11,8 @@ const { customerModel } = require("../models/customer.model");
 const RECIPIENT_TYPES = {
   logged: "Logged Customers",
   order: "Order Customers",
-  sales: "Sales Customers",
+  sales_walking: "Walking Customers",
+  sales_listed: "Listed Customers",
 };
 
 const normalizePhone = (phone) =>
@@ -51,30 +52,36 @@ const resolveRecipients = async (recipientType) => {
       );
     }
 
-    case "sales": {
-      // ── Step 1: scan all sales for walking phones + listed customer IDs ──
-      const sales = await Sales.find({})
-        .select("customerType")
+    case "sales_walking": {
+      // Walking (non-listed) customers from sales — phone comes from the embedded doc
+      const sales = await Sales.find({ "customerType.type": "walking" })
+        .select("customerType.walking")
         .lean();
 
-      const listedIdSet = new Set(); // collect unique listed customer ObjectIds
-      const walkingList = [];        // phones from embedded walking customer docs
+      const walkingList = sales
+        .map((s) => s.customerType?.walking)
+        .filter(Boolean)
+        .map((w) => ({
+          customerId: null,
+          name: w.customerName || "",
+          phone: normalizePhone(w.mobileNumber),
+        }));
 
+      return dedupe(walkingList);
+    }
+
+    case "sales_listed": {
+      // Listed customers from sales — resolve unique customer IDs to their phone numbers
+      const sales = await Sales.find({ "customerType.type": "listed" })
+        .select("customerType.customerId")
+        .lean();
+
+      const listedIdSet = new Set();
       for (const s of sales) {
-        const ct = s.customerType;
-        if (!ct) continue;
-
-        if (ct.type === "listed" && ct.customerId) {
-          listedIdSet.add(ct.customerId.toString());
-        } else if (ct.type === "walking" && ct.walking) {
-          const phone = normalizePhone(ct.walking.mobileNumber);
-          if (phone) {
-            walkingList.push({ customerId: null, name: ct.walking.customerName || "", phone });
-          }
-        }
+        const id = s.customerType?.customerId;
+        if (id) listedIdSet.add(id.toString());
       }
 
-      // ── Step 2: bulk-fetch listed customer phone numbers by ObjectId ──────
       const listedIds = [...listedIdSet].map(
         (id) => new mongoose.Types.ObjectId(id),
       );
@@ -91,8 +98,7 @@ const resolveRecipients = async (recipientType) => {
         phone: normalizePhone(c.mobileNumber),
       }));
 
-      // ── Step 3: merge + dedupe by phone ─────────────────────────────────
-      return dedupe([...walkingList, ...listedList]);
+      return dedupe(listedList);
     }
 
     default:
@@ -125,15 +131,17 @@ const dedupe = (recipients) => {
  * (still deduped so the number matches what would actually be sent).
  */
 const countRecipients = async () => {
-  const [logged, order, sales] = await Promise.all([
+  const [logged, order, salesWalking, salesListed] = await Promise.all([
     resolveRecipients("logged"),
     resolveRecipients("order"),
-    resolveRecipients("sales"),
+    resolveRecipients("sales_walking"),
+    resolveRecipients("sales_listed"),
   ]);
   return {
     logged: logged.length,
     order: order.length,
-    sales: sales.length,
+    sales_walking: salesWalking.length,
+    sales_listed: salesListed.length,
   };
 };
 
