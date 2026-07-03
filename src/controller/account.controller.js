@@ -42,8 +42,13 @@ exports.getAllAccounts = asynchandeler(async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
   const skip = (page - 1) * limit;
+  const search = (req.query.search || "").trim();
 
-  const cacheKey = await buildCacheKey(NS, `page_${page}_limit_${limit}`);
+  const query = search
+    ? { name: { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } }
+    : {};
+
+  const cacheKey = await buildCacheKey(NS, `page_${page}_limit_${limit}_search_${search}`);
   const cached = await getCache(cacheKey);
   if (cached) {
     return apiResponse.sendSuccess(
@@ -55,8 +60,8 @@ exports.getAllAccounts = asynchandeler(async (req, res) => {
   }
 
   const [accounts, total] = await Promise.all([
-    Account.find().sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    Account.countDocuments(),
+    Account.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    Account.countDocuments(query),
   ]);
 
   if (!accounts.length && page === 1) {

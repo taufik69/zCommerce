@@ -220,27 +220,72 @@ exports.createSales = asynchandeler(async (req, res) => {
 
 // get all sales order or get invoiceNumber wise sales
 exports.getAllSales = asynchandeler(async (req, res) => {
-  const { invoiceNumber } = req.query;
-  let query = {};
+  const { invoiceNumber, search } = req.query;
+
+  // Exact invoice lookup — used by callers that need one specific invoice's full details
   if (invoiceNumber) {
-    query = { invoiceNumber };
-  } else {
-    query = {};
+    const sales = await salesModel
+      .find({ invoiceNumber })
+      .sort({ createdAt: -1 })
+      .populate("customerType.customerId")
+      .populate("searchItem.productId")
+      .populate("searchItem.variantId");
+    if (!sales || sales.length === 0) {
+      throw new customError("No sales found", statusCodes.NOT_FOUND);
+    }
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Sales fetched successfully",
+      sales,
+    );
   }
-  const sales = await salesModel
-    .find(query)
-    .sort({ createdAt: -1 })
-    .populate("customerType.customerId")
-    .populate("searchItem.productId")
-    .populate("searchItem.variantId");
-  if (!sales || sales.length === 0) {
-    throw new customError("No sales found", statusCodes.NOT_FOUND);
+
+  // Backward-compatible unpaginated list — existing callers expect a flat array
+  if (!req.query.page && !req.query.limit && !search) {
+    const sales = await salesModel
+      .find({})
+      .sort({ createdAt: -1 })
+      .populate("customerType.customerId")
+      .populate("searchItem.productId")
+      .populate("searchItem.variantId");
+    if (!sales || sales.length === 0) {
+      throw new customError("No sales found", statusCodes.NOT_FOUND);
+    }
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Sales fetched successfully",
+      sales,
+    );
   }
+
+  // Paginated + searchable list — used by infinite-scroll dropdowns
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const skip = (page - 1) * limit;
+
+  const query = search
+    ? { invoiceNumber: { $regex: String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } }
+    : {};
+
+  const [sales, total] = await Promise.all([
+    salesModel
+      .find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("customerType.customerId")
+      .populate("searchItem.productId")
+      .populate("searchItem.variantId"),
+    salesModel.countDocuments(query),
+  ]);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Sales fetched successfully",
-    sales,
+    { sales, total, page, limit, hasNextPage: page * limit < total },
   );
 });
 

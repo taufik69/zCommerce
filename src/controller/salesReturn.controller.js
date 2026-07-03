@@ -6,6 +6,8 @@ const SalesReturn = require("../models/salesReturn.model");
 const Product = require("../models/product.model");
 const Variant = require("../models/variant.model");
 const Sales = require("../models/sales.model");
+const { customerModel } = require("../models/customer.model");
+const CrateTransaction = require("../models/crateTransaction.model");
 const { validateSalesReturn } = require("../validation/salesReturn.validation");
 const { statusCodes } = require("../constant/constant");
 const {
@@ -17,6 +19,51 @@ const {
 
 const NS = "salesReturn";
 const CACHE_TTL = 60 * 60; // 1 hour
+
+// Deduct the return amount from a listed customer's opening dues (floored at 0).
+// Walking customers have no ledger entry — nothing to adjust.
+async function applyCustomerDuesForReturn(customerType, amount, session) {
+  if (customerType?.type !== "listed" || !customerType?.customerId) return;
+  const customer = await customerModel.findById(customerType.customerId).session(session);
+  if (!customer) return;
+  customer.openingDues = Math.max(0, (customer.openingDues || 0) - amount);
+  await customer.save({ session });
+}
+
+// Revert a previously-applied dues deduction (used on delete/update rollback).
+async function revertCustomerDuesForReturn(customerType, amount, session) {
+  if (customerType?.type !== "listed" || !customerType?.customerId) return;
+  await customerModel.findByIdAndUpdate(
+    customerType.customerId,
+    { $inc: { openingDues: amount } },
+    { session },
+  );
+}
+
+// Record the refund as an outgoing cash transaction, describing whether it
+// came from a listed customer's due balance or a walking customer.
+async function recordReturnTransaction({ sale, returnDoc, refundMethod, session }) {
+  const customerType = sale?.customerType;
+  const isListed = customerType?.type === "listed";
+  const customerLabel = isListed
+    ? "listed customer"
+    : (customerType?.walking?.customerName || "walking customer");
+
+  const [transaction] = await CrateTransaction.create(
+    [
+      {
+        date: returnDoc.date || new Date(),
+        account: refundMethod,
+        transactionDescription: `Sales return refund — invoice ${sale?.invoiceNumber || ""} (${customerLabel})`.trim(),
+        voucherNumber: sale?.invoiceNumber || "",
+        transactionType: "cash payment",
+        amount: returnDoc.totalReturnAmount,
+      },
+    ],
+    { session },
+  );
+  return transaction;
+}
 
 // @desc create a new sales return
 exports.createSalesReturn = asynchandeler(async (req, res) => {
@@ -74,6 +121,27 @@ exports.createSalesReturn = asynchandeler(async (req, res) => {
     // 2. Update original Sales record (increment return field + searchItem status)
     originalSale.return = (originalSale.return || 0) + data.totalReturnAmount;
     await originalSale.save({ session });
+
+    // 3. Listed customer -> deduct from opening dues. Walking customer -> skip.
+    await applyCustomerDuesForReturn(
+      originalSale.customerType,
+      data.totalReturnAmount,
+      session,
+    );
+
+    // 4. Record the refund as a transaction either way, and link it back.
+    const transaction = await recordReturnTransaction({
+      sale: originalSale,
+      returnDoc: data,
+      refundMethod: data.refundMethod,
+      session,
+    });
+    returnDoc.transaction = transaction._id;
+    await SalesReturn.findByIdAndUpdate(
+      returnDoc._id,
+      { transaction: transaction._id },
+      { session },
+    );
 
     await session.commitTransaction();
     session.endSession();
@@ -224,6 +292,18 @@ exports.deleteSalesReturn = asynchandeler(async (req, res) => {
       await originalSale.save({ session });
     }
 
+    // 3. Rollback listed customer's opening dues and remove the refund transaction.
+    if (originalSale) {
+      await revertCustomerDuesForReturn(
+        originalSale.customerType,
+        salesReturn.totalReturnAmount,
+        session,
+      );
+    }
+    if (salesReturn.transaction) {
+      await CrateTransaction.findByIdAndDelete(salesReturn.transaction, { session });
+    }
+
     await SalesReturn.findByIdAndDelete(id).session(session);
 
     await session.commitTransaction();
@@ -294,6 +374,15 @@ exports.updateSalesReturn = asynchandeler(async (req, res) => {
       await oldSale.save({ session });
     }
 
+    // 1d. Revert old listed customer's opening dues
+    if (oldSale) {
+      await revertCustomerDuesForReturn(
+        oldSale.customerType,
+        existingReturn.totalReturnAmount,
+        session,
+      );
+    }
+
     // --- STEP 2: APPLY NEW STATE ---
 
     // 2a. Apply new stock
@@ -327,10 +416,48 @@ exports.updateSalesReturn = asynchandeler(async (req, res) => {
       await newSale.save({ session });
     }
 
+    // 2d. Apply new listed customer's opening dues
+    if (newSale) {
+      await applyCustomerDuesForReturn(
+        newSale.customerType,
+        data.totalReturnAmount,
+        session,
+      );
+    }
+
+    // 2e. Update (or create) the linked refund transaction to match the new state
+    let transactionId = existingReturn.transaction;
+    if (transactionId) {
+      const isListed = newSale?.customerType?.type === "listed";
+      const customerLabel = isListed
+        ? "listed customer"
+        : (newSale?.customerType?.walking?.customerName || "walking customer");
+      await CrateTransaction.findByIdAndUpdate(
+        transactionId,
+        {
+          date: data.date || new Date(),
+          account: data.refundMethod,
+          transactionDescription: `Sales return refund — invoice ${newSale?.invoiceNumber || ""} (${customerLabel})`.trim(),
+          voucherNumber: newSale?.invoiceNumber || "",
+          transactionType: "cash payment",
+          amount: data.totalReturnAmount,
+        },
+        { session },
+      );
+    } else {
+      const transaction = await recordReturnTransaction({
+        sale: newSale,
+        returnDoc: data,
+        refundMethod: data.refundMethod,
+        session,
+      });
+      transactionId = transaction._id;
+    }
+
     // 3. Update the return document
     const updatedReturn = await SalesReturn.findByIdAndUpdate(
       id,
-      { $set: data },
+      { $set: { ...data, transaction: transactionId } },
       { new: true, session }
     );
 

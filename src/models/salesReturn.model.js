@@ -16,6 +16,11 @@ const salesReturnSchema = new mongoose.Schema(
       ref: "Account",
       required: true,
     },
+    transaction: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CrateTransaction",
+      default: null,
+    },
     returnReason: {
       type: String,
       trim: true,
