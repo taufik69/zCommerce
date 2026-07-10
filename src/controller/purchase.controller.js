@@ -201,7 +201,7 @@ exports.getAllPurchases = asynchandeler(async (req, res) => {
     res,
     statusCodes.OK,
     "Purchases fetched successfully",
-    purchasesWithSerial,
+    { purchases: purchasesWithSerial },
   );
 });
 

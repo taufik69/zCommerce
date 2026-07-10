@@ -733,7 +733,7 @@ class ProductController {
       res,
       statusCodes.OK,
       "Products fetched successfully",
-      { products: payload, fromCache: false },
+      { ...payload, fromCache: false },
     );
   });
 
