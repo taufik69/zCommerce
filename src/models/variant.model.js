@@ -97,6 +97,7 @@ const variantSchema = new mongoose.Schema(
 
     // Quantity / stock
     stockVariant: { type: Number, min: 0, default: 0 },
+    initialStock: { type: Number, min: 0, default: 0 },
     purchaseReturnStock: { type: Number, min: 0, default: 0 },
     salesReturnStock: { type: Number, min: 0, default: 0 },
     purchaseQuantityStock: { type: Number, min: 0, default: 0 },

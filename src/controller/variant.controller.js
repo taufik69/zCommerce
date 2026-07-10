@@ -126,6 +126,8 @@ exports.createVariant = asynchandeler(async (req, res) => {
 
     const newVariant = new variant({
       ...validatedData,
+      // Snapshot the creation-time stock — never touched again after this
+      initialStock: validatedData.stockVariant,
       thumbnail: finalThumbnail
         ? { status: "pending", localPath: finalThumbnail.path }
         : undefined,
@@ -215,7 +217,7 @@ exports.getAllVariants = asynchandeler(async (req, res, next) => {
       path: "product",
       populate: ["category", "brand", "subcategory", "discount"],
     })
-    .populate("stockVariantAdjust byReturn salesReturn")
+    .populate("byReturn salesReturn")
     .select("-updatedAt")
     .sort({ createdAt: -1 })
     .lean();
@@ -285,7 +287,7 @@ exports.searchVariants = asynchandeler(async (req, res) => {
       select:
         "name category brand subcategory discount barCode sku stock retailPrice wholesalePrice purchasePrice slug",
     })
-    .populate("stockVariantAdjust byReturn salesReturn")
+    .populate("byReturn salesReturn")
     .select("-updatedAt")
     .sort({ createdAt: -1 })
     .lean();
@@ -322,7 +324,7 @@ exports.getSingleVariant = asynchandeler(async (req, res, next) => {
       select:
         "name category brand subcategory discount  barCode sku stock retailPrice wholesalePrice purchasePrice slug",
     })
-    .populate("stockVariantAdjust byReturn salesReturn")
+    .populate("byReturn salesReturn")
     .lean();
 
   if (!singleVariant) {
@@ -444,7 +446,16 @@ exports.updateVariant = asynchandeler(async (req, res) => {
   if (validatedData.wholesaleProfitMarginPercentage === null) {
     validatedData.wholesaleProfitMarginPercentage = 0;
   }
-  Object.assign(existingVariant, validatedData);
+  // "stockVariant" on the update form only updates initialStock (a snapshot)
+  // — the live stockVariant counter is exclusively maintained by
+  // sales/purchase/adjustment/return controllers and must never be
+  // overwritten by an edit form.
+  const { stockVariant: submittedStockVariant, ...restValidatedData } =
+    validatedData;
+  if (submittedStockVariant !== undefined) {
+    restValidatedData.initialStock = submittedStockVariant;
+  }
+  Object.assign(existingVariant, restValidatedData);
   await existingVariant.save();
 
   const nextProductId = existingVariant.product?.toString();

@@ -115,6 +115,8 @@ class ProductController {
     // Set default 0 for null number fields
     if (productData.stock === null || productData.stock === undefined)
       productData.stock = 0;
+    // Snapshot the creation-time stock — never touched again after this
+    productData.initialStock = productData.stock;
     if (productData.weight === null || productData.weight === undefined)
       productData.weight = 0;
     if (
@@ -338,10 +340,10 @@ class ProductController {
     }
 
     const product = await Product.findOne({ slug })
-      .populate("brand discount stockAdjustment")
+      .populate("brand discount")
       .populate({ path: "category", populate: "discount" })
       .populate({ path: "subcategory", populate: "discount" })
-      .populate({ path: "variant", populate: "stockVariantAdjust" })
+      .populate({ path: "variant" })
       .populate({ path: "byReturn", populate: "product variant" })
       .populate({ path: "salesReturn", populate: "product variant" })
       .lean();
@@ -420,7 +422,15 @@ class ProductController {
 
     // Build $set payload — flatten seo so ogImage merges instead of replacing
     const seoData = mergeSeoData(updateData);
-    const $set = { ...updateData };
+    const { stock: submittedStock, ...restUpdateData } = updateData;
+    const $set = { ...restUpdateData };
+    // "stock" on the update form only updates initialStock (a snapshot) —
+    // the live stock/stockVariant counter is exclusively maintained by
+    // sales/purchase/adjustment/return controllers and must never be
+    // overwritten by an edit form.
+    if (submittedStock !== undefined) {
+      $set.initialStock = submittedStock;
+    }
 
     if (Object.keys(seoData).length > 0) {
       Object.entries(seoData).forEach(([k, v]) => {

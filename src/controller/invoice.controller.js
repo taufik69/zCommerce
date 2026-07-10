@@ -1671,7 +1671,6 @@ exports.getZeroSaleVariantsLast30Days = asynchandeler(async (req, res) => {
     createdAt: { $gte: thirtyDaysAgo },
   })
     .populate("product") // populate product name if needed
-    .populate("stockVariantAdjust") // include adjustments for virtuals
     .populate("byReturn") // populate byReturn for virtual
     .populate("salesReturn"); // populate salesReturn for virtual
   if (!variants) {
@@ -1713,7 +1712,6 @@ exports.getZeroSaleProductsLast30Days = asynchandeler(async (req, res) => {
     createdAt: { $gte: thirtyDaysAgo },
   })
     .populate("variant") // include variants for size-wise stock and other virtuals
-    .populate("stockAdjustment")
     .populate("byReturn")
     .populate("salesReturn");
   if (!products) {
