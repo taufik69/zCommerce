@@ -56,7 +56,6 @@ const getVariantFile = (files = [], index, fieldName) => {
 const uniqueFieldLabels = {
   variantName: "Variant name",
   size: "Size",
-  color: "Color",
   sku: "SKU",
   barCode: "Barcode",
 };
@@ -100,7 +99,10 @@ const VariantSchema = Joi.object({
     "any.required": "Variant name is required",
   }),
   size: Joi.string().trim().default("N/A"),
-  color: Joi.string().trim().default("N/A"),
+  color: Joi.string().trim().required().messages({
+    "string.empty": "Color is required",
+    "any.required": "Color is required",
+  }),
   stockVariant: Joi.number().min(0).default(0),
   purchasePrice: Joi.number().min(0).required(),
   retailPrice: Joi.number().min(0).required(),
@@ -122,7 +124,7 @@ const VariantSchema = Joi.object({
 }).options({ abortEarly: false, allowUnknown: true });
 
 const VariantUpdateSchema = VariantSchema.fork(
-  ["product", "variantName", "purchasePrice", "retailPrice"],
+  ["product", "variantName", "purchasePrice", "retailPrice", "color"],
   (schema) => schema.optional(),
 );
 

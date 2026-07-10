@@ -2,6 +2,7 @@ const { statusCodes } = require("../constant/constant");
 const mongoose = require("mongoose");
 const purchaseModel = require("./purchase.model");
 const slugify = require("slugify");
+const { customError } = require("../lib/CustomError");
 
 // ─── Reusable subschemas ─────────────────────────────────────────────────────
 
@@ -167,7 +168,6 @@ variantSchema.index({ product: 1, isActive: 1 });
 const UNIQUE_VARIANT_FIELDS = {
   variantName: "Variant name",
   size: "Size",
-  color: "Color",
   sku: "SKU",
   barCode: "Barcode",
 };
