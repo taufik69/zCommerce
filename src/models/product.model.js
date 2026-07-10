@@ -134,6 +134,7 @@ const productSchema = new mongoose.Schema(
     color: { type: String, trim: true, default: "N/A" },
     stock: { type: Number, min: 0, default: 0 },
     purchaseReturnStock: { type: Number, min: 0, default: 0 },
+    salesReturnStock: { type: Number, min: 0, default: 0 },
     warehouseLocation: { type: String, trim: true },
 
     // Pricing
@@ -157,9 +158,14 @@ const productSchema = new mongoose.Schema(
     alertQuantity: { type: Number, default: 5 },
     stockAlert: { type: Boolean, default: false },
     instock: { type: Boolean },
-    stockAdjustment: [
-      { type: mongoose.Schema.Types.ObjectId, ref: "StockAdjust" },
-    ],
+    stockAdjustmentPlus: {
+      type: Number,
+      default: 0,
+    },
+    stockAdjustmentMinus: {
+      type: Number,
+      default: 0,
+    },
     isActive: { type: Boolean, default: true, index: true },
     totalSales: { type: Number, default: 0 },
     salesReturn: [{ type: mongoose.Schema.Types.ObjectId, ref: "SalesReturn" }],
@@ -242,17 +248,11 @@ productSchema.virtual("singleVariantOpeningStock").get(function () {
 });
 
 productSchema.virtual("adjustmentSingleVariantPlus").get(function () {
-  return (this.stockAdjustment || []).reduce(
-    (sum, a) => sum + (a?.increaseQuantity || 0),
-    0,
-  );
+  return this.stockAdjustmentPlus || 0;
 });
 
 productSchema.virtual("adjustmentSingleVariantMinus").get(function () {
-  return (this.stockAdjustment || []).reduce(
-    (sum, a) => sum + (a?.decreaseQuantity || 0),
-    0,
-  );
+  return this.stockAdjustmentMinus || 0;
 });
 
 productSchema.virtual("totalByReturnQuantity").get(function () {

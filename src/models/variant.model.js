@@ -98,9 +98,15 @@ const variantSchema = new mongoose.Schema(
     // Quantity / stock
     stockVariant: { type: Number, min: 0, default: 0 },
     purchaseReturnStock: { type: Number, min: 0, default: 0 },
-    stockVariantAdjust: [
-      { type: mongoose.Schema.Types.ObjectId, ref: "StockAdjust" },
-    ],
+    salesReturnStock: { type: Number, min: 0, default: 0 },
+    stockAdjustmentPlus: {
+      type: Number,
+      default: 0,
+    },
+    stockAdjustmentMinus: {
+      type: Number,
+      default: 0,
+    },
     alertVariantStock: { type: Number, min: 0, default: 5 },
 
     // Pricing
@@ -174,18 +180,12 @@ const UNIQUE_VARIANT_FIELDS = {
 
 // calculate stock adjustment // adjustment plus
 variantSchema.virtual("adjustmentMultipleVariantPlus").get(function () {
-  return this.stockVariantAdjust?.reduce((total, variant) => {
-    total += variant?.increaseQuantity;
-    return total;
-  }, 0);
+  return this.stockAdjustmentPlus || 0;
 });
 
 //calculate stock adjustment // adjustment minus
 variantSchema.virtual("adjustmentMultipleVariantMinus").get(function () {
-  return this.stockVariantAdjust?.reduce((total, variant) => {
-    total += variant?.decreaseQuantity;
-    return total;
-  }, 0);
+  return this.stockAdjustmentMinus || 0;
 });
 
 // get opening stock

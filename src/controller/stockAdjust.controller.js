@@ -59,7 +59,8 @@ exports.createStockAdjust = asynchandeler(async (req, res) => {
       throw new customError("Product not found", statusCodes.NOT_FOUND);
     }
     product.stock += increaseQuantity - decreaseQuantity;
-    product.stockAdjustment.push(stockAdjust._id);
+    product.stockAdjustmentPlus = (product.stockAdjustmentPlus || 0) + (increaseQuantity || 0);
+    product.stockAdjustmentMinus = (product.stockAdjustmentMinus || 0) + (decreaseQuantity || 0);
     await product.save();
   }
   //    update variant stock
@@ -69,7 +70,8 @@ exports.createStockAdjust = asynchandeler(async (req, res) => {
       throw new customError("Variant not found", statusCodes.NOT_FOUND);
     }
     variant.stockVariant += increaseQuantity - decreaseQuantity;
-    variant.stockVariantAdjust.push(stockAdjust._id);
+    variant.stockAdjustmentPlus = (variant.stockAdjustmentPlus || 0) + (increaseQuantity || 0);
+    variant.stockAdjustmentMinus = (variant.stockAdjustmentMinus || 0) + (decreaseQuantity || 0);
     await variant.save();
   }
 
@@ -234,7 +236,7 @@ exports.getAllProductCategoryWise = asynchandeler(async (req, res) => {
   if (cached) return apiResponse.sendSuccess(res, statusCodes.OK, "Products retrieved successfully", cached);
 
   const products = await Product.find({ category }).populate(
-    "stockAdjustment category subcategory brand variant",
+    "category subcategory brand variant",
   );
   await safeSet(cacheKey, products, CACHE_TTL);
   apiResponse.sendSuccess(res, statusCodes.OK, "Products retrieved successfully", products);
@@ -250,7 +252,7 @@ exports.getAllProductSSubcategoryWise = asynchandeler(async (req, res) => {
   if (cached) return apiResponse.sendSuccess(res, statusCodes.OK, "Products retrieved successfully", cached);
 
   const products = await Product.find({ subcategory }).populate(
-    "stockAdjustment category subcategory brand variant",
+    "category subcategory brand variant",
   );
   if (!products || products.length === 0)
     throw new customError("Products not found", statusCodes.NOT_FOUND);
@@ -346,7 +348,8 @@ exports.deleteStockAdjustById = asynchandeler(async (req, res) => {
       throw new customError("Product not found", statusCodes.NOT_FOUND);
     }
     product.stock -= (increaseQuantity || 0) - (decreaseQuantity || 0);
-    product.stockAdjustment.pull(stockAdjust._id);
+    product.stockAdjustmentPlus = Math.max(0, (product.stockAdjustmentPlus || 0) - (increaseQuantity || 0));
+    product.stockAdjustmentMinus = Math.max(0, (product.stockAdjustmentMinus || 0) - (decreaseQuantity || 0));
     await product.save();
   }
   if (variantId) {
@@ -355,7 +358,8 @@ exports.deleteStockAdjustById = asynchandeler(async (req, res) => {
       throw new customError("Variant not found", statusCodes.NOT_FOUND);
     }
     variant.stockVariant -= (increaseQuantity || 0) - (decreaseQuantity || 0);
-    variant.stockVariantAdjust.pull(stockAdjust._id);
+    variant.stockAdjustmentPlus = Math.max(0, (variant.stockAdjustmentPlus || 0) - (increaseQuantity || 0));
+    variant.stockAdjustmentMinus = Math.max(0, (variant.stockAdjustmentMinus || 0) - (decreaseQuantity || 0));
     await variant.save();
   }
 
@@ -435,19 +439,25 @@ exports.updateStockAdjustById = asynchandeler(async (req, res) => {
   const newDelta = resolvedInc - resolvedDec;
 
   const stockDiff = newDelta - oldDelta; // net change to apply on top of existing
+  const incDiff = resolvedInc - oldInc; // change to apply to stockAdjustmentPlus
+  const decDiff = resolvedDec - oldDec; // change to apply to stockAdjustmentMinus
 
   // Adjust stock on the affected document
-  if (stockDiff !== 0) {
+  if (stockDiff !== 0 || incDiff !== 0 || decDiff !== 0) {
     if (existing.productId) {
       const product = await Product.findById(existing.productId);
       if (!product) throw new customError("Product not found", statusCodes.NOT_FOUND);
       product.stock += stockDiff;
+      product.stockAdjustmentPlus = Math.max(0, (product.stockAdjustmentPlus || 0) + incDiff);
+      product.stockAdjustmentMinus = Math.max(0, (product.stockAdjustmentMinus || 0) + decDiff);
       await product.save();
     }
     if (existing.variantId) {
       const variant = await Variant.findById(existing.variantId);
       if (!variant) throw new customError("Variant not found", statusCodes.NOT_FOUND);
       variant.stockVariant += stockDiff;
+      variant.stockAdjustmentPlus = Math.max(0, (variant.stockAdjustmentPlus || 0) + incDiff);
+      variant.stockAdjustmentMinus = Math.max(0, (variant.stockAdjustmentMinus || 0) + decDiff);
       await variant.save();
     }
   }

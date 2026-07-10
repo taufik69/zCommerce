@@ -220,6 +220,9 @@ exports.createPurchaseReturn = asynchandeler(async (req, res) => {
     session.endSession();
 
     await bumpNsVersion(NS);
+    // Also bump product cache — this endpoint mutates stock/stockVariant and
+    // purchaseReturnStock on Product/Variant, which /product/* endpoints cache.
+    await bumpNsVersion("product");
 
     return apiResponse.sendSuccess(
       res,
@@ -635,6 +638,9 @@ exports.updatePurchaseReturn = asynchandeler(async (req, res) => {
     session.endSession();
 
     await bumpNsVersion(NS);
+    // Also bump product cache — this endpoint mutates stock/stockVariant and
+    // purchaseReturnStock on Product/Variant, which /product/* endpoints cache.
+    await bumpNsVersion("product");
 
     return apiResponse.sendSuccess(
       res,
@@ -717,6 +723,9 @@ exports.deletePurchaseReturn = asynchandeler(async (req, res) => {
     session.endSession();
 
     await bumpNsVersion(NS);
+    // Also bump product cache — this endpoint mutates stock/stockVariant and
+    // purchaseReturnStock on Product/Variant, which /product/* endpoints cache.
+    await bumpNsVersion("product");
 
     return apiResponse.sendSuccess(
       res,

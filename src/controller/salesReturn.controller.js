@@ -98,13 +98,13 @@ exports.createSalesReturn = asynchandeler(async (req, res) => {
       if (item.variant) {
         await Variant.findByIdAndUpdate(
           item.variant,
-          { $inc: { stockVariant: item.quantity } },
+          { $inc: { stockVariant: item.quantity, salesReturnStock: item.quantity } },
           { session }
         );
       } else if (item.product) {
         await Product.findByIdAndUpdate(
           item.product,
-          { $inc: { stock: item.quantity } },
+          { $inc: { stock: item.quantity, salesReturnStock: item.quantity } },
           { session }
         );
       }
@@ -147,6 +147,9 @@ exports.createSalesReturn = asynchandeler(async (req, res) => {
     session.endSession();
 
     await bumpNsVersion(NS);
+    // Also bump product cache — this endpoint mutates stock/stockVariant and
+    // salesReturnStock on Product/Variant, which /product/* endpoints cache.
+    await bumpNsVersion("product");
 
     apiResponse.sendSuccess(
       res,
@@ -264,13 +267,13 @@ exports.deleteSalesReturn = asynchandeler(async (req, res) => {
       if (item.variant) {
         await Variant.findByIdAndUpdate(
           item.variant,
-          { $inc: { stockVariant: -item.quantity } },
+          { $inc: { stockVariant: -item.quantity, salesReturnStock: -item.quantity } },
           { session }
         );
       } else if (item.product) {
         await Product.findByIdAndUpdate(
           item.product,
-          { $inc: { stock: -item.quantity } },
+          { $inc: { stock: -item.quantity, salesReturnStock: -item.quantity } },
           { session }
         );
       }
@@ -310,6 +313,9 @@ exports.deleteSalesReturn = asynchandeler(async (req, res) => {
     session.endSession();
 
     await bumpNsVersion(NS);
+    // Also bump product cache — this endpoint mutates stock/stockVariant and
+    // salesReturnStock on Product/Variant, which /product/* endpoints cache.
+    await bumpNsVersion("product");
 
     apiResponse.sendSuccess(
       res,
@@ -348,13 +354,13 @@ exports.updateSalesReturn = asynchandeler(async (req, res) => {
       if (item.variant) {
         await Variant.findByIdAndUpdate(
           item.variant,
-          { $inc: { stockVariant: -item.quantity } },
+          { $inc: { stockVariant: -item.quantity, salesReturnStock: -item.quantity } },
           { session }
         );
       } else if (item.product) {
         await Product.findByIdAndUpdate(
           item.product,
-          { $inc: { stock: -item.quantity } },
+          { $inc: { stock: -item.quantity, salesReturnStock: -item.quantity } },
           { session }
         );
       }
@@ -390,13 +396,13 @@ exports.updateSalesReturn = asynchandeler(async (req, res) => {
       if (item.variant) {
         await Variant.findByIdAndUpdate(
           item.variant,
-          { $inc: { stockVariant: item.quantity } },
+          { $inc: { stockVariant: item.quantity, salesReturnStock: item.quantity } },
           { session }
         );
       } else if (item.product) {
         await Product.findByIdAndUpdate(
           item.product,
-          { $inc: { stock: item.quantity } },
+          { $inc: { stock: item.quantity, salesReturnStock: item.quantity } },
           { session }
         );
       }
@@ -465,6 +471,9 @@ exports.updateSalesReturn = asynchandeler(async (req, res) => {
     session.endSession();
 
     await bumpNsVersion(NS);
+    // Also bump product cache — this endpoint mutates stock/stockVariant and
+    // salesReturnStock on Product/Variant, which /product/* endpoints cache.
+    await bumpNsVersion("product");
 
     apiResponse.sendSuccess(
       res,
