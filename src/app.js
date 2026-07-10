@@ -26,10 +26,7 @@ app.use(
         "http://localhost:3000",
         "http://localhost:5172",
         "http://localhost:5174",
-        "https://smartsoftnextjs-ecommerce-git-main-wasim-mahamods-projects.vercel.app",
-        "https://smartsoftnextjs-ecommerce.vercel.app",
-        "https://z-ecommerce-seven.vercel.app",
-        "https://ecommercenext-baig.vercel.app",
+        "http://165.99.165.19",
       ];
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
