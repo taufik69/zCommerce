@@ -80,6 +80,8 @@ exports.createPurchase = asynchandeler(async (req, res) => {
         const productInfo = await Product.findById(product).session(session);
         if (productInfo) {
           productInfo.stock = (productInfo.stock || 0) + quantity;
+          productInfo.purchaseQuantityStock =
+            (productInfo.purchaseQuantityStock || 0) + quantity;
           productInfo.wholesalePrice =
             wholesalePrice || productInfo.wholesalePrice;
           productInfo.purchasePrice =
@@ -95,6 +97,8 @@ exports.createPurchase = asynchandeler(async (req, res) => {
         const variantInfo = await Variant.findById(variant).session(session);
         if (variantInfo) {
           variantInfo.stockVariant = (variantInfo.stockVariant || 0) + quantity;
+          variantInfo.purchaseQuantityStock =
+            (variantInfo.purchaseQuantityStock || 0) + quantity;
           variantInfo.wholesalePrice =
             wholesalePrice || variantInfo.wholesalePrice;
           variantInfo.purchasePrice =
@@ -283,12 +287,12 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
       const { product, variant, quantity } = item;
       if (product) {
         await Product.findByIdAndUpdate(product, {
-          $inc: { stock: -quantity },
+          $inc: { stock: -quantity, purchaseQuantityStock: -quantity },
         }).session(session);
       }
       if (variant) {
         await Variant.findByIdAndUpdate(variant, {
-          $inc: { stockVariant: -quantity },
+          $inc: { stockVariant: -quantity, purchaseQuantityStock: -quantity },
         }).session(session);
       }
     }
@@ -344,6 +348,8 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
         const productInfo = await Product.findById(product).session(session);
         if (productInfo) {
           productInfo.stock = (productInfo.stock || 0) + quantity;
+          productInfo.purchaseQuantityStock =
+            (productInfo.purchaseQuantityStock || 0) + quantity;
           productInfo.wholesalePrice = wholesalePrice;
           productInfo.purchasePrice = purchasePrice;
           productInfo.retailPrice = retailPrice;
@@ -357,6 +363,8 @@ exports.updatePurchase = asynchandeler(async (req, res) => {
         const variantInfo = await Variant.findById(variant).session(session);
         if (variantInfo) {
           variantInfo.stockVariant = (variantInfo.stockVariant || 0) + quantity;
+          variantInfo.purchaseQuantityStock =
+            (variantInfo.purchaseQuantityStock || 0) + quantity;
           variantInfo.wholesalePrice = wholesalePrice;
           variantInfo.purchasePrice = purchasePrice;
           variantInfo.retailPrice = retailPrice;
@@ -437,12 +445,12 @@ exports.deletePurchase = asynchandeler(async (req, res) => {
       const { product, variant, quantity } = item;
       if (product) {
         await Product.findByIdAndUpdate(product, {
-          $inc: { stock: -quantity },
+          $inc: { stock: -quantity, purchaseQuantityStock: -quantity },
         }).session(session);
       }
       if (variant) {
         await Variant.findByIdAndUpdate(variant, {
-          $inc: { stockVariant: -quantity },
+          $inc: { stockVariant: -quantity, purchaseQuantityStock: -quantity },
         }).session(session);
       }
     }
