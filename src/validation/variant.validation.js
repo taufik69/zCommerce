@@ -116,6 +116,8 @@ const VariantSchema = Joi.object({
   unit: Joi.string()
     .valid("Piece", "Kg", "Gram", "Packet", "pair", "liter", "Custom")
     .optional(),
+  groupUnit: Joi.string().trim().allow("").optional(),
+  groupUnitQuantity: Joi.number().min(0).optional().allow(null),
   specifications: Joi.string().trim().allow("").optional(),
   weight: Joi.number().min(0).optional(),
   dimensions: dimensionsField.optional(),

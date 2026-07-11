@@ -131,6 +131,8 @@ const variantSchema = new mongoose.Schema(
       type: String,
       enum: ["Piece", "Kg", "Gram", "Packet", "pair", "liter", "Custom"],
     },
+    groupUnit: { type: String },
+    groupUnitQuantity: { type: Number },
     specifications: { type: String, default: null },
     alertQuantity: { type: Number, default: 5 },
     stockAlert: { type: Boolean, default: false },
