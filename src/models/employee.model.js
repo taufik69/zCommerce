@@ -96,6 +96,7 @@ const employeeSchema = new mongoose.Schema(
       specialAllowance: { type: Number, default: 0, min: 0 },
       providentFund: { type: Number, default: 0, min: 0 },
       grossSalary: { type: Number, default: 0, min: 0 },
+      netSalary: { type: Number, default: 0, min: 0 },
     },
 
     certifications: [
@@ -175,12 +176,13 @@ employeeSchema.post("save", function (error, doc, next) {
   return next(error);
 });
 
-// Calculate gross salary before save
+// Calculate gross and net salary before save
 employeeSchema.pre("save", function (next) {
   try {
     const { basicSalary = 0, houseRent = 0, medicalAllowance = 0, othersAllowance = 0, specialAllowance = 0, providentFund = 0 } = this.salary;
     this.salary.grossSalary =
-      basicSalary + houseRent + medicalAllowance + othersAllowance + specialAllowance - providentFund;
+      basicSalary + houseRent + medicalAllowance + othersAllowance + specialAllowance;
+    this.salary.netSalary = this.salary.grossSalary - providentFund;
     next();
   } catch (error) {
     next(error);

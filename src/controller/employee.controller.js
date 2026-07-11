@@ -210,7 +210,7 @@ exports.updateEmployee = asynchandeler(async (req, res, next) => {
     });
   }
 
-  // Recalculate grossSalary manually since findByIdAndUpdate bypasses pre-save hooks
+  // Recalculate grossSalary/netSalary manually since findByIdAndUpdate bypasses pre-save hooks
   if (rest.salary || Object.keys(rest).some((k) => k.startsWith("salary."))) {
     const merged = {
       basicSalary: 0,
@@ -222,13 +222,14 @@ exports.updateEmployee = asynchandeler(async (req, res, next) => {
       ...employee.salary?.toObject?.() ?? employee.salary ?? {},
       ...(rest.salary ?? {}),
     };
-    rest["salary.grossSalary"] =
+    const grossSalary =
       Number(merged.basicSalary) +
       Number(merged.houseRent) +
       Number(merged.medicalAllowance) +
       Number(merged.othersAllowance) +
-      Number(merged.specialAllowance) -
-      Number(merged.providentFund);
+      Number(merged.specialAllowance);
+    rest["salary.grossSalary"] = grossSalary;
+    rest["salary.netSalary"] = grossSalary - Number(merged.providentFund);
     delete rest.salary;
   }
 
@@ -398,28 +399,15 @@ exports.createEmployeeAdvancePayment = asynchandeler(async (req, res) => {
         throw new customError("Employee not found", statusCodes.NOT_FOUND);
       }
 
-      // (optional) salary enough check: if you want prevent negative salary
-      const grossSalary = Number(employee?.salary?.grossSalary || 0);
-      if (amount > grossSalary)
+      // salary enough check: prevent advances beyond the employee's net salary
+      const netSalary = Number(employee?.salary?.netSalary || 0);
+      if (amount > netSalary)
         throw new customError("Salary not enough", statusCodes.BAD_REQUEST);
 
-      // 2) create advance payment
+      // 2) create advance payment — tracked independently in its own ledger;
+      // the employee's salary structure is never mutated by advances.
       const doc = new employeeAdvancePayment({ ...req.body, amount });
       advancePaymentDoc = await doc.save({ session });
-
-      // 3) reduce from salary (minus)
-      const updatedEmployee = await employeeModel.findOneAndUpdate(
-        { _id: employeeId },
-        { $inc: { "salary.grossSalary": -amount } },
-        { new: true, runValidators: true, session },
-      );
-
-      if (!updatedEmployee) {
-        throw new customError(
-          "Employee update failed",
-          statusCodes.SERVER_ERROR,
-        );
-      }
     });
 
     session.endSession();

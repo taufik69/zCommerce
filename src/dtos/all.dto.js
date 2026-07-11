@@ -148,11 +148,11 @@ exports.customerPaymentListDTO = (docs = []) => {
         }
       : null,
     referenceInvoice: doc.referenceInvoice || "",
-    dueBalance: doc.dueBalance ?? 0,
+    dueBeforePayment: doc.dueBeforePayment ?? 0,
     paidAmount: doc.paidAmount ?? 0,
     lessAmount: doc.lessAmount ?? 0,
     cashBack: doc.cashBack ?? 0,
-    remainAmount: doc.customer?.openingDues ?? 0,
+    remainingDue: doc.remainingDue ?? 0,
     date: doc.date,
     paymentMode: doc.paymentMode
       ? { _id: doc.paymentMode._id?.toString(), name: doc.paymentMode.name || "" }
@@ -177,10 +177,11 @@ exports.customerPaymentDetailsDTO = (doc) => {
         }
       : null,
     referenceInvoice: doc.referenceInvoice || "",
-    dueBalance: doc.dueBalance ?? 0,
+    dueBeforePayment: doc.dueBeforePayment ?? 0,
     paidAmount: doc.paidAmount ?? 0,
     lessAmount: doc.lessAmount ?? 0,
     cashBack: doc.cashBack ?? 0,
+    remainingDue: doc.remainingDue ?? 0,
     date: doc.date,
     paymentMode: doc.paymentMode
       ? { _id: doc.paymentMode._id?.toString(), name: doc.paymentMode.name || "" }
@@ -209,7 +210,8 @@ exports.customerAdvancePaymentListDTO = (docs = []) => {
     paidAmount: doc.paidAmount ?? 0,
     advanceAmount: doc.advanceAmount ?? 0,
     advanceCashBack: doc.advanceCashBack ?? 0,
-    remainAmount: doc.customer?.openingDues ?? 0,
+    dueBeforePayment: doc.dueBeforePayment ?? 0,
+    remainingDue: doc.remainingDue ?? 0,
     paymentMode: doc.paymentMode
       ? { _id: doc.paymentMode._id?.toString(), name: doc.paymentMode.name || "" }
       : null,
@@ -236,6 +238,8 @@ exports.customerAdvancePaymentDetailsDTO = (doc) => {
     paidAmount: doc.paidAmount ?? 0,
     advanceAmount: doc.advanceAmount ?? 0,
     advanceCashBack: doc.advanceCashBack ?? 0,
+    dueBeforePayment: doc.dueBeforePayment ?? 0,
+    remainingDue: doc.remainingDue ?? 0,
     paymentMode: doc.paymentMode
       ? { _id: doc.paymentMode._id?.toString(), name: doc.paymentMode.name || "" }
       : null,

@@ -270,6 +270,21 @@ const customerPaymentRecivedSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Snapshot of the customer's due balance at the moment this payment
+    // was recorded — required so historical rows keep showing their own
+    // before/after figures instead of the customer's current live due.
+    dueBeforePayment: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    remainingDue: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     paidAmount: {
       type: Number,
       default: 0,
@@ -350,6 +365,21 @@ const customerAdvancePaymentRecivedSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: [0, "Advance cash back cannot be negative"],
+    },
+
+    // Snapshot of the customer's due balance at the moment this advance
+    // payment was recorded — so historical rows keep showing their own
+    // before/after figures instead of the customer's current live due.
+    dueBeforePayment: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    remainingDue: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     paymentMode: {

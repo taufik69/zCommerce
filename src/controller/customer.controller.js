@@ -482,6 +482,8 @@ exports.createCustomerPaymentRecived = asynchandeler(async (req, res) => {
         );
       }
 
+      const remainingDue = currentDue - totalReduce;
+
       // 2) create a new payment doc per transaction
       [paymentDoc] = await customerPaymentRecived.create(
         [
@@ -494,13 +496,15 @@ exports.createCustomerPaymentRecived = asynchandeler(async (req, res) => {
             remarks: req.body.remarks,
             date: req.body.date,
             referenceInvoice: req.body.referenceInvoice,
+            dueBeforePayment: currentDue,
+            remainingDue,
           },
         ],
         { session },
       );
 
       //  due reduce
-      customer.openingDues = currentDue - totalReduce;
+      customer.openingDues = remainingDue;
       await customer.save({ session });
     });
 
@@ -667,6 +671,8 @@ exports.updateCustomerPaymentRecived = asynchandeler(async (req, res) => {
         );
       }
 
+      const newRemainingDue = currentDue - delta;
+
       // 4) update payment doc (set exact values)
       updatedDoc = await customerPaymentRecived.findOneAndUpdate(
         { customer },
@@ -676,6 +682,7 @@ exports.updateCustomerPaymentRecived = asynchandeler(async (req, res) => {
             paidAmount: newPaid,
             lessAmount: newLess,
             cashBack: newCashBack,
+            remainingDue: newRemainingDue,
           },
         },
         { new: true, runValidators: true, session },
@@ -683,7 +690,7 @@ exports.updateCustomerPaymentRecived = asynchandeler(async (req, res) => {
 
       // 5) adjust customer due by delta
       // delta > 0 => due কমবে, delta < 0 => due বাড়বে
-      customerDoc.openingDues = currentDue - delta;
+      customerDoc.openingDues = newRemainingDue;
       await customerDoc.save({ session });
     });
 
@@ -760,6 +767,8 @@ exports.createCustomerAdvancePaymentRecived = asynchandeler(
           );
         }
 
+        const remainingDue = currentDue - paidInput;
+
         [doc] = await customerAdvancePaymentModel.create(
           [
             {
@@ -770,12 +779,14 @@ exports.createCustomerAdvancePaymentRecived = asynchandeler(
               paymentMode: req.body.paymentMode,
               date: req.body.date,
               remarks: req.body.remarks,
+              dueBeforePayment: currentDue,
+              remainingDue,
             },
           ],
           { session },
         );
 
-        customer.openingDues = currentDue - paidInput;
+        customer.openingDues = remainingDue;
         await customer.save({ session });
       });
 
