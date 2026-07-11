@@ -10,6 +10,7 @@ const permissionList = [
   { permissionName: "Category" },
   { permissionName: "Sub Category" },
   { permissionName: "Brand" },
+  { permissionName: "Barcode Print" },
   // Variant & Size
   { permissionName: "Size Chart" },
   { permissionName: "Variant" },
@@ -60,6 +61,7 @@ const permissionList = [
   { permissionName: "Advance Payment" },
   // Sales
   { permissionName: "Retail Sales" },
+  { permissionName: "Wholesale Sales" },
   { permissionName: "Sales History" },
   // Reports
   { permissionName: "Purchase Invoice" },
