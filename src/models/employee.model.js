@@ -153,10 +153,10 @@ employeeSchema.post("save", async function (doc, next) {
       { new: true, upsert: true },
     );
 
-    const padded = String(counter.seq).padStart(5, "0");
+    const padded = String(counter.seq).padStart(2, "0");
     await doc.constructor.updateOne(
       { _id: doc._id },
-      { $set: { employeeId: `EMP-${padded}` } },
+      { $set: { employeeId: `EMP-SI-${padded}` } },
     );
     next();
   } catch (error) {

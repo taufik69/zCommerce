@@ -51,13 +51,18 @@ exports.getAllFundHandovers = asynchandeler(async (req, res) => {
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
   const skip = (page - 1) * limit;
 
+  const query = {};
+  if (req.query.serial) {
+    query.handoverSerialId = req.query.serial;
+  }
+
   const [funds, total] = await Promise.all([
-    FundHandoverDescription.find()
+    FundHandoverDescription.find(query)
       .populate("fundPaymentMode")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
-    FundHandoverDescription.countDocuments(),
+    FundHandoverDescription.countDocuments(query),
   ]);
 
   if (!funds.length && page === 1) {

@@ -71,16 +71,11 @@ exports.getAllTransaction = asynchandeler(async (req, res) => {
     });
   }
 
-  const transactions = rawTransactions.map((tx, index) => {
-    const serialNumber = `TRXID-${(skip + index + 1).toString().padStart(6, "0")}`;
-    return { ...tx.toObject(), serialNumber };
-  });
-
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Transactions fetched successfully",
-    { transactions, total, page, limit, hasNextPage: page * limit < total },
+    { transactions: rawTransactions, total, page, limit, hasNextPage: page * limit < total },
   );
 });
 
