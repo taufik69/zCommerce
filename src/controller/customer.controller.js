@@ -804,17 +804,20 @@ exports.createCustomerAdvancePaymentRecived = asynchandeler(
 // @query ?slug=rahim-ahmed
 // @query ?name=rahim
 exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
-  const { customer } = req.query;
+  const { customer, paymentId } = req.query;
 
   const cacheKey = await buildCacheKey(
     NS_CUSTOMER_ADVANCE,
-    customer ? `customer:${customer}` : "all",
+    paymentId
+      ? `paymentId:${paymentId}`
+      : customer
+        ? `customer:${customer}`
+        : "all",
   );
   const cached = await getCache(cacheKey);
   if (cached) {
-    const dataKey = customer
-      ? "customerAdvancePayment"
-      : "customerAdvancePayments";
+    const dataKey =
+      paymentId || customer ? "customerAdvancePayment" : "customerAdvancePayments";
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
@@ -823,7 +826,32 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
     );
   }
 
-  //  Get single by slug
+  //  Get single by paymentId (e.g. CAP-SI-01)
+  if (paymentId) {
+    const doc = await customerAdvancePaymentModel
+      .findOne({ paymentId })
+      .populate("customer paymentMode");
+
+    if (!doc) {
+      return apiResponse.sendError(
+        res,
+        statusCodes.NOT_FOUND,
+        "Customer payment recived not found",
+      );
+    }
+
+    const dto = customerAdvancePaymentDetailsDTO(doc);
+    await setCache(cacheKey, dto, CACHE_TTL);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Customer payment received retrieved successfully",
+      { customerAdvancePayment: dto, fromCache: false },
+    );
+  }
+
+  //  Get single by customer
   if (customer) {
     const doc = await customerAdvancePaymentModel
       .findOne({

@@ -196,9 +196,9 @@ exports.customerPaymentDetailsDTO = (doc) => {
 
 // customerAdvancePayment.dto.js;
 exports.customerAdvancePaymentListDTO = (docs = []) => {
-  return docs.map((doc, index) => ({
+  return docs.map((doc) => ({
     _id: doc._id?.toString(),
-    paymentId: `CAP-SI-${(index + 1).toString().padStart(2, "0")}`,
+    paymentId: doc.paymentId || "",
     customer: doc.customer
       ? {
           _id: doc.customer._id?.toString(),
@@ -227,6 +227,7 @@ exports.customerAdvancePaymentDetailsDTO = (doc) => {
 
   return {
     _id: doc._id?.toString(),
+    paymentId: doc.paymentId || "",
     customer: doc.customer
       ? {
           _id: doc.customer._id?.toString(),

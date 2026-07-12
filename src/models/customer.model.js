@@ -3,6 +3,7 @@ const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
 
 const { default: slugify } = require("slugify");
+const Counter = require("./counter.model");
 const customerTypeSchema = mongoose.Schema({
   customerType: {
     type: String,
@@ -348,6 +349,13 @@ const customerPaymentRecived =
 
 const customerAdvancePaymentRecivedSchema = new mongoose.Schema(
   {
+    paymentId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
+
     customer: {
       type: mongoose.Schema.Types.ObjectId,
       required: [true, "Customer name is required"],
@@ -403,6 +411,28 @@ const customerAdvancePaymentRecivedSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+// Auto-generate a sequential, never-reused paymentId after first save
+customerAdvancePaymentRecivedSchema.post("save", async function (doc, next) {
+  try {
+    if (doc.paymentId) return next();
+
+    const counter = await Counter.findOneAndUpdate(
+      { key: "CUSTOMER_ADVANCE_PAYMENT" },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true },
+    );
+
+    const padded = String(counter.seq).padStart(2, "0");
+    await doc.constructor.updateOne(
+      { _id: doc._id },
+      { $set: { paymentId: `CAP-SI-${padded}` } },
+    );
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 const customerAdvancePaymentModel =
   mongoose.models.CustomerAdvancePaymentRecived ||
