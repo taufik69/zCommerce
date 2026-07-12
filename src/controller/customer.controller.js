@@ -531,20 +531,50 @@ exports.createCustomerPaymentRecived = asynchandeler(async (req, res) => {
 // @query ?slug=rahim-ahmed
 // @query ?name=rahim
 exports.getCustomerPaymentReviced = asynchandeler(async (req, res) => {
-  const { customer } = req.query;
+  const { customer, paymentId } = req.query;
 
   const cacheKey = await buildCacheKey(
     NS_CUSTOMER_PAYMENT,
-    customer ? `customer:${customer}` : "all",
+    paymentId
+      ? `paymentId:${paymentId}`
+      : customer
+        ? `customer:${customer}`
+        : "all",
   );
   const cached = await getCache(cacheKey);
   if (cached) {
-    const dataKey = customer ? "customerPayment" : "customerPayments";
+    const dataKey =
+      paymentId || customer ? "customerPayment" : "customerPayments";
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
       "Customer payment retrieved successfully",
       { [dataKey]: cached, fromCache: true },
+    );
+  }
+
+  // Get single by paymentId (e.g. CPR-SI-01)
+  if (paymentId) {
+    const doc = await customerPaymentRecived
+      .findOne({ paymentId })
+      .populate("customer paymentMode");
+
+    if (!doc) {
+      return apiResponse.sendError(
+        res,
+        statusCodes.NOT_FOUND,
+        "Customer payment not found",
+      );
+    }
+
+    const dto = customerPaymentDetailsDTO(doc);
+    await setCache(cacheKey, dto, CACHE_TTL);
+
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Customer payment retrieved successfully",
+      { customerPayment: dto, fromCache: false },
     );
   }
 

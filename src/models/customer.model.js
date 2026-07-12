@@ -68,6 +68,13 @@ const CustomerType =
 
 const customerSchema = new mongoose.Schema(
   {
+    customSerialId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
+
     customerId: {
       type: String,
       trim: true,
@@ -257,6 +264,32 @@ customerSchema.pre("save", async function (next) {
   }
 });
 
+// Auto-generate a sequential, never-reused customSerialId after first save
+customerSchema.post("save", async function (doc, next) {
+  try {
+    if (doc.customSerialId) return next();
+
+    const session = doc.$session();
+
+    const counter = await Counter.findOneAndUpdate(
+      { key: "CUSTOMER_SERIAL" },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true, session },
+    );
+
+    const padded = String(counter.seq).padStart(2, "0");
+    doc.customSerialId = `CUS-SI-${padded}`;
+    await doc.constructor.updateOne(
+      { _id: doc._id },
+      { $set: { customSerialId: doc.customSerialId } },
+      { session },
+    );
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 const customerModel =
   mongoose.models.Customer || mongoose.model("Customer", customerSchema);
 
@@ -264,6 +297,13 @@ const customerModel =
 
 const customerPaymentRecivedSchema = new mongoose.Schema(
   {
+    paymentId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
+
     customer: {
       type: mongoose.Schema.Types.ObjectId,
       required: [true, "Customer id is required"],
@@ -341,6 +381,32 @@ const customerPaymentRecivedSchema = new mongoose.Schema(
   },
 );
 
+// Auto-generate a sequential, never-reused paymentId after first save
+customerPaymentRecivedSchema.post("save", async function (doc, next) {
+  try {
+    if (doc.paymentId) return next();
+
+    const session = doc.$session();
+
+    const counter = await Counter.findOneAndUpdate(
+      { key: "CUSTOMER_PAYMENT" },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true, session },
+    );
+
+    const padded = String(counter.seq).padStart(2, "0");
+    doc.paymentId = `CPR-SI-${padded}`;
+    await doc.constructor.updateOne(
+      { _id: doc._id },
+      { $set: { paymentId: doc.paymentId } },
+      { session },
+    );
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 const customerPaymentRecived =
   mongoose.models.CustomerPaymentRecived ||
   mongoose.model("CustomerPaymentRecived", customerPaymentRecivedSchema);
@@ -417,16 +483,20 @@ customerAdvancePaymentRecivedSchema.post("save", async function (doc, next) {
   try {
     if (doc.paymentId) return next();
 
+    const session = doc.$session();
+
     const counter = await Counter.findOneAndUpdate(
       { key: "CUSTOMER_ADVANCE_PAYMENT" },
       { $inc: { seq: 1 } },
-      { new: true, upsert: true },
+      { new: true, upsert: true, session },
     );
 
     const padded = String(counter.seq).padStart(2, "0");
+    doc.paymentId = `CAP-SI-${padded}`;
     await doc.constructor.updateOne(
       { _id: doc._id },
-      { $set: { paymentId: `CAP-SI-${padded}` } },
+      { $set: { paymentId: doc.paymentId } },
+      { session },
     );
     next();
   } catch (error) {

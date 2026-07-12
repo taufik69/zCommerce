@@ -88,6 +88,7 @@ exports.supplierDuePaymentDTO = (doc) => {
 exports.customerListDTO = (docs = []) => {
   return docs.map((doc) => ({
     id: doc._id?.toString(),
+    customSerialId: doc.customSerialId || "",
     customerId: doc.customerId,
     customerType: doc.customerType || "",
     fullName: doc.fullName,
@@ -113,6 +114,7 @@ exports.customerDetailsDTO = (doc) => {
 
   return {
     id: doc._id?.toString(),
+    customSerialId: doc.customSerialId || "",
     customerId: doc.customerId,
     customerType: doc.customerType || "",
     fullName: doc.fullName,
@@ -137,9 +139,9 @@ exports.customerDetailsDTO = (doc) => {
 
 // customerPayment.dto.js
 exports.customerPaymentListDTO = (docs = []) => {
-  return docs.map((doc, index) => ({
+  return docs.map((doc) => ({
     _id: doc._id?.toString(),
-    paymentId: `CPR-SI-${(index + 1).toString().padStart(2, "0")}`,
+    paymentId: doc.paymentId || "",
     customer: doc.customer
       ? {
           _id: doc.customer._id?.toString(),
@@ -170,6 +172,7 @@ exports.customerPaymentDetailsDTO = (doc) => {
 
   return {
     _id: doc._id?.toString(),
+    paymentId: doc.paymentId || "",
     customer: doc.customer
       ? {
           _id: doc.customer._id?.toString(),
