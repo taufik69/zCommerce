@@ -24,9 +24,8 @@ const searchItemSchema = new mongoose.Schema(
 
     salesStatus: {
       type: String,
-      enum: ["sale", "return" , "exchange"],
+      enum: ["sale", "return", "exchange"],
       default: "sale",
-      
     },
 
     barcode: { type: String, trim: true },
@@ -145,7 +144,7 @@ const salesSchema = new mongoose.Schema(
 
     salesType: {
       type: String,
-      enum: ["wholesale", "retailsale"],
+      enum: ["wholesale", "retailsale", "retailsaleorder", "wholesaleorder"],
       default: "retailsale",
     },
   },

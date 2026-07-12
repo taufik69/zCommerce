@@ -52,14 +52,19 @@ exports.getAllMoneyTransfer = asynchandeler(async (req, res) => {
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
   const skip = (page - 1) * limit;
 
+  const query = {};
+  if (req.query.serial) {
+    query.transferSerialId = req.query.serial;
+  }
+
   const [transfers, total] = await Promise.all([
-    MoneyTransfer.find()
+    MoneyTransfer.find(query)
       .populate("fromAccount")
       .populate("toAccount")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
-    MoneyTransfer.countDocuments(),
+    MoneyTransfer.countDocuments(query),
   ]);
 
   if (!transfers.length && page === 1) {

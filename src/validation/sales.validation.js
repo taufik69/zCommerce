@@ -180,7 +180,9 @@ const updateSalesSchema = Joi.object({
 
   paymentStatus: Joi.string().valid("paid", "partial", "due").optional(),
 
-  salesType: Joi.string().valid("wholesale", "retailsale").optional(),
+  salesType: Joi.string()
+    .valid("wholesale", "retailsale", "retailsaleorder", "wholesaleorder")
+    .optional(),
 })
   .min(1)
   .options({ abortEarly: false, allowUnknown: true });
