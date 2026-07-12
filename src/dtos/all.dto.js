@@ -95,6 +95,7 @@ exports.customerListDTO = (docs = []) => {
     occupation: doc.occupation || "",
     nidNumber: doc.nidNumber || "",
     openingDues: doc.openingDues ?? 0,
+    advancePaymentRecived: doc.advancePaymentRecived ?? 0,
     regularDiscountPercent: doc.regularDiscountPercent ?? 0,
     dueLimit: doc.dueLimit ?? 0,
     emailAddress: doc.emailAddress || "",
@@ -119,6 +120,7 @@ exports.customerDetailsDTO = (doc) => {
     occupation: doc.occupation || "",
     nidNumber: doc.nidNumber || "",
     openingDues: doc.openingDues ?? 0,
+    advancePaymentRecived: doc.advancePaymentRecived ?? 0,
     regularDiscountPercent: doc.regularDiscountPercent ?? 0,
     dueLimit: doc.dueLimit ?? 0,
     emailAddress: doc.emailAddress || "",
@@ -204,14 +206,13 @@ exports.customerAdvancePaymentListDTO = (docs = []) => {
           mobileNumber: doc.customer.mobileNumber || "",
           customerId: doc.customer.customerId || "",
           openingDues: doc.customer.openingDues ?? 0,
+          advancePaymentRecived: doc.customer.advancePaymentRecived ?? 0,
         }
       : null,
     balance: doc.balance ?? 0,
     paidAmount: doc.paidAmount ?? 0,
     advanceAmount: doc.advanceAmount ?? 0,
     advanceCashBack: doc.advanceCashBack ?? 0,
-    dueBeforePayment: doc.dueBeforePayment ?? 0,
-    remainingDue: doc.remainingDue ?? 0,
     paymentMode: doc.paymentMode
       ? { _id: doc.paymentMode._id?.toString(), name: doc.paymentMode.name || "" }
       : null,
@@ -232,14 +233,14 @@ exports.customerAdvancePaymentDetailsDTO = (doc) => {
           fullName: doc.customer.fullName || "",
           mobileNumber: doc.customer.mobileNumber || "",
           customerId: doc.customer.customerId || "",
+          openingDues: doc.customer.openingDues ?? 0,
+          advancePaymentRecived: doc.customer.advancePaymentRecived ?? 0,
         }
       : null,
     balance: doc.balance ?? 0,
     paidAmount: doc.paidAmount ?? 0,
     advanceAmount: doc.advanceAmount ?? 0,
     advanceCashBack: doc.advanceCashBack ?? 0,
-    dueBeforePayment: doc.dueBeforePayment ?? 0,
-    remainingDue: doc.remainingDue ?? 0,
     paymentMode: doc.paymentMode
       ? { _id: doc.paymentMode._id?.toString(), name: doc.paymentMode.name || "" }
       : null,

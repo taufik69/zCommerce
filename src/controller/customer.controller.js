@@ -759,15 +759,8 @@ exports.createCustomerAdvancePaymentRecived = asynchandeler(
         const customer = await customerModel.findById(customerId).session(session);
         if (!customer) throw new customError("Customer not found", statusCodes.NOT_FOUND);
 
-        const currentDue = Number(customer.openingDues || 0);
-        if (paidInput > currentDue) {
-          throw new customError(
-            `Opening due not enough. Current: ${currentDue}`,
-            statusCodes.BAD_REQUEST,
-          );
-        }
-
-        const remainingDue = currentDue - paidInput;
+        const cumulativeAdvanceRecived =
+          Number(customer.advancePaymentRecived || 0) + paidInput;
 
         [doc] = await customerAdvancePaymentModel.create(
           [
@@ -775,18 +768,16 @@ exports.createCustomerAdvancePaymentRecived = asynchandeler(
               customer: customerId,
               paidAmount: paidInput,
               advanceCashBack: cashBackInput,
-              balance: paidInput - cashBackInput,
+              balance: cumulativeAdvanceRecived,
               paymentMode: req.body.paymentMode,
               date: req.body.date,
               remarks: req.body.remarks,
-              dueBeforePayment: currentDue,
-              remainingDue,
             },
           ],
           { session },
         );
 
-        customer.openingDues = remainingDue;
+        customer.advancePaymentRecived = cumulativeAdvanceRecived;
         await customer.save({ session });
       });
 
@@ -895,9 +886,48 @@ exports.getCustomerAdvancePaymentReviced = asynchandeler(async (req, res) => {
 exports.deleteCustomerAdvancePaymentRecived = asynchandeler(
   async (req, res) => {
     const { id } = req.params;
-    const paymentRecived = await customerAdvancePaymentModel.findOneAndDelete({
-      _id: id,
-    });
+    const session = await mongoose.startSession();
+    let paymentRecived;
+    try {
+      await session.withTransaction(async () => {
+        paymentRecived = await customerAdvancePaymentModel
+          .findOneAndDelete({ _id: id })
+          .session(session);
+
+        if (!paymentRecived) return;
+
+        const customer = await customerModel
+          .findById(paymentRecived.customer)
+          .session(session);
+
+        if (customer) {
+          customer.advancePaymentRecived = Math.max(
+            Number(customer.advancePaymentRecived || 0) -
+              Number(paymentRecived.paidAmount || 0),
+            0,
+          );
+          await customer.save({ session });
+
+          // Recompute cumulative balance on remaining records for this customer
+          const remaining = await customerAdvancePaymentModel
+            .find({ customer: customer._id })
+            .sort({ createdAt: 1 })
+            .session(session);
+
+          let running = 0;
+          for (const record of remaining) {
+            running += Number(record.paidAmount || 0);
+            if (record.balance !== running) {
+              record.balance = running;
+              await record.save({ session });
+            }
+          }
+        }
+      });
+    } finally {
+      session.endSession();
+    }
+
     if (!paymentRecived) {
       return apiResponse.sendError(
         res,
@@ -905,8 +935,10 @@ exports.deleteCustomerAdvancePaymentRecived = asynchandeler(
         "Customer payment recived not found",
       );
     }
+
     // Invalidate cache
     await bumpNsVersion(NS_CUSTOMER_ADVANCE);
+    await bumpNsVersion(NS_CUSTOMER);
 
     apiResponse.sendSuccess(
       res,

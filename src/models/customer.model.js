@@ -120,6 +120,12 @@ const customerSchema = new mongoose.Schema(
       min: [0, "Opening dues cannot be negative"],
     },
 
+    advancePaymentRecived: {
+      type: Number,
+      default: 0,
+      min: [0, "Advance payment recived cannot be negative"],
+    },
+
     regularDiscountPercent: {
       type: Number,
       default: 0,
@@ -365,21 +371,6 @@ const customerAdvancePaymentRecivedSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: [0, "Advance cash back cannot be negative"],
-    },
-
-    // Snapshot of the customer's due balance at the moment this advance
-    // payment was recorded — so historical rows keep showing their own
-    // before/after figures instead of the customer's current live due.
-    dueBeforePayment: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    remainingDue: {
-      type: Number,
-      default: 0,
-      min: 0,
     },
 
     paymentMode: {
