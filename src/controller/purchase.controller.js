@@ -194,21 +194,13 @@ exports.getAllPurchases = asynchandeler(async (req, res) => {
     throw new customError("Purchases not found", statusCodes.NOT_FOUND);
   }
 
-  const purchasesWithSerial = purchases.map((p, index) => {
-    const serialNumber = (index + 1).toString().padStart(2, "0");
-    return {
-      serial: `PUR-SI-${serialNumber}`,
-      ...p,
-    };
-  });
-
-  await setCache(cacheKey, purchasesWithSerial, CACHE_TTL);
+  await setCache(cacheKey, purchases, CACHE_TTL);
 
   return apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Purchases fetched successfully",
-    { purchases: purchasesWithSerial },
+    { purchases },
   );
 });
 

@@ -1,9 +1,17 @@
 const mongoose = require("mongoose");
 const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
+const Counter = require("./counter.model");
 
 const purchaseSchema = new mongoose.Schema(
   {
+    serial: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
+
     invoiceNumber: {
       type: String,
       unique: true,
@@ -130,6 +138,33 @@ purchaseSchema.pre("save", async function (next) {
 });
 // check invoiceid is unique or not
 purchaseSchema.index({ invoiceNumber: 1 }, { unique: true });
+
+// Auto-generate a sequential, never-reused serial after first save
+purchaseSchema.post("save", async function (doc, next) {
+  try {
+    if (doc.serial) return next();
+
+    const session = doc.$session();
+
+    const counter = await Counter.findOneAndUpdate(
+      { key: "PURCHASE_SERIAL" },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true, session },
+    );
+
+    const padded = String(counter.seq).padStart(2, "0");
+    doc.serial = `PUR-SI-${padded}`;
+    await doc.constructor.updateOne(
+      { _id: doc._id },
+      { $set: { serial: doc.serial } },
+      { session },
+    );
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 const Purchase =
   mongoose.models.Purchase || mongoose.model("Purchase", purchaseSchema);
 
