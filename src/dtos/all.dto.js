@@ -37,6 +37,7 @@ exports.supplierDTO = (doc) => {
 
   return {
     id: doc._id?.toString(),
+    supplierSerialId: doc.supplierSerialId || "",
     supplierId: doc.supplierId,
     supplierName: doc.supplierName,
     contactPersonName: doc.contactPersonName || "",
@@ -52,6 +53,7 @@ exports.supplierDTO = (doc) => {
 exports.supplierListDTO = (docs = []) => {
   return docs.map((doc) => ({
     id: doc._id?.toString(),
+    supplierSerialId: doc.supplierSerialId || "",
     supplierId: doc.supplierId,
     supplierName: doc.supplierName,
     contactPersonName: doc.contactPersonName || "",
@@ -70,6 +72,7 @@ exports.supplierDuePaymentDTO = (doc) => {
 
   return {
     id: doc._id?.toString(),
+    supplierPaymentSerialId: doc.supplierPaymentSerialId,
     transactionId: doc.transactionId,
     date: doc.date,
     supplierId: doc.supplierId,

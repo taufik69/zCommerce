@@ -33,15 +33,19 @@ exports.createSupplier = asynchandeler(async (req, res) => {
 // get all supplier data
 
 exports.getAllSupplier = asynchandeler(async (req, res) => {
-  const { supplierId } = req.query;
+  const { supplierId, supplierSerialId } = req.query;
   let query = {};
   if (supplierId) {
     query.supplierId = supplierId;
+  } else if (supplierSerialId) {
+    query.supplierSerialId = supplierSerialId;
   } else {
     query.isActive = true;
   }
   const suppliers = await SupplierModel.aggregate([
     { $match: query },
+
+    { $sort: { createdAt: -1 } },
 
     {
       $lookup: {
@@ -258,6 +262,7 @@ exports.getSupplierDuePaymentById = asynchandeler(async (req, res) => {
     },
     {
       $project: {
+        supplierPaymentSerialId: 1,
         transactionId: 1,
         date: 1,
         paidAmount: 1,
@@ -297,10 +302,16 @@ exports.getAllSupplierDuePayment = asynchandeler(async (req, res) => {
     matchStage.supplierId = req.query.supplierId;
   }
 
+  if (req.query.serial) {
+    matchStage.supplierPaymentSerialId = req.query.serial;
+  }
+
   const payments = await SupplierDuePayment.aggregate([
     {
       $match: matchStage,
     },
+
+    { $sort: { createdAt: -1 } },
 
     {
       $lookup: {
@@ -328,6 +339,7 @@ exports.getAllSupplierDuePayment = asynchandeler(async (req, res) => {
 
     {
       $project: {
+        supplierPaymentSerialId: 1,
         transactionId: 1,
         date: 1,
         paidAmount: 1,

@@ -1,9 +1,18 @@
 const mongoose = require("mongoose");
 const { customError } = require("../lib/CustomError");
 const { statusCodes } = require("../constant/constant");
+const Counter = require("./counter.model");
 
 const supplierSchema = new mongoose.Schema(
   {
+    // Sequential, never-reused display serial — e.g. SUPL-SI-01
+    supplierSerialId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
+
     // Supplier ID — auto-set from mobile number on create
     supplierId: {
       type: String,
@@ -107,12 +116,46 @@ supplierSchema.pre("save", async function (next) {
   }
 });
 
+// Auto-generate a sequential, never-reused supplierSerialId after first save
+supplierSchema.post("save", async function (doc, next) {
+  try {
+    if (doc.supplierSerialId) return next();
+
+    const session = doc.$session();
+
+    const counter = await Counter.findOneAndUpdate(
+      { key: "SUPPLIER_SERIAL" },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true, session },
+    );
+
+    const padded = String(counter.seq).padStart(2, "0");
+    doc.supplierSerialId = `SUPL-SI-${padded}`;
+    await doc.constructor.updateOne(
+      { _id: doc._id },
+      { $set: { supplierSerialId: doc.supplierSerialId } },
+      { session },
+    );
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 const SupplierModel =
   mongoose.models.Supplier || mongoose.model("Supplier", supplierSchema);
 
 //
 const supplierDuePaymentSchema = new mongoose.Schema(
   {
+    // Sequential, never-reused display serial — e.g. SUPLP-SI-01
+    supplierPaymentSerialId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
+
     // Transaction ID — auto-generated in pre-save hook, not required at input
     transactionId: {
       type: String,
@@ -199,6 +242,32 @@ supplierDuePaymentSchema.pre("save", function (next) {
     this.transactionId = `STID-${y}${m}${day}-${rand}`;
   }
   next();
+});
+
+// Auto-generate a sequential, never-reused supplierPaymentSerialId after first save
+supplierDuePaymentSchema.post("save", async function (doc, next) {
+  try {
+    if (doc.supplierPaymentSerialId) return next();
+
+    const session = doc.$session();
+
+    const counter = await Counter.findOneAndUpdate(
+      { key: "SUPPLIER_PAYMENT_SERIAL" },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true, session },
+    );
+
+    const padded = String(counter.seq).padStart(2, "0");
+    doc.supplierPaymentSerialId = `SUPLP-SI-${padded}`;
+    await doc.constructor.updateOne(
+      { _id: doc._id },
+      { $set: { supplierPaymentSerialId: doc.supplierPaymentSerialId } },
+      { session },
+    );
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 const SupplierDuePayment =

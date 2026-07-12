@@ -241,6 +241,7 @@ exports.createPurchaseReturn = asynchandeler(async (req, res) => {
 
 exports.getPurchaseReturn = asynchandeler(async (req, res) => {
   const {
+    serial,
     supplierId,
     supplierName,
     productName,
@@ -254,7 +255,7 @@ exports.getPurchaseReturn = asynchandeler(async (req, res) => {
   } = req.query;
 
   const isSearch =
-    supplierId || supplierName || productName || variantName || returnDate || startDate || endDate;
+    serial || supplierId || supplierName || productName || variantName || returnDate || startDate || endDate;
 
   // Only use cache for plain list (no filters)
   if (!isSearch) {
@@ -274,6 +275,11 @@ exports.getPurchaseReturn = asynchandeler(async (req, res) => {
   }
 
   const filter = {};
+
+  // Serial filter (exact, e.g. PURR-SI-01)
+  if (serial) {
+    filter.serial = serial.trim();
+  }
 
   // Supplier filter
   if (supplierId) {
