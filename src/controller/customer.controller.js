@@ -270,10 +270,11 @@ exports.getAllCustomers = asynchandeler(async (req, res) => {
     .sort({ createdAt: -1 });
 
   if (!customers || customers.length === 0) {
-    return apiResponse.sendError(
+    return apiResponse.sendSuccess(
       res,
-      statusCodes.NOT_FOUND,
+      statusCodes.OK,
       "Customers not found",
+      { customers: [], fromCache: false },
     );
   }
 

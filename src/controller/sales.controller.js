@@ -13,6 +13,7 @@ const {
   customerAdvancePaymentModel,
 } = require("../models/customer.model");
 const { clientCommandMessageReg } = require("bullmq");
+const { bumpNsVersion } = require("@/utils/cache.util");
 
 // @desc create a new sales
 // @desc create a new sales (transaction safe + background notifications)
@@ -41,6 +42,9 @@ exports.createSales = asynchandeler(async (req, res) => {
         // sale -> reduce stock, return -> increase stock
         const sign = item.salesStatus === "return" ? +1 : -1;
         const incBy = sign * qty;
+        // posSold moves opposite to the stock effect of a sale:
+        // sale (-qty stock) -> +qty posSold, return (+qty stock) -> -qty posSold
+        const posSoldIncBy = -incBy;
 
         // Product
         if (item.productId) {
@@ -53,7 +57,7 @@ exports.createSales = asynchandeler(async (req, res) => {
           productOps.push({
             updateOne: {
               filter,
-              update: { $inc: { stock: incBy } },
+              update: { $inc: { stock: incBy, posSold: posSoldIncBy } },
             },
           });
         }
@@ -71,7 +75,7 @@ exports.createSales = asynchandeler(async (req, res) => {
           variantOps.push({
             updateOne: {
               filter,
-              update: { $inc: { stockVariant: incBy } },
+              update: { $inc: { stockVariant: incBy, posSold: posSoldIncBy } },
             },
           });
         }
@@ -139,6 +143,10 @@ exports.createSales = asynchandeler(async (req, res) => {
 
     // commit done; rollback already handled automatically if error thrown
     session.endSession();
+
+    // invalidate product/variant caches so stock & posSold changes are visible immediately
+    await bumpNsVersion("product");
+    await bumpNsVersion("variant");
 
     // 3) Background notifications (AFTER commit)
     if (createdSale?.sendSms) {
@@ -414,24 +422,39 @@ exports.searchProductsAndVariants = async (req, res) => {
             { $match: variantMatch },
 
             // variant discount populate
-            // {
-            //   $lookup: {
-            //     from: "discounts",
-            //     localField: "discount",
-            //     foreignField: "_id",
-            //     as: "discount",
-            //   },
-            // },
-            // {
-            //   $unwind: {
-            //     path: "$discount",
-            //     preserveNullAndEmptyArrays: true,
-            //   },
-            // },
+            {
+              $lookup: {
+                from: "discounts",
+                localField: "discount",
+                foreignField: "_id",
+                as: "discount",
+              },
+            },
+            {
+              $unwind: {
+                path: "$discount",
+                preserveNullAndEmptyArrays: true,
+              },
+            },
 
+            {
+              $lookup: {
+                from: productModel.collection.name,
+                localField: "product",
+                foreignField: "_id",
+                as: "productInfo",
+              },
+            },
+            {
+              $unwind: {
+                path: "$productInfo",
+                preserveNullAndEmptyArrays: true,
+              },
+            },
             {
               $addFields: {
                 _type: "variant",
+                productName: "$productInfo.name",
                 _score: {
                   $cond: [
                     {
@@ -453,6 +476,7 @@ exports.searchProductsAndVariants = async (req, res) => {
                 _type: 1,
                 _score: 1,
                 product: 1,
+                productName: 1,
                 variantName: 1,
                 slug: 1,
                 sku: 1,
@@ -583,6 +607,7 @@ exports.updateSales = asynchandeler(async (req, res) => {
       // else: !oldComplete && !newComplete => do nothing (no stock ops)
 
       // 4) Build bulk operations (with stock check on reductions)
+      // posSold moves opposite to the stock delta (stock down => posSold up)
       const productOps = [];
       for (const [productId, d] of productDelta.entries()) {
         if (!d) continue;
@@ -592,7 +617,7 @@ exports.updateSales = asynchandeler(async (req, res) => {
           : { _id: productId };
 
         productOps.push({
-          updateOne: { filter, update: { $inc: { stock: d } } },
+          updateOne: { filter, update: { $inc: { stock: d, posSold: -d } } },
         });
       }
 
@@ -605,7 +630,10 @@ exports.updateSales = asynchandeler(async (req, res) => {
           : { _id: variantId };
 
         variantOps.push({
-          updateOne: { filter, update: { $inc: { stockVariant: d } } },
+          updateOne: {
+            filter,
+            update: { $inc: { stockVariant: d, posSold: -d } },
+          },
         });
       }
 
@@ -657,6 +685,10 @@ exports.updateSales = asynchandeler(async (req, res) => {
     });
 
     session.endSession();
+
+    // invalidate product/variant caches so stock & posSold changes are visible immediately
+    await bumpNsVersion("product");
+    await bumpNsVersion("variant");
 
     // 7) Post-commit notifications (optional, same style as your createSales)
     if (updatedSale?.sendSms) {
@@ -735,6 +767,7 @@ exports.deleteSales = asynchandeler(async (req, res) => {
         }
 
         // 3️⃣Build bulk ops
+        // posSold moves opposite to the stock delta (stock down => posSold up)
         const productOps = [];
         for (const [productId, d] of productMap.entries()) {
           const reduce = d < 0;
@@ -744,7 +777,7 @@ exports.deleteSales = asynchandeler(async (req, res) => {
             : { _id: productId };
 
           productOps.push({
-            updateOne: { filter, update: { $inc: { stock: d } } },
+            updateOne: { filter, update: { $inc: { stock: d, posSold: -d } } },
           });
         }
 
@@ -757,7 +790,10 @@ exports.deleteSales = asynchandeler(async (req, res) => {
             : { _id: variantId };
 
           variantOps.push({
-            updateOne: { filter, update: { $inc: { stockVariant: d } } },
+            updateOne: {
+              filter,
+              update: { $inc: { stockVariant: d, posSold: -d } },
+            },
           });
         }
 
@@ -815,6 +851,10 @@ exports.deleteSales = asynchandeler(async (req, res) => {
     });
 
     session.endSession();
+
+    // invalidate product/variant caches so stock & posSold changes are visible immediately
+    await bumpNsVersion("product");
+    await bumpNsVersion("variant");
 
     return apiResponse.sendSuccess(
       res,

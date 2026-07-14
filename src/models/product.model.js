@@ -137,6 +137,8 @@ const productSchema = new mongoose.Schema(
     purchaseReturnStock: { type: Number, min: 0, default: 0 },
     salesReturnStock: { type: Number, min: 0, default: 0 },
     purchaseQuantityStock: { type: Number, min: 0, default: 0 },
+    posSold: { type: Number, min: 0, default: 0 },
+    webSold: { type: Number, min: 0, default: 0 },
     warehouseLocation: { type: String, trim: true },
 
     // Pricing
