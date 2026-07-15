@@ -66,6 +66,7 @@ _.use("/supplier", require("./api/supplier.api"));
 _.use("/customer", require("./api/customer.api"));
 _.use("/sales", require("./api/sales.api"));
 _.use("/audit", require("./api/audit.api"));
+_.use("/dashboard", require("./api/dashboard.api"));
 _.route("*").all(() => {
   throw new customError("Route not found", 404);
 });
