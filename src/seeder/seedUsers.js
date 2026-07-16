@@ -14,20 +14,7 @@ const USERS = [
     phone: "01700000001",
     roleSlug: "superadmin",
   },
-  {
-    name: "Admin",
-    email: "admin@baig.com",
-    password: "Admin@1234",
-    phone: "01700000002",
-    roleSlug: "admin",
-  },
-  {
-    name: "Manager",
-    email: "manager@baig.com",
-    password: "Manager@123",
-    phone: "01700000003",
-    roleSlug: "manager",
-  },
+ 
 ];
 
 async function seedUsers() {
