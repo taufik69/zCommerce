@@ -15,6 +15,7 @@
     "backfill:employee-salary": "node src/seeder/backfillEmployeeSalary.js",
     "backfill:customer-payment-due": "node src/seeder/backfillCustomerPaymentDue.js",
     "backfill:customer-advance-payment-due": "node src/seeder/backfillCustomerAdvancePaymentDue.js",
+    "backfill:sales-invoice": "node src/seeder/backfillSalesInvoiceNumber.js",
     "socket": "node src/socket/client.js",
     "superAdmin": "node src/seeder/addAdminSeeder.js",
     "seed:all": "concurrently \"npm run seed:permissions\" \"npm run seed:roles\" \"npm run seed:role-permissions\" \"npm run seed:users\" \"npm run seed:delivery\"",

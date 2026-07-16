@@ -1,5 +1,6 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
+const Counter = require("./counter.model");
 
 /** -------------------------
  * Sub Schemas
@@ -151,50 +152,32 @@ const salesSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-salesSchema.pre("save", async function (next) {
+// Auto-generate a sequential, never-reused invoiceNumber after first save —
+// e.g. INV-SI-01. The counter is atomic, so concurrent sales can't collide the
+// way a find-the-last-invoice-and-increment scan can.
+salesSchema.post("save", async function (doc, next) {
   try {
-    if (!this.isNew || this.invoiceNumber) return next();
+    if (doc.invoiceNumber) return next();
 
     const prefix = process.env.INVOICE_PREFIX || "INV";
+    const session = doc.$session();
 
-    let created = false;
+    const counter = await Counter.findOneAndUpdate(
+      { key: "SALES_INVOICE" },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true, session },
+    );
 
-    while (!created) {
-      // last invoice খুঁজে বের করা
-      const lastInvoice = await this.constructor
-        .findOne({ invoiceNumber: { $regex: `^${prefix}-` } })
-        .sort({ invoiceNumber: -1 })
-        .select("invoiceNumber")
-        .lean();
-
-      let lastNumber = 0;
-
-      if (lastInvoice?.invoiceNumber) {
-        const numPart = lastInvoice.invoiceNumber.split("-")[1];
-        lastNumber = Number(numPart) || 0;
-      }
-
-      const nextNumber = lastNumber + 1;
-
-      // 6 digit serial
-      const serial = String(nextNumber).padStart(6, "0");
-
-      const newInvoice = `${prefix}-${serial}`;
-
-      // duplicate check
-      const exists = await this.constructor.exists({
-        invoiceNumber: newInvoice,
-      });
-
-      if (!exists) {
-        this.invoiceNumber = newInvoice;
-        created = true;
-      }
-    }
-
+    const padded = String(counter.seq).padStart(2, "0");
+    doc.invoiceNumber = `${prefix}-SI-${padded}`;
+    await doc.constructor.updateOne(
+      { _id: doc._id },
+      { $set: { invoiceNumber: doc.invoiceNumber } },
+      { session },
+    );
     next();
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 });
 

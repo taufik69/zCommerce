@@ -13,7 +13,14 @@ const {
   customerAdvancePaymentModel,
 } = require("../models/customer.model");
 const { clientCommandMessageReg } = require("bullmq");
-const { bumpNsVersion } = require("@/utils/cache.util");
+const {
+  bumpNsVersion,
+  buildCacheKey,
+  getCache,
+  setCache,
+} = require("@/utils/cache.util");
+
+const NS = "sales";
 
 // @desc create a new sales
 // @desc create a new sales (transaction safe + background notifications)
@@ -147,6 +154,8 @@ exports.createSales = asynchandeler(async (req, res) => {
     // invalidate product/variant caches so stock & posSold changes are visible immediately
     await bumpNsVersion("product");
     await bumpNsVersion("variant");
+    // and the sales list/invoice caches, so sales history shows this change
+    await bumpNsVersion(NS);
 
     // 3) Background notifications (AFTER commit)
     if (createdSale?.sendSms) {
@@ -232,15 +241,29 @@ exports.getAllSales = asynchandeler(async (req, res) => {
 
   // Exact invoice lookup — used by callers that need one specific invoice's full details
   if (invoiceNumber) {
+    const cacheKey = await buildCacheKey(NS, `invoice:${invoiceNumber}`);
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Sales fetched successfully",
+        cached,
+      );
+    }
+
     const sales = await salesModel
       .find({ invoiceNumber })
       .sort({ createdAt: -1 })
       .populate("customerType.customerId")
       .populate("searchItem.productId")
-      .populate("searchItem.variantId");
+      .populate("searchItem.variantId")
+      .populate("salesMen");
     if (!sales || sales.length === 0) {
       throw new customError("No sales found", statusCodes.NOT_FOUND);
     }
+
+    await setCache(cacheKey, sales, 300);
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
@@ -251,6 +274,17 @@ exports.getAllSales = asynchandeler(async (req, res) => {
 
   // Backward-compatible unpaginated list — existing callers expect a flat array
   if (!req.query.page && !req.query.limit && !search) {
+    const cacheKey = await buildCacheKey(NS, "all");
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return apiResponse.sendSuccess(
+        res,
+        statusCodes.OK,
+        "Sales fetched successfully",
+        cached,
+      );
+    }
+
     const sales = await salesModel
       .find({})
       .sort({ createdAt: -1 })
@@ -260,6 +294,8 @@ exports.getAllSales = asynchandeler(async (req, res) => {
     if (!sales || sales.length === 0) {
       throw new customError("No sales found", statusCodes.NOT_FOUND);
     }
+
+    await setCache(cacheKey, sales, 300);
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
@@ -277,6 +313,20 @@ exports.getAllSales = asynchandeler(async (req, res) => {
     ? { invoiceNumber: { $regex: String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } }
     : {};
 
+  const cacheKey = await buildCacheKey(
+    NS,
+    `list:p${page}:l${limit}:s${search || ""}`,
+  );
+  const cached = await getCache(cacheKey);
+  if (cached) {
+    return apiResponse.sendSuccess(
+      res,
+      statusCodes.OK,
+      "Sales fetched successfully",
+      cached,
+    );
+  }
+
   const [sales, total] = await Promise.all([
     salesModel
       .find(query)
@@ -289,11 +339,20 @@ exports.getAllSales = asynchandeler(async (req, res) => {
     salesModel.countDocuments(query),
   ]);
 
+  const payload = {
+    sales,
+    total,
+    page,
+    limit,
+    hasNextPage: page * limit < total,
+  };
+  await setCache(cacheKey, payload, 300);
+
   apiResponse.sendSuccess(
     res,
     statusCodes.OK,
     "Sales fetched successfully",
-    { sales, total, page, limit, hasNextPage: page * limit < total },
+    payload,
   );
 });
 
@@ -692,6 +751,8 @@ exports.updateSales = asynchandeler(async (req, res) => {
     // invalidate product/variant caches so stock & posSold changes are visible immediately
     await bumpNsVersion("product");
     await bumpNsVersion("variant");
+    // and the sales list/invoice caches, so sales history shows this change
+    await bumpNsVersion(NS);
 
     // 7) Post-commit notifications (optional, same style as your createSales)
     if (updatedSale?.sendSms) {
@@ -858,6 +919,8 @@ exports.deleteSales = asynchandeler(async (req, res) => {
     // invalidate product/variant caches so stock & posSold changes are visible immediately
     await bumpNsVersion("product");
     await bumpNsVersion("variant");
+    // and the sales list/invoice caches, so sales history shows this change
+    await bumpNsVersion(NS);
 
     return apiResponse.sendSuccess(
       res,
