@@ -159,7 +159,6 @@ salesSchema.post("save", async function (doc, next) {
   try {
     if (doc.invoiceNumber) return next();
 
-    const prefix = process.env.INVOICE_PREFIX || "INV";
     const session = doc.$session();
 
     const counter = await Counter.findOneAndUpdate(
@@ -169,7 +168,7 @@ salesSchema.post("save", async function (doc, next) {
     );
 
     const padded = String(counter.seq).padStart(2, "0");
-    doc.invoiceNumber = `${prefix}-SI-${padded}`;
+    doc.invoiceNumber = `INV-SI-${padded}`;
     await doc.constructor.updateOne(
       { _id: doc._id },
       { $set: { invoiceNumber: doc.invoiceNumber } },

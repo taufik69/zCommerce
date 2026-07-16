@@ -258,7 +258,9 @@ exports.getAllSales = asynchandeler(async (req, res) => {
       .populate("customerType.customerId")
       .populate("searchItem.productId")
       .populate("searchItem.variantId")
-      .populate("salesMen");
+      .populate("salesMen")
+      .populate("paymentMethod.singlePayment.paymentTo")
+      .populate("paymentMethod.multiplePayment.paymentTo");
     if (!sales || sales.length === 0) {
       throw new customError("No sales found", statusCodes.NOT_FOUND);
     }

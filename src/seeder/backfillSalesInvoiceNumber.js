@@ -13,8 +13,6 @@ const { bumpNsVersion } = require("../utils/cache.util");
 // external record referencing the previous INV-000001 format will no longer
 // match. Run --dry first.
 async function backfillSalesInvoiceNumber({ dryRun }) {
-  const prefix = process.env.INVOICE_PREFIX || "INV";
-
   // Oldest first, so the oldest sale becomes -01.
   const sales = await Sales.find({})
     .sort({ createdAt: 1 })
@@ -34,7 +32,7 @@ async function backfillSalesInvoiceNumber({ dryRun }) {
 
   for (const sale of sales) {
     seq += 1;
-    const next = `${prefix}-SI-${String(seq).padStart(2, "0")}`;
+    const next = `INV-SI-${String(seq).padStart(2, "0")}`;
 
     if (sale.invoiceNumber === next) {
       skipped += 1;
@@ -58,7 +56,7 @@ async function backfillSalesInvoiceNumber({ dryRun }) {
       { $set: { seq } },
       { upsert: true },
     );
-    console.log(`Counter SALES_INVOICE set to ${seq} — next sale: ${prefix}-SI-${String(seq + 1).padStart(2, "0")}`);
+    console.log(`Counter SALES_INVOICE set to ${seq} — next sale: INV-SI-${String(seq + 1).padStart(2, "0")}`);
     await bumpNsVersion("sales");
   }
 
