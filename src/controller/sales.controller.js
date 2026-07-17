@@ -22,9 +22,59 @@ const {
 
 const NS = "sales";
 
+// Server-side discount-limit enforcement. The frontend disables discount fields
+// and warns the seller, but a client can be bypassed, so the same rule is
+// re-checked here from the trusted req.user.discountLimit.
+//
+// Rule: the seller's discountLimit caps the combined discount on a sale as a
+// percentage of the gross line value. Item-level discounts (already carried
+// from the product/variant) + the invoice-level discountPercent + lessTaka are
+// all summed and expressed as one effective percentage. discountLimit === 0
+// means "no limit" (consistent with the customer dueLimit convention).
+// The cap applies to every user, including superadmins.
+const enforceDiscountLimit = (user, body) => {
+  const limit = Number(user?.discountLimit || 0);
+  if (limit <= 0) return;
+
+  const items = Array.isArray(body?.searchItem) ? body.searchItem : [];
+
+  let gross = 0;
+  let itemDiscount = 0;
+  for (const it of items) {
+    // Only sale lines contribute to a discount cap; returns/exchanges don't.
+    if (it?.salesStatus && it.salesStatus !== "sale") continue;
+    const rate = Number(it?.salesRate || 0);
+    const qty = Number(it?.quantity || 0);
+    gross += rate * qty;
+    itemDiscount += Number(it?.discount || 0);
+  }
+
+  if (gross <= 0) return;
+
+  const invoiceDiscount = (Number(body?.discountPercent || 0) / 100) * gross;
+  const lessTaka = Number(body?.lessTaka || 0);
+
+  const totalDiscount = itemDiscount + invoiceDiscount + lessTaka;
+  const effectivePercent = (totalDiscount / gross) * 100;
+
+  // Round to 2 dp to avoid rejecting on floating-point noise at the boundary.
+  if (Math.round(effectivePercent * 100) / 100 > limit) {
+    throw new customError(
+      `Discount limit exceeded. Your limit is ${limit}% but this sale applies ${effectivePercent.toFixed(
+        2,
+      )}%.`,
+      statusCodes.FORBIDDEN,
+    );
+  }
+};
+
 // @desc create a new sales
 // @desc create a new sales (transaction safe + background notifications)
 exports.createSales = asynchandeler(async (req, res) => {
+  // Enforce the seller's discount limit and stamp who is accountable for it.
+  enforceDiscountLimit(req.user, req.body);
+  req.body.discountGivenBy = req.user?._id;
+
   const session = await mongoose.startSession();
   let createdSale;
 
@@ -259,6 +309,7 @@ exports.getAllSales = asynchandeler(async (req, res) => {
       .populate("searchItem.productId")
       .populate("searchItem.variantId")
       .populate("salesMen")
+      .populate("discountGivenBy", "name email discountLimit")
       .populate("paymentMethod.singlePayment.paymentTo")
       .populate("paymentMethod.multiplePayment.paymentTo");
     if (!sales || sales.length === 0) {
@@ -292,7 +343,8 @@ exports.getAllSales = asynchandeler(async (req, res) => {
       .sort({ createdAt: -1 })
       .populate("customerType.customerId")
       .populate("searchItem.productId")
-      .populate("searchItem.variantId");
+      .populate("searchItem.variantId")
+      .populate("discountGivenBy", "name email discountLimit");
     if (!sales || sales.length === 0) {
       throw new customError("No sales found", statusCodes.NOT_FOUND);
     }
@@ -337,7 +389,8 @@ exports.getAllSales = asynchandeler(async (req, res) => {
       .limit(limit)
       .populate("customerType.customerId")
       .populate("searchItem.productId")
-      .populate("searchItem.variantId"),
+      .populate("searchItem.variantId")
+      .populate("discountGivenBy", "name email discountLimit"),
     salesModel.countDocuments(query),
   ]);
 
@@ -590,6 +643,17 @@ exports.updateSales = asynchandeler(async (req, res) => {
       if (!oldSale) {
         throw new customError("Sales not found", statusCodes.NOT_FOUND);
       }
+
+      // Enforce the seller's discount limit on the effective (merged) sale —
+      // an update may only send some fields, so fall back to the stored values
+      // for anything not supplied before checking the combined discount.
+      enforceDiscountLimit(req.user, {
+        searchItem: req.body.searchItem ?? oldSale.searchItem,
+        discountPercent: req.body.discountPercent ?? oldSale.discountPercent,
+        lessTaka: req.body.lessTaka ?? oldSale.lessTaka,
+      });
+      // Record who applied the discount on this edit.
+      req.body.discountGivenBy = req.user?._id;
 
       // 2) Decide NEW state (if field not sent, keep old)
       const newInvoiceStatus = req.body.invoiceStatus ?? oldSale.invoiceStatus;

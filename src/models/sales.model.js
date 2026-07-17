@@ -110,6 +110,14 @@ const salesSchema = new mongoose.Schema(
       required: [true, "Salesman is required"],
     },
 
+    // The logged-in user (seller/admin) who created this sale and is
+    // accountable for any discount applied. Set server-side from req.user,
+    // never trusted from the request body. Populated in reports.
+    discountGivenBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
     invoiceStatus: {
       type: String,
       enum: ["complete", "draft", "pending"],
