@@ -293,12 +293,16 @@ exports.createSales = asynchandeler(async (req, res) => {
 
 // get all sales order or get invoiceNumber wise sales
 exports.getAllSales = asynchandeler(async (req, res) => {
-  const { invoiceNumber, search, salesType } = req.query;
+  const { invoiceNumber, search, salesType, invoiceStatus } = req.query;
 
-  // Optional salesType filter (e.g. ?salesType=retailsaleorder) — lets the
-  // order-list pages fetch only their own rows instead of the whole history.
-  const typeFilter =
-    salesType && String(salesType).trim() ? { salesType: String(salesType).trim() } : {};
+  // Optional list filters. salesType (e.g. ?salesType=retailsaleorder) lets the
+  // order-list pages fetch only their own rows; invoiceStatus (e.g.
+  // ?invoiceStatus=draft) powers the draft-order list. Both can combine.
+  const listFilter = {};
+  if (salesType && String(salesType).trim())
+    listFilter.salesType = String(salesType).trim();
+  if (invoiceStatus && String(invoiceStatus).trim())
+    listFilter.invoiceStatus = String(invoiceStatus).trim();
 
   // Exact invoice lookup — used by callers that need one specific invoice's full details
   if (invoiceNumber) {
@@ -338,10 +342,10 @@ exports.getAllSales = asynchandeler(async (req, res) => {
 
   // Backward-compatible unpaginated list — existing callers expect a flat array
   if (!req.query.page && !req.query.limit && !search) {
-    const cacheKey = await buildCacheKey(
-      NS,
-      salesType ? `all:type:${String(salesType).trim()}` : "all",
-    );
+    const filterSuffix = Object.keys(listFilter).length
+      ? `all:${listFilter.salesType || "*"}:${listFilter.invoiceStatus || "*"}`
+      : "all";
+    const cacheKey = await buildCacheKey(NS, filterSuffix);
     const cached = await getCache(cacheKey);
     if (cached) {
       return apiResponse.sendSuccess(
@@ -353,7 +357,7 @@ exports.getAllSales = asynchandeler(async (req, res) => {
     }
 
     const sales = await salesModel
-      .find(typeFilter)
+      .find(listFilter)
       .sort({ createdAt: -1 })
       .populate("customerType.customerId")
       .populate("searchItem.productId")
