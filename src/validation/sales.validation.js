@@ -102,7 +102,9 @@ const createSalesSchema = Joi.object({
     "array.min": "At least 1 item is required",
   }),
 
-  salesMen: objectId.optional(),
+  salesMen: objectId.required().messages({
+    "any.required": "Salesman is required",
+  }),
 
   invoiceStatus: Joi.string()
     .valid("complete", "draft", "pending")

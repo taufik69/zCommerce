@@ -104,7 +104,11 @@ const salesSchema = new mongoose.Schema(
 
     searchItem: { type: [searchItemSchema], default: [] },
 
-    salesMen: { type: mongoose.Schema.Types.ObjectId, ref: "Employee" },
+    salesMen: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Employee",
+      required: [true, "Salesman is required"],
+    },
 
     invoiceStatus: {
       type: String,
