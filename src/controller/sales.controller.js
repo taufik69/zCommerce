@@ -293,7 +293,12 @@ exports.createSales = asynchandeler(async (req, res) => {
 
 // get all sales order or get invoiceNumber wise sales
 exports.getAllSales = asynchandeler(async (req, res) => {
-  const { invoiceNumber, search } = req.query;
+  const { invoiceNumber, search, salesType } = req.query;
+
+  // Optional salesType filter (e.g. ?salesType=retailsaleorder) — lets the
+  // order-list pages fetch only their own rows instead of the whole history.
+  const typeFilter =
+    salesType && String(salesType).trim() ? { salesType: String(salesType).trim() } : {};
 
   // Exact invoice lookup — used by callers that need one specific invoice's full details
   if (invoiceNumber) {
@@ -333,7 +338,10 @@ exports.getAllSales = asynchandeler(async (req, res) => {
 
   // Backward-compatible unpaginated list — existing callers expect a flat array
   if (!req.query.page && !req.query.limit && !search) {
-    const cacheKey = await buildCacheKey(NS, "all");
+    const cacheKey = await buildCacheKey(
+      NS,
+      salesType ? `all:type:${String(salesType).trim()}` : "all",
+    );
     const cached = await getCache(cacheKey);
     if (cached) {
       return apiResponse.sendSuccess(
@@ -345,22 +353,22 @@ exports.getAllSales = asynchandeler(async (req, res) => {
     }
 
     const sales = await salesModel
-      .find({})
+      .find(typeFilter)
       .sort({ createdAt: -1 })
       .populate("customerType.customerId")
       .populate("searchItem.productId")
       .populate("searchItem.variantId")
       .populate("discountGivenBy", "name email discountLimit");
-    if (!sales || sales.length === 0) {
-      throw new customError("No sales found", statusCodes.NOT_FOUND);
-    }
 
-    await setCache(cacheKey, sales, 300);
+    // A filtered list (e.g. an order page with no orders yet) legitimately
+    // returns nothing — send an empty array instead of a 404 in that case.
+    const payload = sales || [];
+    await setCache(cacheKey, payload, 300);
     return apiResponse.sendSuccess(
       res,
       statusCodes.OK,
       "Sales fetched successfully",
-      sales,
+      payload,
     );
   }
 
