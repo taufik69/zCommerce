@@ -88,11 +88,17 @@ exports.createSales = asynchandeler(async (req, res) => {
         throw new customError("Sales not created", statusCodes.SERVER_ERROR);
       }
 
+      // Stock is only committed for a completed sale. Pending/draft orders
+      // (e.g. from the sale-order pages) save without touching stock, so they
+      // can be created even when stock is short — the deduction happens later
+      // when the order is marked complete via updateSales.
+      const shouldApplyStock = createdSale.invoiceStatus === "complete";
+
       //  Build bulk stock operations (fast + atomic)
       const productOps = [];
       const variantOps = [];
 
-      for (const item of createdSale.searchItem || []) {
+      for (const item of shouldApplyStock ? createdSale.searchItem || [] : []) {
         const qty = Number(item.quantity || 0);
         if (qty <= 0) continue;
 
