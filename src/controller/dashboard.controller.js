@@ -10,6 +10,9 @@ const salesModel = require("../models/sales.model");
 const productModel = require("../models/product.model");
 const variantModel = require("../models/variant.model");
 const { customerModel } = require("../models/customer.model");
+const { SupplierModel } = require("../models/supplier.model");
+const employeeModel = require("../models/employee.model");
+const crateTransactionModel = require("../models/crateTransaction.model");
 
 const NS = "dashboard";
 const CACHE_TTL = 2 * 60; // 2 minutes — dashboard tolerates slight staleness
@@ -61,6 +64,11 @@ exports.getOverview = asynchandeler(async (req, res) => {
   // Match filter for time-bounded sales queries
   const dateMatch = start ? { createdAt: { $gte: start, $lte: end } } : {};
 
+  // "Today" window — independent of the range selector (summary cards below)
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayMatch = { createdAt: { $gte: todayStart } };
+
   const [
     salesAgg,
     salesByType,
@@ -74,6 +82,11 @@ exports.getOverview = asynchandeler(async (req, res) => {
     lowStockProducts,
     customerCount,
     duesAgg,
+    supplierCount,
+    employeeCount,
+    salesTodayAgg,
+    cashTodayAgg,
+    supplierDuesAgg,
   ] = await Promise.all([
     // 1. Headline sales KPIs within range
     salesModel.aggregate([
@@ -216,6 +229,54 @@ exports.getOverview = asynchandeler(async (req, res) => {
         },
       },
     ]),
+
+    // 13. Total suppliers (not soft-deleted)
+    SupplierModel.countDocuments({ deletedAt: null }),
+
+    // 14. Total employees
+    employeeModel.countDocuments({}),
+
+    // 15. Today's sales breakdown (payable / paid / due)
+    salesModel.aggregate([
+      { $match: todayMatch },
+      {
+        $group: {
+          _id: null,
+          totalSales: { $sum: "$payable" },
+          cashSales: { $sum: "$paid" },
+          duesSales: { $sum: "$presentDue" },
+        },
+      },
+    ]),
+
+    // 16. Today's cash transactions grouped by type
+    crateTransactionModel.aggregate([
+      { $match: todayMatch },
+      {
+        $group: {
+          _id: "$transactionType",
+          amount: { $sum: "$amount" },
+        },
+      },
+    ]),
+
+    // 17. Overall supplier dues (opening + purchase due)
+    SupplierModel.aggregate([
+      { $match: { deletedAt: null } },
+      {
+        $group: {
+          _id: null,
+          totalDue: {
+            $sum: {
+              $add: [
+                { $ifNull: ["$openingDues", 0] },
+                { $ifNull: ["$totalPurchaseDue", 0] },
+              ],
+            },
+          },
+        },
+      },
+    ]),
   ]);
 
   const s = salesAgg[0] || {
@@ -249,6 +310,43 @@ exports.getOverview = asynchandeler(async (req, res) => {
       ),
       outstandingDues: Math.round(duesAgg[0]?.totalDue || 0),
     },
+    summary: (() => {
+      const st = salesTodayAgg[0] || {
+        totalSales: 0,
+        cashSales: 0,
+        duesSales: 0,
+      };
+      const cashReceive = Math.round(
+        cashTodayAgg.find((c) => c._id === "cash recived")?.amount || 0,
+      );
+      const cashPayment = Math.round(
+        cashTodayAgg.find((c) => c._id === "cash payment")?.amount || 0,
+      );
+      const supplierDues = Math.round(supplierDuesAgg[0]?.totalDue || 0);
+      const customerDues = Math.round(duesAgg[0]?.totalDue || 0);
+      return {
+        profile: {
+          totalCustomer: customerCount || 0,
+          totalSupplier: supplierCount || 0,
+          totalEmployee: employeeCount || 0,
+        },
+        salesToday: {
+          totalSales: Math.round(st.totalSales || 0),
+          cashSales: Math.round(st.cashSales || 0),
+          duesSales: Math.round(st.duesSales || 0),
+        },
+        cashToday: {
+          cashReceive,
+          cashPayment,
+          cashBalance: cashReceive - cashPayment,
+        },
+        overallBalance: {
+          supplierDues,
+          customerDues,
+          liabilityBalance: supplierDues - customerDues,
+        },
+      };
+    })(),
     salesByType: salesByType.map((t) => ({
       type: t._id || "unknown",
       revenue: Math.round(t.revenue || 0),
