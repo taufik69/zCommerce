@@ -584,7 +584,6 @@ exports.updateSales = asynchandeler(async (req, res) => {
   try {
     await session.withTransaction(async () => {
       const saleId = req.params.saleId;
-      console.log(saleId);
 
       // 1) Load old sale inside transaction
       const oldSale = await salesModel.findById(saleId).session(session).lean();
