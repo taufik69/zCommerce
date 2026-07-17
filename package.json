@@ -21,8 +21,9 @@
     "seed:all": "concurrently \"npm run seed:permissions\" \"npm run seed:roles\" \"npm run seed:role-permissions\" \"npm run seed:users\" \"npm run seed:delivery\"",
     "worker:image": "node src/workers/image.worker.js",
     "worker:sms": "node src/workers/sms.worker.js",
+    "worker:email": "node src/workers/email.worker.js",
     "worker:audit": "node src/workers/audit.worker.js",
-    "worker:all": "concurrently \"npm run worker:image\" \"npm run worker:sms\" \"npm run worker:audit\""
+    "worker:all": "concurrently \"npm run worker:image\" \"npm run worker:sms\" \"npm run worker:email\" \"npm run worker:audit\""
   },
   "_moduleAliases": {
     "@": "src"

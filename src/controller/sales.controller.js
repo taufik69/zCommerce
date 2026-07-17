@@ -12,6 +12,11 @@ const {
   customerModel,
   customerAdvancePaymentModel,
 } = require("../models/customer.model");
+const StoreInformation = require("../models/storeInformation.model");
+const { smsQueue } = require("../queues/sms.queue");
+const { emailQueue } = require("../queues/email.queue");
+const { buildInvoiceHtml } = require("../helpers/invoiceTemplate");
+const SmsLog = require("../models/smsLog.model");
 const { clientCommandMessageReg } = require("bullmq");
 const {
   bumpNsVersion,
@@ -64,6 +69,99 @@ const enforceDiscountLimit = (user, body) => {
         2,
       )}%.`,
       statusCodes.FORBIDDEN,
+    );
+  }
+};
+
+// Resolve the customer's phone + email from a sale, whether walking or listed.
+const resolveCustomerContact = async (sale) => {
+  const ct = sale.customerType || {};
+  if (ct.type === "walking") {
+    return {
+      name: ct.walking?.customerName || "",
+      phone: ct.walking?.mobileNumber || "",
+      email: ct.walking?.email || "",
+    };
+  }
+  const customer = await customerModel.findById(ct.customerId).lean();
+  return {
+    name: customer?.fullName || "",
+    phone: customer?.mobileNumber || "",
+    email: customer?.emailAddress || customer?.email || "",
+  };
+};
+
+// Hand a sale's SMS + email off to their queues. The SMS is the short text
+// receipt (per the store's template); the email carries the full HTML invoice
+// mirroring the print design. Both are enqueued; the workers do the sending.
+const enqueueSalesNotifications = async (createdSale) => {
+  const { phone, email } = await resolveCustomerContact(createdSale);
+  const store = await StoreInformation.findOne().lean();
+  const storeName = store?.storeName || "";
+  const hotline = store?.phone || "";
+
+  const money = (v) => Number(v || 0).toFixed(2);
+
+  // ── SMS (short text receipt) ──
+  if (phone) {
+    const smsText =
+      `Dear Sir/Mam,\n\n` +
+      `Thank you for shopping at ${storeName}. We truly appreciate your support and look forward to serving you again!\n\n` +
+      `Invoice No: ${createdSale.invoiceNumber}\n` +
+      `Total Payable: ${money(createdSale.payable)} Taka\n` +
+      `Paid: ${money(createdSale.paid)} Taka\n` +
+      `Due: ${money(createdSale.presentDue)}\n\n` +
+      `${storeName}\n` +
+      `HOTLINE: ${hotline}\n\n` +
+      `If needed, you can return or exchange the product within 7 days. Thanks for shopping!`;
+
+    // The SMS worker tracks delivery against an SmsLog, matching recipients by
+    // array index — so create the log first, then enqueue with its id.
+    const log = await SmsLog.create({
+      type: "single",
+      recipientType: "sales",
+      message: smsText,
+      totalCount: 1,
+      status: "queued",
+      recipients: [{ phone, status: "pending" }],
+    });
+
+    const job = await smsQueue.add(
+      "send-sales-sms",
+      {
+        logId: log._id.toString(),
+        message: smsText,
+        recipients: [{ phone, index: 0 }],
+      },
+      { jobId: `sales-sms-${createdSale._id}` },
+    );
+    await SmsLog.updateOne({ _id: log._id }, { $set: { jobId: job.id } });
+  }
+
+  // ── Email (full HTML invoice) ──
+  if (email) {
+    // Re-fetch the sale fully populated so the invoice HTML has customer,
+    // item and salesman details — the txn-created doc isn't populated.
+    const populated = await salesModel
+      .findById(createdSale._id)
+      .populate("customerType.customerId")
+      .populate("searchItem.productId")
+      .populate("searchItem.variantId")
+      .populate("salesMen")
+      .populate("paymentMethod.singlePayment.paymentTo")
+      .populate("paymentMethod.multiplePayment.paymentTo")
+      .lean();
+
+    const html = buildInvoiceHtml(populated || createdSale.toObject?.() || createdSale, store);
+
+    await emailQueue.add(
+      "send-sales-invoice",
+      {
+        to: email,
+        subject: `Invoice ${createdSale.invoiceNumber} - ${storeName}`,
+        html,
+      },
+      { jobId: `sales-email-${createdSale._id}` },
     );
   }
 };
@@ -213,70 +311,16 @@ exports.createSales = asynchandeler(async (req, res) => {
     // and the sales list/invoice caches, so sales history shows this change
     await bumpNsVersion(NS);
 
-    // 3) Background notifications (AFTER commit)
+    // 3) Background notifications (AFTER commit) — SMS and email are both
+    // handed off to their BullMQ queues, so the request returns immediately and
+    // the dedicated workers (worker:sms / worker:email) do the sending with
+    // retries. Enqueue failures are logged but never fail the sale.
     if (createdSale?.sendSms) {
-      setImmediate(async () => {
-        try {
-          const customerType = createdSale.customerType;
-
-          let phone = "";
-          let email = "";
-          let name = "";
-          let address = "";
-
-          if (customerType?.type === "walking") {
-            name = customerType?.walking?.customerName || "";
-            phone = customerType?.walking?.mobileNumber || "";
-            email = customerType?.walking?.email || "";
-            address = customerType?.walking?.address || "";
-          } else {
-            // listed customer id is customerType.listed.customerId
-            const customerId = customerType?.customerId;
-
-            const customer = await customerModel.findById(customerId).lean();
-            if (!customer) {
-              throw new customError(
-                "Customer not found",
-                statusCodes.NOT_FOUND,
-              );
-            }
-
-            name = customer.fullName || "";
-            phone = customer.mobileNumber || "";
-            email = customer.emailAddress || customer.email || "";
-            address = customer.presentAddress || "";
-          }
-
-          if (!phone) {
-            console.log("SMS skipped: phone missing");
-            return;
-          }
-
-          const msgContent =
-            `Customer Name: ${name}\n` +
-            `Mobile Number: ${phone}\n` +
-            (email ? `Email: ${email}\n` : "") +
-            (address ? `Address: ${address}\n` : "") +
-            `Invoice: ${createdSale.invoiceNumber}`;
-
-          // SMS: handle failure (do not crash request; it's background)
-          try {
-            const smsResult = await sendSMS(phone, msgContent);
-            console.log("SMS sent:", smsResult);
-          } catch (smsErr) {
-            console.log("SMS failed:", smsErr);
-          }
-
-          // Email: fire-and-forget
-          if (email) {
-            sendEmail(email, "Order Confirmation", msgContent).catch((e) => {
-              console.log("Email failed:", e);
-            });
-          }
-        } catch (e) {
-          console.log("Notification background error:", e);
-        }
-      });
+      try {
+        await enqueueSalesNotifications(createdSale);
+      } catch (e) {
+        console.log("Notification enqueue error:", e.message);
+      }
     }
 
     return apiResponse.sendSuccess(
