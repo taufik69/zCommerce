@@ -9,7 +9,12 @@ _.route("/purchase-invoice").post(
   authorize("purchase-invoice", "view"),
   reportController.getPurchaseInvoiceReport,
 );
-_.route("/purchase-invoice/suppliers").get(
+_.route("/purchase-product").post(
+  authGuard,
+  authorize("purchase-product-report", "view"),
+  reportController.getPurchaseProductReport,
+);
+_.route("/purchase/suppliers").get(
   authGuard,
   authorize("purchase-invoice", "view"),
   reportController.getPurchaseInvoiceSuppliers,

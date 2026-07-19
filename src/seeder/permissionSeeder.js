@@ -65,6 +65,7 @@ const permissionList = [
   { permissionName: "Sales History" },
   // Reports
   { permissionName: "Purchase Invoice" },
+  { permissionName: "Purchase Product Report" },
   { permissionName: "Purchase Summary" },
   { permissionName: "Purchase Return Report" },
   { permissionName: "Order Invoice" },
