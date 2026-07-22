@@ -960,43 +960,42 @@ exports.deleteSales = asynchandeler(async (req, res) => {
         }
 
         // 3️⃣Build bulk ops
-        // posSold moves opposite to the stock delta (stock down => posSold up)
+        // Deleting a completed sale undoes it: stock goes back up and posSold
+        // comes back down by the same amount (a deleted sale sold nothing).
+        // No stock floor is applied here, unlike the create path — a revert is
+        // undoing history, not selling, so it must never be refused. Guarding
+        // it would leave the sale undeletable whenever a return line is
+        // involved and stock had since been drawn down elsewhere.
         const productOps = [];
         for (const [productId, d] of productMap.entries()) {
-          const reduce = d < 0;
-
-          const filter = reduce
-            ? { _id: productId, stock: { $gte: Math.abs(d) } }
-            : { _id: productId };
-
           productOps.push({
-            updateOne: { filter, update: { $inc: { stock: d, posSold: -d } } },
+            updateOne: {
+              filter: { _id: productId },
+              update: { $inc: { stock: d, posSold: -d } },
+            },
           });
         }
 
         const variantOps = [];
         for (const [variantId, d] of variantMap.entries()) {
-          const reduce = d < 0;
-
-          const filter = reduce
-            ? { _id: variantId, stockVariant: { $gte: Math.abs(d) } }
-            : { _id: variantId };
-
           variantOps.push({
             updateOne: {
-              filter,
+              filter: { _id: variantId },
               update: { $inc: { stockVariant: d, posSold: -d } },
             },
           });
         }
 
         // 4️ Execute stock revert
+        // A row that no longer matches means the product/variant was deleted
+        // from the catalogue after the sale was rung up. There is nothing left
+        // to credit the stock back to, but that must not strand the sale as
+        // undeletable — so this is logged, not thrown.
         if (productOps.length) {
           const r = await productModel.bulkWrite(productOps, { session });
           if (r.matchedCount !== productOps.length) {
-            throw new customError(
-              "Product stock revert failed",
-              statusCodes.BAD_REQUEST,
+            console.warn(
+              `deleteSales: ${productOps.length - r.matchedCount} product(s) missing on stock revert for sale ${saleId}`,
             );
           }
         }
@@ -1004,9 +1003,8 @@ exports.deleteSales = asynchandeler(async (req, res) => {
         if (variantOps.length) {
           const r = await variantModel.bulkWrite(variantOps, { session });
           if (r.matchedCount !== variantOps.length) {
-            throw new customError(
-              "Variant stock revert failed",
-              statusCodes.BAD_REQUEST,
+            console.warn(
+              `deleteSales: ${variantOps.length - r.matchedCount} variant(s) missing on stock revert for sale ${saleId}`,
             );
           }
         }
