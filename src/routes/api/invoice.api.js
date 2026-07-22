@@ -1,12 +1,16 @@
 const express = require("express");
 const _ = express.Router();
 const invoiceController = require("../../controller/invoice.controller");
+const reportController = require("../../controller/report.controller");
 const { authGuard } = require("../../middleware/authMiddleware");
 const { authorize } = require("../../middleware/checkPermission.middleware");
 
-_.route("/purchase-invoice").post(authGuard, authorize("purchase-invoice", "view"), invoiceController.purchaseInvoice);
+// Purchase invoice report — migrated to report.controller.js (fixed supplier-name
+// lookup + dueamount field-name bug, optimized to a single indexed aggregate).
+// Same handler is also mounted at POST /report/purchase-invoice.
+_.route("/purchase-invoice").post(authGuard, authorize("purchase-invoice", "view"), reportController.getPurchaseInvoiceReport);
 _.route("/purchase-summary").post(authGuard, authorize("purchase-summary", "view"), invoiceController.purchaseSummary);
-_.route("/purchase-supplier").get(authGuard, authorize("purchase-summary", "view"), invoiceController.getSupplierSummary);
+_.route("/purchase-supplier").get(authGuard, authorize("purchase-summary", "view"), reportController.getPurchaseInvoiceSuppliers);
 _.route("/buyreturn-invoice").post(authGuard, authorize("purchase-return-report", "view"), invoiceController.getPurchaseBySupplier);
 _.route("/order-invoice").post(authGuard, authorize("order-invoice", "view"), invoiceController.getInvoiceReport);
 _.route("/order-status").post(authGuard, authorize("order-status-report", "view"), invoiceController.getOrderSummaryByDate);

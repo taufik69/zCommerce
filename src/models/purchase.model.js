@@ -139,6 +139,10 @@ purchaseSchema.pre("save", async function (next) {
 // check invoiceid is unique or not
 purchaseSchema.index({ invoiceNumber: 1 }, { unique: true });
 
+// Purchase invoice report — date-range scan, optionally narrowed by supplier
+purchaseSchema.index({ date: -1 });
+purchaseSchema.index({ supplierId: 1, date: -1 });
+
 // Auto-generate a sequential, never-reused serial after first save
 purchaseSchema.post("save", async function (doc, next) {
   try {
