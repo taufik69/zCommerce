@@ -250,7 +250,12 @@ exports.createOrder = asynchandeler(async (req, res) => {
 
     // Step 7: Update stock and coupon usage after successful order creation
     // Step 7: Update stock and coupon usage after successful order creation
-    const stockUpdatePromises = [];
+    // The pre-check below reads the stock loaded with the cart, which is a
+    // stale snapshot by the time the write runs — two concurrent orders can
+    // both pass it and both decrement, driving stock negative. The $gte in the
+    // filter re-checks the same condition atomically at write time, so the
+    // update simply does not match once stock is short. A null result means
+    // that happened, and the order is rejected rather than overselling.
     for (const item of cart.items) {
       // Product stock update
       if (item.product) {
@@ -260,14 +265,18 @@ exports.createOrder = asynchandeler(async (req, res) => {
             400,
           );
         }
-        stockUpdatePromises.push(
-          Product.findOneAndUpdate(
-            { _id: item.product },
-            {
-              $inc: { stock: -item.quantity, totalSales: item.quantity },
-            },
-          ),
+        const updated = await Product.findOneAndUpdate(
+          { _id: item.product, stock: { $gte: item.quantity } },
+          {
+            $inc: { stock: -item.quantity, totalSales: item.quantity },
+          },
         );
+        if (!updated) {
+          throw new customError(
+            `${item.product.name} does not have enough stock`,
+            400,
+          );
+        }
       }
       // Variant stock update
       if (item.variant) {
@@ -277,17 +286,20 @@ exports.createOrder = asynchandeler(async (req, res) => {
             400,
           );
         }
-        stockUpdatePromises.push(
-          Variant.findOneAndUpdate(
-            { _id: item.variant },
-            {
-              $inc: { stockVariant: -item.quantity, totalSales: item.quantity },
-            },
-          ),
+        const updated = await Variant.findOneAndUpdate(
+          { _id: item.variant, stockVariant: { $gte: item.quantity } },
+          {
+            $inc: { stockVariant: -item.quantity, totalSales: item.quantity },
+          },
         );
+        if (!updated) {
+          throw new customError(
+            `${item.variant.variantName} does not have enough stock from variant`,
+            400,
+          );
+        }
       }
     }
-    await Promise.all(stockUpdatePromises);
 
     if (coupon) {
       await Coupon.updateOne({ _id: coupon._id }, { $inc: { usedCount: 1 } });
@@ -419,7 +431,10 @@ exports.createOrder = asynchandeler(async (req, res) => {
     console.log(error);
     // If order creation or any subsequent step fails, we must rollback stock and coupon usage
     if (order && order._id) {
-      // Rollback stock
+      // Rollback stock — this must undo the forward deduction, so the signs
+      // are the inverse of the ones above: stock goes back up and totalSales
+      // comes back down. (This previously repeated the forward operation,
+      // deducting a second time and driving stock negative on every failure.)
       const stockUpdatePromises = [];
       for (const item of cart.items) {
         // Product stock update
@@ -428,7 +443,7 @@ exports.createOrder = asynchandeler(async (req, res) => {
             Product.updateOne(
               { _id: item.product },
               {
-                $inc: { stock: -item.quantity, totalSales: item.quantity },
+                $inc: { stock: item.quantity, totalSales: -item.quantity },
               },
             ),
           );
@@ -440,8 +455,8 @@ exports.createOrder = asynchandeler(async (req, res) => {
               { _id: item.variant },
               {
                 $inc: {
-                  stockVariant: -item.quantity,
-                  totalSales: item.quantity,
+                  stockVariant: item.quantity,
+                  totalSales: -item.quantity,
                 },
               },
             ),

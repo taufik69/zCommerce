@@ -166,12 +166,17 @@ exports.createPurchaseReturn = asynchandeler(async (req, res) => {
     );
 
     // Bulk update product stock
+    // The $gte guard makes the check atomic with the decrement: a row whose
+    // stock has already dropped below the returned quantity simply will not
+    // match, so stock can never be driven negative. matchedCount catching the
+    // shortfall is what turns that into a rejected return rather than a
+    // silently skipped one.
     if (productIds.length) {
       const productOps = returnProducts
         .filter((i) => i.product)
         .map((i) => ({
           updateOne: {
-            filter: { _id: i.product },
+            filter: { _id: i.product, stock: { $gte: i.quantity } },
             update: {
               $inc: {
                 stock: -i.quantity,
@@ -181,7 +186,13 @@ exports.createPurchaseReturn = asynchandeler(async (req, res) => {
           },
         }));
       if (productOps.length) {
-        await Product.bulkWrite(productOps, { session });
+        const r = await Product.bulkWrite(productOps, { session });
+        if (r.matchedCount !== productOps.length) {
+          throw new customError(
+            "Not enough product stock to return some items",
+            statusCodes.BAD_REQUEST,
+          );
+        }
       }
     }
 
@@ -191,7 +202,7 @@ exports.createPurchaseReturn = asynchandeler(async (req, res) => {
         .filter((i) => i.variant)
         .map((i) => ({
           updateOne: {
-            filter: { _id: i.variant },
+            filter: { _id: i.variant, stockVariant: { $gte: i.quantity } },
             update: {
               $inc: {
                 stockVariant: -i.quantity,
@@ -201,7 +212,13 @@ exports.createPurchaseReturn = asynchandeler(async (req, res) => {
           },
         }));
       if (variantOps.length) {
-        await Variant.bulkWrite(variantOps, { session });
+        const r = await Variant.bulkWrite(variantOps, { session });
+        if (r.matchedCount !== variantOps.length) {
+          throw new customError(
+            "Not enough variant stock to return some items",
+            statusCodes.BAD_REQUEST,
+          );
+        }
       }
     }
 
@@ -585,11 +602,14 @@ exports.updatePurchaseReturn = asynchandeler(async (req, res) => {
 
     // ── STEP 3: Apply new stock ─────────────────────────────────────────────
 
+    // Guarded the same way as the create path: the $gte makes the check
+    // atomic with the decrement so stock cannot go negative, and the
+    // matchedCount shortfall rejects the update instead of skipping rows.
     const newProductOps = returnProducts
       .filter((i) => i.product)
       .map((i) => ({
         updateOne: {
-          filter: { _id: i.product },
+          filter: { _id: i.product, stock: { $gte: i.quantity } },
           update: {
             $inc: {
               stock: -i.quantity,
@@ -603,7 +623,7 @@ exports.updatePurchaseReturn = asynchandeler(async (req, res) => {
       .filter((i) => i.variant)
       .map((i) => ({
         updateOne: {
-          filter: { _id: i.variant },
+          filter: { _id: i.variant, stockVariant: { $gte: i.quantity } },
           update: {
             $inc: {
               stockVariant: -i.quantity,
@@ -614,10 +634,22 @@ exports.updatePurchaseReturn = asynchandeler(async (req, res) => {
       }));
 
     if (newProductOps.length) {
-      await Product.bulkWrite(newProductOps, { session });
+      const r = await Product.bulkWrite(newProductOps, { session });
+      if (r.matchedCount !== newProductOps.length) {
+        throw new customError(
+          "Not enough product stock to return some items",
+          statusCodes.BAD_REQUEST,
+        );
+      }
     }
     if (newVariantOps.length) {
-      await Variant.bulkWrite(newVariantOps, { session });
+      const r = await Variant.bulkWrite(newVariantOps, { session });
+      if (r.matchedCount !== newVariantOps.length) {
+        throw new customError(
+          "Not enough variant stock to return some items",
+          statusCodes.BAD_REQUEST,
+        );
+      }
     }
 
     // Apply new supplier dues
