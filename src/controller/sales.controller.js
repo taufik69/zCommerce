@@ -406,6 +406,7 @@ exports.getAllSales = asynchandeler(async (req, res) => {
       .populate("customerType.customerId")
       .populate("searchItem.productId")
       .populate("searchItem.variantId")
+      .populate("salesMen")
       .populate("discountGivenBy", "name email discountLimit");
 
     // A filtered list (e.g. an order page with no orders yet) legitimately
@@ -452,6 +453,7 @@ exports.getAllSales = asynchandeler(async (req, res) => {
       .populate("customerType.customerId")
       .populate("searchItem.productId")
       .populate("searchItem.variantId")
+      .populate("salesMen")
       .populate("discountGivenBy", "name email discountLimit"),
     salesModel.countDocuments(query),
   ]);
