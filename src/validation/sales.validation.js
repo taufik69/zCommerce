@@ -53,6 +53,10 @@ const searchItemSchema = Joi.object({
   unit: Joi.string().trim().allow("").optional(),
   salesRate: Joi.number().min(0).default(0),
   discount: Joi.number().min(0).default(0),
+  // Marks `discount` as a flat taka amount or a percentage of the line.
+  // Defaults to "amount" to match how sales saved before this field existed
+  // are read back.
+  discountType: Joi.string().valid("amount", "percent").default("amount"),
 
   subtotal: Joi.number().min(0).default(0),
 })

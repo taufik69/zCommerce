@@ -365,8 +365,12 @@ exports.getAllSales = asynchandeler(async (req, res) => {
       .find({ invoiceNumber })
       .sort({ createdAt: -1 })
       .populate("customerType.customerId")
-      .populate("searchItem.productId")
-      .populate("searchItem.variantId")
+      // The nested discount is populated so the edit form can tell whether an
+      // item's discount is the product's own (and therefore locked) rather
+      // than one the seller typed. Without it `discount` arrives as a bare
+      // ObjectId and the lock cannot be restored.
+      .populate({ path: "searchItem.productId", populate: { path: "discount" } })
+      .populate({ path: "searchItem.variantId", populate: { path: "discount" } })
       .populate("salesMen")
       .populate("discountGivenBy", "name email discountLimit")
       .populate("paymentMethod.singlePayment.paymentTo")

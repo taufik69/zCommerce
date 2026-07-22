@@ -41,6 +41,16 @@ const searchItemSchema = new mongoose.Schema(
 
     salesRate: { type: Number, default: 0, min: 0 },
     discount: { type: Number, default: 0, min: 0 },
+    // Whether `discount` is a flat taka amount off each unit or a percentage
+    // of the line. Without this the value is ambiguous on read: editing a sale
+    // could not tell 10% from ৳10 and had to assume one of them, silently
+    // changing the price. Defaults to "amount" so sales saved before this
+    // field existed keep the behaviour they were read with.
+    discountType: {
+      type: String,
+      enum: ["amount", "percent"],
+      default: "amount",
+    },
 
     subtotal: { type: Number, default: 0, min: 0 },
   },
